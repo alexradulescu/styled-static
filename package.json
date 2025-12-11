@@ -1,8 +1,12 @@
 {
-  "name": "@alexradulescu/styled-static",
+  "name": "@alex.radulescu/styled-static",
   "version": "0.2.0",
   "description": "Zero-runtime styled components for React 19+ with Vite. CSS extracted at build time.",
   "type": "module",
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
