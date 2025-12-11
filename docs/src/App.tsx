@@ -28,7 +28,6 @@ import {
   styled,
 } from "styled-static";
 import { CodeBlock } from "./sections/shared";
-import { CodeBlock } from "./sections/shared";
 
 // Lazy-loaded sections for code splitting
 const ApiSection = lazy(() =>
