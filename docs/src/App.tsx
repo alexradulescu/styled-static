@@ -1,10 +1,4 @@
-import {
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-  type ReactNode,
-} from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import {
   styled,
   css,
@@ -12,8 +6,11 @@ import {
   styledVariants,
   cssVariants,
   cx,
+  initTheme,
+  setTheme,
+  getTheme,
+  onSystemThemeChange,
 } from "styled-static";
-import { highlight } from "sugar-high";
 import {
   Globe,
   HeartCrack,
@@ -26,15 +23,23 @@ import {
   Zap,
   Lightbulb,
   Info,
-  Copy,
-  Check,
   Sun,
   Moon,
   Search,
   Github,
   Palette,
-  AlertTriangle,
 } from "lucide-react";
+import { CodeBlock } from "./sections/shared";
+
+// Lazy-loaded sections for code splitting
+const ApiSection = lazy(() =>
+  import("./sections/ApiSection").then((m) => ({ default: m.ApiSection }))
+);
+const FeaturesSection = lazy(() =>
+  import("./sections/FeaturesSection").then((m) => ({
+    default: m.FeaturesSection,
+  }))
+);
 
 // =============================================================================
 // Theme & Global Styles
@@ -57,6 +62,8 @@ const GlobalStyle = createGlobalStyle`
     --content-max-width: 720px;
     --radius: 8px;
     --transition: 0.2s ease;
+    --scrollbar-thumb: rgba(0, 0, 0, 0.15);
+    --scrollbar-thumb-hover: rgba(0, 0, 0, 0.25);
 
     /* Sugar High syntax highlighting (dark theme for code blocks) */
     --sh-class: #4ec9b0;
@@ -78,10 +85,37 @@ const GlobalStyle = createGlobalStyle`
     --color-border: #2a2a2a;
     --color-text: #e5e7eb;
     --color-text-secondary: #9ca3af;
+    --scrollbar-thumb: rgba(255, 255, 255, 0.15);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.25);
   }
 
   * {
     box-sizing: border-box;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+
+  /* Webkit scrollbar styling */
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 3px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: transparent;
   }
 
   html {
@@ -282,7 +316,7 @@ const Content = styled.div`
 `;
 
 // =============================================================================
-// Typography
+// Typography - Inline for Getting Started
 // =============================================================================
 
 const PageTitle = styled.h1`
@@ -313,13 +347,6 @@ const SectionTitle = styled.h2`
   letter-spacing: -0.01em;
 `;
 
-const SubsectionTitle = styled.h3`
-  font-size: 1.125rem;
-  font-weight: 600;
-  margin: 2rem 0 1rem;
-  color: var(--color-text);
-`;
-
 const Paragraph = styled.p`
   margin: 0 0 1rem;
   color: var(--color-text);
@@ -334,7 +361,7 @@ const InlineCode = styled.code`
 `;
 
 // =============================================================================
-// Code Block
+// Code Block (inline for Getting Started)
 // =============================================================================
 
 const CodeBlockWrapper = styled.div`
@@ -366,32 +393,12 @@ const CodeBlockContent = styled.pre`
   overflow-x: auto;
 `;
 
-const CopyButton = styled.button`
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
-  font-family: inherit;
-  color: #9ca3af;
-  background: transparent;
-  border: 1px solid #3a3a3a;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all var(--transition);
-
-  &:hover {
-    background: #3a3a3a;
-    color: white;
-  }
-`;
-
 // =============================================================================
-// Callout Component
+// Callout (inline for Getting Started)
 // =============================================================================
 
 const calloutStyles = cssVariants({
-  css: `
+  css: css`
     display: flex;
     gap: 0.75rem;
     padding: 1rem;
@@ -402,7 +409,7 @@ const calloutStyles = cssVariants({
   `,
   variants: {
     type: {
-      note: `
+      note: css`
         background: #eff6ff;
         border: 1px solid #bfdbfe;
         [data-theme="dark"] & {
@@ -410,7 +417,7 @@ const calloutStyles = cssVariants({
           border-color: #2563eb40;
         }
       `,
-      tip: `
+      tip: css`
         background: #f0fdf4;
         border: 1px solid #bbf7d0;
         [data-theme="dark"] & {
@@ -418,7 +425,7 @@ const calloutStyles = cssVariants({
           border-color: #10b98140;
         }
       `,
-      warning: `
+      warning: css`
         background: #fffbeb;
         border: 1px solid #fde68a;
         [data-theme="dark"] & {
@@ -440,118 +447,15 @@ const CalloutContent = styled.div`
 `;
 
 // =============================================================================
-// Demo Components
+// Loading Spinner
 // =============================================================================
 
-const DemoArea = styled.div`
-  padding: 1.5rem;
-  margin: 1.5rem 0;
-  background: var(--color-bg-sidebar);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-`;
-
-const DemoLabel = styled.div`
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 1rem;
-`;
-
-const ButtonGroup = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-`;
-
-// Demo button using styledVariants
-const Button = styledVariants({
-  component: "button",
-  css: `
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    font-family: inherit;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-
-    &:focus {
-      outline: none;
-      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3);
-    }
-
-    &:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-  `,
-  variants: {
-    variant: {
-      primary: `
-        background: var(--color-primary);
-        color: white;
-        &:hover:not(:disabled) { background: var(--color-primary-hover); }
-      `,
-      secondary: `
-        background: var(--color-border);
-        color: var(--color-text);
-        &:hover:not(:disabled) { background: var(--color-text-secondary); color: white; }
-      `,
-      ghost: `
-        background: transparent;
-        color: var(--color-text-secondary);
-        &:hover:not(:disabled) { background: var(--color-border); color: var(--color-text); }
-      `,
-    },
-    size: {
-      sm: `padding: 0.375rem 0.75rem; font-size: 0.8125rem;`,
-      md: `padding: 0.5rem 1rem; font-size: 0.875rem;`,
-      lg: `padding: 0.75rem 1.5rem; font-size: 1rem;`,
-    },
-  },
-});
-
-// Example styled components for demos
-const StyledButton = styled.button`
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  font-family: inherit;
-  background: var(--color-primary);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-
-  &:hover {
-    background: var(--color-primary-hover);
-  }
-`;
-
-const ExtendedButton = styled(StyledButton)`
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-`;
-
-const highlightClass = css`
-  box-shadow: 0 0 0 3px var(--color-primary);
-`;
-
-const Counter = styled.div`
+const LoadingWrapper = styled.div`
   display: flex;
   align-items: center;
-  gap: 1rem;
-  font-size: 1.5rem;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  justify-content: center;
+  padding: 4rem 2rem;
+  color: var(--color-text-secondary);
 `;
 
 // =============================================================================
@@ -615,6 +519,18 @@ const sections: SectionInfo[] = [
     keywords: ["cx", "classnames", "conditional", "join"],
   },
   {
+    id: "keyframes",
+    title: "keyframes",
+    group: "API",
+    keywords: ["keyframes", "animation", "spin", "pulse", "rotate"],
+  },
+  {
+    id: "attrs",
+    title: "attrs",
+    group: "API",
+    keywords: ["attrs", "attributes", "default", "type", "input"],
+  },
+  {
     id: "variants",
     title: "Variants API",
     group: "API",
@@ -644,109 +560,46 @@ const sections: SectionInfo[] = [
     group: "Features",
     keywords: ["nesting", "&", "hover", "pseudo"],
   },
+  {
+    id: "theming",
+    title: "Theming",
+    group: "Features",
+    keywords: ["theme", "dark", "light", "mode", "toggle", "custom"],
+  },
 ];
-
-// =============================================================================
-// Callout Component
-// =============================================================================
-
-function Callout({
-  type,
-  icon,
-  children,
-}: {
-  type: "note" | "tip" | "warning";
-  icon: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <div className={calloutStyles({ type })}>
-      <CalloutIcon>{icon}</CalloutIcon>
-      <CalloutContent>{children}</CalloutContent>
-    </div>
-  );
-}
-
-// =============================================================================
-// CodeBlock Component
-// =============================================================================
-
-function CodeBlock({
-  filename,
-  children,
-}: {
-  filename?: string;
-  children: string;
-}) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(children);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  // Sugar High returns HTML string with syntax highlighting
-  const highlightedCode = highlight(children);
-
-  return (
-    <CodeBlockWrapper>
-      {filename && (
-        <CodeBlockHeader>
-          <span>{filename}</span>
-          <CopyButton onClick={handleCopy}>
-            {copied ? (
-              <>
-                <Check size={14} /> Copied
-              </>
-            ) : (
-              <>
-                <Copy size={14} /> Copy
-              </>
-            )}
-          </CopyButton>
-        </CodeBlockHeader>
-      )}
-      <CodeBlockContent dangerouslySetInnerHTML={{ __html: highlightedCode }} />
-    </CodeBlockWrapper>
-  );
-}
 
 // =============================================================================
 // Main App
 // =============================================================================
 
 export function App() {
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    if (typeof window !== "undefined") {
-      return (
-        (localStorage.getItem("theme") as "light" | "dark") ||
-        (window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "dark"
-          : "light")
-      );
-    }
-    return "light";
+  const [theme, setThemeState] = useState<string>(() => {
+    // Initialize theme from localStorage or system preference
+    return initTheme({ useSystemPreference: true });
   });
   const [activeSection, setActiveSection] = useState("introduction");
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const [count, setCount] = useState(0);
-  const [isHighlighted, setIsHighlighted] = useState(false);
 
-  // Theme toggle
-  const toggleTheme = useCallback(() => {
-    setTheme((prev) => {
-      const next = prev === "light" ? "dark" : "light";
-      localStorage.setItem("theme", next);
-      return next;
+  // Theme toggle using styled-static helpers
+  const toggleTheme = () => {
+    const current = getTheme();
+    const next = current === "dark" ? "light" : "dark";
+    setTheme(next);
+    setThemeState(next);
+  };
+
+  // Subscribe to system theme changes
+  useEffect(() => {
+    return onSystemThemeChange((prefersDark) => {
+      // Only auto-switch if user hasn't manually set a preference
+      if (!localStorage.getItem("theme")) {
+        const next = prefersDark ? "dark" : "light";
+        setTheme(next, false);
+        setThemeState(next);
+      }
     });
   }, []);
-
-  // Apply theme to document
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-  }, [theme]);
 
   // Keyboard shortcut for search
   useEffect(() => {
@@ -764,9 +617,11 @@ export function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Scroll spy
+  // Scroll spy with MutationObserver to handle lazy-loaded sections
   useEffect(() => {
-    const observer = new IntersectionObserver(
+    const observedElements = new Set<Element>();
+
+    const intersectionObserver = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
@@ -777,24 +632,49 @@ export function App() {
       { rootMargin: "-20% 0px -70% 0px" }
     );
 
-    sections.forEach(({ id }) => {
-      const el = document.getElementById(id);
-      if (el) observer.observe(el);
+    // Function to observe any new sections that appear in the DOM
+    const observeSections = () => {
+      sections.forEach(({ id }) => {
+        const el = document.getElementById(id);
+        if (el && !observedElements.has(el)) {
+          intersectionObserver.observe(el);
+          observedElements.add(el);
+        }
+      });
+    };
+
+    // Initial observation
+    observeSections();
+
+    // Use MutationObserver to detect when lazy-loaded sections are added
+    const mutationObserver = new MutationObserver(() => {
+      observeSections();
     });
 
-    return () => observer.disconnect();
+    // Observe the document body for added nodes
+    mutationObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+
+    return () => {
+      intersectionObserver.disconnect();
+      mutationObserver.disconnect();
+    };
   }, []);
 
-  // Filter sections based on search
+  // Filter sections based on search query
   const filteredSections = searchQuery
     ? sections.filter(
         (s) =>
           s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          s.keywords.some((k) => k.includes(searchQuery.toLowerCase()))
+          s.keywords.some((k) =>
+            k.toLowerCase().includes(searchQuery.toLowerCase())
+          )
       )
     : sections;
 
-  // Group sections
+  // Group sections by their group
   const groupedSections = filteredSections.reduce((acc, section) => {
     const group = section.group || "Other";
     if (!acc[group]) acc[group] = [];
@@ -809,12 +689,12 @@ export function App() {
         <Sidebar>
           <SidebarHeader>
             <Logo href="#">
-              <Palette size={20} />
-              <span>styled-static</span>
+              <Palette size={24} />
+              styled-static
             </Logo>
             <SearchInput>
               <SearchIcon>
-                <Search size={14} />
+                <Search size={16} />
               </SearchIcon>
               <SearchField
                 ref={searchInputRef}
@@ -831,16 +711,14 @@ export function App() {
             {Object.entries(groupedSections).map(([group, items]) => (
               <NavGroup key={group}>
                 <NavGroupTitle>{group}</NavGroupTitle>
-                {items.map((section) => (
+                {items.map((item) => (
                   <NavItem
-                    key={section.id}
-                    href={`#${section.id}`}
-                    className={cx(
-                      activeSection === section.id && activeNavItem
-                    )}
+                    key={item.id}
+                    href={`#${item.id}`}
+                    className={activeSection === item.id ? activeNavItem : ""}
                     onClick={() => setSearchQuery("")}
                   >
-                    {section.title}
+                    {item.title}
                   </NavItem>
                 ))}
               </NavGroup>
@@ -852,25 +730,29 @@ export function App() {
               {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
               {theme === "light" ? "Dark" : "Light"}
             </ThemeToggle>
-            <a
-              href="https://github.com/alexradulescu/styled-static"
+            <NavItem
+              href="https://github.com/nicholascostadev/styled-static"
               target="_blank"
               rel="noopener noreferrer"
-              style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}
+              style={{ padding: "0.5rem" }}
             >
-              <Github size={16} />
-              GitHub
-            </a>
+              <Github size={20} />
+            </NavItem>
           </SidebarFooter>
         </Sidebar>
 
         <Main>
           <Content>
+            {/* Hero */}
             <PageTitle>styled-static</PageTitle>
             <PageSubtitle>
               Zero-runtime CSS-in-JS for React 19+ with Vite. Write
               styled-components syntax, get static CSS extracted at build time.
             </PageSubtitle>
+
+            {/* ========================================== */}
+            {/* GETTING STARTED - Inline (not lazy loaded) */}
+            {/* ========================================== */}
 
             {/* Quick Overview */}
             <Section id="quick-overview">
@@ -879,131 +761,98 @@ export function App() {
                 All the APIs you need at a glance. styled-static provides 6 core
                 functions that cover most CSS-in-JS use cases:
               </Paragraph>
+              <CodeBlock>{`// Style elements
+const Button = styled.button\`padding: 0.5rem 1rem;\`;
 
-              <SubsectionTitle>styled.element</SubsectionTitle>
-              <Paragraph>Style HTML elements with template literals:</Paragraph>
-              <CodeBlock>{`const Button = styled.button\`
-  padding: 0.5rem 1rem;
-  background: blue;
-  color: white;
-\`;`}</CodeBlock>
+// Extend components
+const Primary = styled(Button)\`font-weight: bold;\`;
 
-              <SubsectionTitle>styled(Component)</SubsectionTitle>
-              <Paragraph>Extend existing styled components:</Paragraph>
-              <CodeBlock>{`const PrimaryButton = styled(Button)\`
-  font-weight: bold;
-  background: darkblue;
-\`;`}</CodeBlock>
+// Get class string
+const active = css\`outline: 2px solid;\`;
 
-              <SubsectionTitle>css</SubsectionTitle>
-              <Paragraph>Get a scoped class name string:</Paragraph>
-              <CodeBlock>{`const activeClass = css\`
-  outline: 2px solid blue;
-\`;
+// Global styles
+const GlobalStyle = createGlobalStyle\`* { box-sizing: border-box; }\`;
 
-<Button className={isActive ? activeClass : ''}>Click</Button>`}</CodeBlock>
+// Scoped keyframes
+const spin = keyframes\`from { transform: rotate(0deg); } to { transform: rotate(360deg); }\`;
 
-              <SubsectionTitle>createGlobalStyle</SubsectionTitle>
-              <Paragraph>Define global (unscoped) styles:</Paragraph>
-              <CodeBlock>{`const GlobalStyle = createGlobalStyle\`
-  * { box-sizing: border-box; }
-  body { margin: 0; font-family: system-ui; }
-\`;
-
-<GlobalStyle /> // Render once at app root`}</CodeBlock>
-
-              <SubsectionTitle>styledVariants</SubsectionTitle>
-              <Paragraph>
-                Create components with type-safe variant props:
-              </Paragraph>
-              <CodeBlock>{`const Button = styledVariants({
+// Type-safe variants
+const Btn = styledVariants({
   component: 'button',
-  css: \`padding: 0.5rem 1rem; border-radius: 4px;\`,
-  variants: {
-    size: {
-      sm: \`font-size: 0.875rem;\`,
-      lg: \`font-size: 1.125rem;\`,
-    },
-  },
-});
-
-<Button size="lg">Large Button</Button>`}</CodeBlock>
-
-              <SubsectionTitle>cssVariants</SubsectionTitle>
-              <Paragraph>Get variant class strings for any element:</Paragraph>
-              <CodeBlock>{`const badgeCss = cssVariants({
-  css: \`padding: 0.25rem 0.5rem; border-radius: 4px;\`,
-  variants: {
-    color: {
-      blue: \`background: #e0f2fe; color: #0369a1;\`,
-      green: \`background: #dcfce7; color: #166534;\`,
-    },
-  },
-});
-
-<span className={badgeCss({ color: 'blue' })}>Info</span>`}</CodeBlock>
-
-              <DemoArea>
-                <DemoLabel>Interactive Demo</DemoLabel>
-                <Counter>
-                  <Button
-                    variant="secondary"
-                    size="md"
-                    onClick={() => setCount((c) => c - 1)}
-                  >
-                    −
-                  </Button>
-                  <span>{count}</span>
-                  <Button
-                    variant="primary"
-                    size="md"
-                    onClick={() => setCount((c) => c + 1)}
-                  >
-                    +
-                  </Button>
-                </Counter>
-              </DemoArea>
+  css: css\`padding: 0.5rem;\`,
+  variants: { size: { sm: css\`font-size: 0.875rem;\`, lg: css\`font-size: 1.125rem;\` } }
+});`}</CodeBlock>
             </Section>
 
             {/* Why styled-static? */}
             <Section id="why">
               <SectionTitle>Why styled-static?</SectionTitle>
 
-              <Callout type="tip" icon={<Globe size={20} />}>
-                <strong>CSS & browsers have evolved.</strong> Native CSS
-                nesting, CSS variables, container queries, and fewer vendor
-                prefixes mean the gap between CSS and CSS-in-JS has never been
-                smaller.
-              </Callout>
+              <div className={calloutStyles({ type: "tip" })}>
+                <CalloutIcon>
+                  <Globe size={20} />
+                </CalloutIcon>
+                <CalloutContent>
+                  <strong>CSS & browsers have evolved.</strong> Native CSS
+                  nesting, CSS variables, container queries, and fewer vendor
+                  prefixes mean the gap between CSS and CSS-in-JS has never been
+                  smaller.
+                </CalloutContent>
+              </div>
 
-              <Callout type="note" icon={<HeartCrack size={20} />}>
-                <strong>CSS-in-JS fatigue is real.</strong> Most libraries are
-                now obsolete, overly complex, or have large runtime overhead.
-                The ecosystem needs simpler solutions.
-              </Callout>
+              <div className={calloutStyles({ type: "note" })}>
+                <CalloutIcon>
+                  <HeartCrack size={20} />
+                </CalloutIcon>
+                <CalloutContent>
+                  <strong>CSS-in-JS fatigue is real.</strong> Most libraries are
+                  now obsolete, overly complex, or have large runtime overhead.
+                  The ecosystem needs simpler solutions.
+                </CalloutContent>
+              </div>
 
-              <Callout type="tip" icon={<Sparkles size={20} />}>
-                <strong>Syntactic sugar over CSS modules.</strong> Most projects
-                don't need runtime interpolation. They need a better DX for
-                writing and organizing CSS.
-              </Callout>
+              <div className={calloutStyles({ type: "tip" })}>
+                <CalloutIcon>
+                  <Sparkles size={20} />
+                </CalloutIcon>
+                <CalloutContent>
+                  <strong>Syntactic sugar over CSS modules.</strong> Most
+                  projects don't need runtime interpolation. They need a better
+                  DX for writing and organizing CSS.
+                </CalloutContent>
+              </div>
 
-              <Callout type="warning" icon={<Shield size={20} />}>
-                <strong>Supply chain security matters.</strong> Zero
-                dependencies means a minimal attack surface. No transitive
-                dependencies to audit or worry about.
-              </Callout>
+              <div className={calloutStyles({ type: "warning" })}>
+                <CalloutIcon>
+                  <Shield size={20} />
+                </CalloutIcon>
+                <CalloutContent>
+                  <strong>Supply chain security matters.</strong> Zero
+                  dependencies means a minimal attack surface. No transitive
+                  dependencies to audit or worry about.
+                </CalloutContent>
+              </div>
 
-              <Callout type="tip" icon={<Target size={20} />}>
-                <strong>Intentionally simple.</strong> 95% native browser
-                foundation + 5% sprinkles on top. We leverage what browsers
-                already do well.
-              </Callout>
+              <div className={calloutStyles({ type: "tip" })}>
+                <CalloutIcon>
+                  <Target size={20} />
+                </CalloutIcon>
+                <CalloutContent>
+                  <strong>Intentionally simple.</strong> 95% native browser
+                  foundation + 5% sprinkles on top. We leverage what browsers
+                  already do well.
+                </CalloutContent>
+              </div>
 
-              <Callout type="note" icon={<PartyPopper size={20} />}>
-                <strong>Built for fun.</strong> Sometimes the best projects come
-                from curiosity and the joy of building something useful.
-              </Callout>
+              <div className={calloutStyles({ type: "note" })}>
+                <CalloutIcon>
+                  <PartyPopper size={20} />
+                </CalloutIcon>
+                <CalloutContent>
+                  <strong>Built for fun.</strong> Sometimes the best projects
+                  come from curiosity and the joy of building something useful.
+                </CalloutContent>
+              </div>
             </Section>
 
             {/* What We Don't Do */}
@@ -1014,32 +863,52 @@ export function App() {
                 support—and why:
               </Paragraph>
 
-              <Callout type="warning" icon={<Ban size={20} />}>
-                <strong>No runtime interpolation.</strong> You can't write{" "}
-                <InlineCode>{`\${props => props.color}`}</InlineCode>. CSS is
-                extracted at build time, so values must be static. Use CSS
-                variables, data attributes, or the Variants API for dynamic
-                styles.
-              </Callout>
+              <div className={calloutStyles({ type: "warning" })}>
+                <CalloutIcon>
+                  <Ban size={20} />
+                </CalloutIcon>
+                <CalloutContent>
+                  <strong>No runtime interpolation.</strong> You can't write{" "}
+                  <InlineCode>{`\${props => props.color}`}</InlineCode>. CSS is
+                  extracted at build time, so values must be static. Use CSS
+                  variables, data attributes, or the Variants API for dynamic
+                  styles.
+                </CalloutContent>
+              </div>
 
-              <Callout type="note" icon={<Atom size={20} />}>
-                <strong>React 19+ only.</strong> We rely on automatic ref
-                forwarding instead of <InlineCode>forwardRef</InlineCode>. This
-                keeps the runtime tiny but requires React 19.
-              </Callout>
+              <div className={calloutStyles({ type: "note" })}>
+                <CalloutIcon>
+                  <Atom size={20} />
+                </CalloutIcon>
+                <CalloutContent>
+                  <strong>React 19+ only.</strong> We rely on automatic ref
+                  forwarding instead of <InlineCode>forwardRef</InlineCode>.
+                  This keeps the runtime tiny but requires React 19.
+                </CalloutContent>
+              </div>
 
-              <Callout type="note" icon={<Zap size={20} />}>
-                <strong>Vite only.</strong> The plugin uses Vite's built-in AST
-                parser and virtual module system. No Webpack, Rollup, or other
-                bundler support.
-              </Callout>
+              <div className={calloutStyles({ type: "note" })}>
+                <CalloutIcon>
+                  <Zap size={20} />
+                </CalloutIcon>
+                <CalloutContent>
+                  <strong>Vite only.</strong> The plugin uses Vite's built-in
+                  AST parser and virtual module system. No Webpack, Rollup, or
+                  other bundler support.
+                </CalloutContent>
+              </div>
 
-              <Callout type="tip" icon={<Lightbulb size={20} />}>
-                <strong>Why these constraints?</strong> Each limitation removes
-                complexity. No runtime interpolation means no runtime CSS
-                parsing. React 19 means no forwardRef wrapper. Vite-only means
-                one excellent integration instead of many mediocre ones.
-              </Callout>
+              <div className={calloutStyles({ type: "tip" })}>
+                <CalloutIcon>
+                  <Lightbulb size={20} />
+                </CalloutIcon>
+                <CalloutContent>
+                  <strong>Why these constraints?</strong> Each limitation
+                  removes complexity. No runtime interpolation means no runtime
+                  CSS parsing. React 19 means no forwardRef wrapper. Vite-only
+                  means one excellent integration instead of many mediocre ones.
+                </CalloutContent>
+              </div>
             </Section>
 
             {/* Installation */}
@@ -1059,330 +928,36 @@ import { styledStatic } from 'styled-static/vite';
 export default defineConfig({
   plugins: [styledStatic(), react()],
 });`}</CodeBlock>
-              <Callout type="note" icon={<Info size={20} />}>
-                The plugin must be placed <strong>before</strong> the React
-                plugin in the plugins array.
-              </Callout>
+              <div className={calloutStyles({ type: "note" })}>
+                <CalloutIcon>
+                  <Info size={20} />
+                </CalloutIcon>
+                <CalloutContent>
+                  The plugin must be placed <strong>before</strong> the React
+                  plugin in the plugins array.
+                </CalloutContent>
+              </div>
             </Section>
 
-            {/* styled */}
-            <Section id="styled">
-              <SectionTitle>styled</SectionTitle>
-              <Paragraph>
-                Create styled components using template literals. All HTML
-                elements are available as methods on the{" "}
-                <InlineCode>styled</InlineCode> object.
-              </Paragraph>
-              <CodeBlock filename="Button.tsx">{`import { styled } from 'styled-static';
+            {/* ========================================== */}
+            {/* API SECTION - Lazy loaded */}
+            {/* ========================================== */}
+            <Suspense
+              fallback={<LoadingWrapper>Loading API docs...</LoadingWrapper>}
+            >
+              <ApiSection />
+            </Suspense>
 
-const Button = styled.button\`
-  padding: 0.5rem 1rem;
-  background: #10b981;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-
-  &:hover {
-    background: #059669;
-  }
-\`;
-
-// Usage
-<Button>Click me</Button>`}</CodeBlock>
-              <DemoArea>
-                <DemoLabel>Result</DemoLabel>
-                <StyledButton>Click me</StyledButton>
-              </DemoArea>
-            </Section>
-
-            {/* Extension */}
-            <Section id="extension">
-              <SectionTitle>Component Extension</SectionTitle>
-              <Paragraph>
-                Extend existing styled components by passing them to{" "}
-                <InlineCode>styled()</InlineCode>. The new component inherits
-                all styles from the base.
-              </Paragraph>
-              <CodeBlock filename="ExtendedButton.tsx">{`const Button = styled.button\`
-  padding: 0.5rem 1rem;
-  background: #10b981;
-  color: white;
-\`;
-
-const BoldButton = styled(Button)\`
-  font-weight: 600;
-  text-transform: uppercase;
-\`;`}</CodeBlock>
-              <DemoArea>
-                <DemoLabel>Result</DemoLabel>
-                <ButtonGroup>
-                  <StyledButton>Base Button</StyledButton>
-                  <ExtendedButton>Extended Button</ExtendedButton>
-                </ButtonGroup>
-              </DemoArea>
-            </Section>
-
-            {/* css */}
-            <Section id="css">
-              <SectionTitle>css Helper</SectionTitle>
-              <Paragraph>
-                The <InlineCode>css</InlineCode> helper returns a scoped class
-                name string. Use it for conditional styles or to mix with styled
-                components.
-              </Paragraph>
-              <CodeBlock>{`import { css } from 'styled-static';
-
-const highlightClass = css\`
-  box-shadow: 0 0 0 3px #10b981;
-\`;
-
-// Apply conditionally
-<button className={isActive ? highlightClass : ''}>
-  Click me
-</button>`}</CodeBlock>
-              <DemoArea>
-                <DemoLabel>Result</DemoLabel>
-                <ButtonGroup>
-                  <StyledButton
-                    className={cx(isHighlighted && highlightClass)}
-                    onClick={() => setIsHighlighted(!isHighlighted)}
-                  >
-                    {isHighlighted
-                      ? "Highlighted! Click to remove"
-                      : "Click to highlight"}
-                  </StyledButton>
-                </ButtonGroup>
-              </DemoArea>
-            </Section>
-
-            {/* cx */}
-            <Section id="cx">
-              <SectionTitle>cx Utility</SectionTitle>
-              <Paragraph>
-                A minimal (~40 byte) utility for conditionally joining class
-                names. Filters out falsy values automatically.
-              </Paragraph>
-              <CodeBlock>{`import { cx } from 'styled-static';
-
-// Multiple class names
-cx('base', 'active')           // → 'base active'
-
-// Conditional classes
-cx('btn', isActive && 'active') // → 'btn active' or 'btn'
-
-// With css helper
-const activeClass = css\`color: blue;\`;
-cx('btn', isActive && activeClass)
-
-// Falsy values are filtered
-cx('a', null, undefined, false, 'b') // → 'a b'`}</CodeBlock>
-            </Section>
-
-            {/* Variants */}
-            <Section id="variants">
-              <SectionTitle>Variants API</SectionTitle>
-              <Paragraph>
-                For type-safe variant handling, use{" "}
-                <InlineCode>styledVariants</InlineCode> to create components
-                with variant props, or <InlineCode>cssVariants</InlineCode> to
-                get class functions.
-              </Paragraph>
-              <SubsectionTitle>styledVariants</SubsectionTitle>
-              <CodeBlock>{`import { styledVariants } from 'styled-static';
-
-const Button = styledVariants({
-  component: 'button',
-  css: \`padding: 0.5rem 1rem; border-radius: 6px;\`,
-  variants: {
-    variant: {
-      primary: \`background: #10b981; color: white;\`,
-      secondary: \`background: #e5e7eb; color: #1a1a1a;\`,
-    },
-    size: {
-      sm: \`font-size: 0.875rem;\`,
-      lg: \`font-size: 1.125rem;\`,
-    },
-  },
-});
-
-// Usage with type-safe props
-<Button variant="primary" size="lg">Click</Button>`}</CodeBlock>
-              <DemoArea>
-                <DemoLabel>Result</DemoLabel>
-                <ButtonGroup>
-                  <Button variant="primary" size="sm">
-                    Primary SM
-                  </Button>
-                  <Button variant="primary" size="md">
-                    Primary MD
-                  </Button>
-                  <Button variant="primary" size="lg">
-                    Primary LG
-                  </Button>
-                  <Button variant="secondary" size="md">
-                    Secondary
-                  </Button>
-                  <Button variant="ghost" size="md">
-                    Ghost
-                  </Button>
-                </ButtonGroup>
-              </DemoArea>
-
-              <SubsectionTitle>cssVariants</SubsectionTitle>
-              <CodeBlock>{`import { cssVariants } from 'styled-static';
-
-const badgeCss = cssVariants({
-  css: \`padding: 0.25rem 0.5rem; border-radius: 4px;\`,
-  variants: {
-    color: {
-      info: \`background: #eff6ff; color: #1d4ed8;\`,
-      success: \`background: #f0fdf4; color: #166534;\`,
-    },
-  },
-});
-
-// Returns class string
-<span className={badgeCss({ color: 'success' })}>
-  Success
-</span>`}</CodeBlock>
-            </Section>
-
-            {/* Global Styles */}
-            <Section id="global">
-              <SectionTitle>Global Styles</SectionTitle>
-              <Paragraph>
-                Use <InlineCode>createGlobalStyle</InlineCode> for global CSS
-                like resets, CSS variables, or base styles.
-              </Paragraph>
-              <CodeBlock>{`import { createGlobalStyle } from 'styled-static';
-
-const GlobalStyle = createGlobalStyle\`
-  :root {
-    --color-primary: #10b981;
-    --color-text: #1a1a1a;
-  }
-
-  * {
-    box-sizing: border-box;
-  }
-
-  body {
-    margin: 0;
-    font-family: system-ui, sans-serif;
-    color: var(--color-text);
-  }
-\`;
-
-// Render once at app root
-<GlobalStyle />
-<App />`}</CodeBlock>
-              <Callout type="note" icon={<Info size={20} />}>
-                The component renders nothing at runtime. All CSS is extracted
-                and injected via imports.
-              </Callout>
-            </Section>
-
-            {/* as prop */}
-            <Section id="as-prop">
-              <SectionTitle>Polymorphic as Prop</SectionTitle>
-              <Paragraph>
-                Change the rendered element using the{" "}
-                <InlineCode>as</InlineCode> prop. Useful for semantic HTML or
-                accessibility.
-              </Paragraph>
-              <CodeBlock>{`const Button = styled.button\`
-  padding: 0.5rem 1rem;
-  background: #10b981;
-  color: white;
-\`;
-
-// Render as anchor
-<Button as="a" href="/link">
-  I'm a link!
-</Button>
-
-// Render as span
-<Button as="span">
-  I'm a span!
-</Button>`}</CodeBlock>
-              <DemoArea>
-                <DemoLabel>Result</DemoLabel>
-                <ButtonGroup>
-                  <StyledButton>Button</StyledButton>
-                  {/* @ts-expect-error - polymorphic typing limitation */}
-                  <StyledButton as="a" href="#as-prop">
-                    Anchor
-                  </StyledButton>
-                  <StyledButton as="span">Span</StyledButton>
-                </ButtonGroup>
-              </DemoArea>
-            </Section>
-
-            {/* Transient Props */}
-            <Section id="transient">
-              <SectionTitle>Transient Props</SectionTitle>
-              <Paragraph>
-                Props prefixed with <InlineCode>$</InlineCode> are filtered out
-                before reaching the DOM. Use them to pass data to your component
-                logic without polluting HTML attributes.
-              </Paragraph>
-              <CodeBlock>{`const Button = styled.button\`
-  padding: 0.5rem 1rem;
-\`;
-
-// $variant won't appear in the DOM
-<Button $variant="primary" $size="large">
-  Click me
-</Button>
-
-// Rendered HTML:
-<button class="ss-abc123">Click me</button>`}</CodeBlock>
-              <Callout type="warning" icon={<AlertTriangle size={20} />}>
-                Transient props are for DOM filtering only. For dynamic CSS
-                based on props, use the Variants API instead.
-              </Callout>
-            </Section>
-
-            {/* CSS Nesting */}
-            <Section id="nesting">
-              <SectionTitle>CSS Nesting</SectionTitle>
-              <Paragraph>
-                styled-static uses native CSS nesting (supported in all modern
-                browsers). Use
-                <InlineCode>&</InlineCode> to reference the parent selector.
-              </Paragraph>
-              <CodeBlock>{`const Card = styled.div\`
-  padding: 1rem;
-  background: white;
-  border-radius: 8px;
-
-  /* Pseudo-classes */
-  &:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  }
-
-  /* Child selectors */
-  & h2 {
-    margin: 0 0 0.5rem;
-  }
-
-  /* Media queries */
-  @media (max-width: 640px) {
-    padding: 0.5rem;
-  }
-
-  /* Pseudo-elements */
-  &::before {
-    content: '';
-    position: absolute;
-  }
-\`;`}</CodeBlock>
-              <Callout type="tip" icon={<Lightbulb size={20} />}>
-                Native CSS nesting means zero build-time processing. Your CSS is
-                passed directly to the browser.
-              </Callout>
-            </Section>
+            {/* ========================================== */}
+            {/* FEATURES SECTION - Lazy loaded */}
+            {/* ========================================== */}
+            <Suspense
+              fallback={
+                <LoadingWrapper>Loading Features docs...</LoadingWrapper>
+              }
+            >
+              <FeaturesSection theme={theme} toggleTheme={toggleTheme} />
+            </Suspense>
           </Content>
         </Main>
       </Layout>

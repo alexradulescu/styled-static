@@ -17,14 +17,73 @@ import { createElement, type ComponentType, type JSX } from "react";
 type HTMLTag = keyof JSX.IntrinsicElements;
 
 /**
+ * Dangerous HTML elements that should not be used with the `as` prop.
+ * These elements can execute scripts, embed external content, or inject styles.
+ *
+ * SECURITY: Defense-in-depth to prevent XSS via polymorphic rendering.
+ * While the developer controls the code, this prevents accidental misuse
+ * where user input might flow into the `as` prop.
+ */
+const DANGEROUS_ELEMENTS = new Set([
+  "script",
+  "iframe",
+  "object",
+  "embed",
+  "style",
+  "link",
+  "meta",
+  "base",
+  "noscript",
+  "template",
+]);
+
+/**
+ * Validates that an element is safe to render.
+ * Returns the safe tag, or falls back to the default if dangerous.
+ */
+function validateAsTag(as: unknown, defaultTag: string): string {
+  if (typeof as !== "string") {
+    return defaultTag;
+  }
+  const normalized = as.toLowerCase();
+  if (DANGEROUS_ELEMENTS.has(normalized)) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        `[styled-static] Blocked dangerous element "${as}" in "as" prop. ` +
+          `Falling back to "${defaultTag}".`
+      );
+    }
+    return defaultTag;
+  }
+  return as;
+}
+
+/**
+ * Sanitizes a variant value to prevent CSS class injection attacks.
+ * Only allows alphanumeric characters and hyphens.
+ *
+ * SECURITY: User-controlled variant props could inject arbitrary classes
+ * (e.g., color="primary malicious-class") which could override security-sensitive
+ * styles or enable CSS-based data exfiltration attacks.
+ */
+function sanitizeVariantValue(value: unknown): string | null {
+  const str = String(value);
+  const sanitized = str.replace(/[^a-zA-Z0-9-]/g, "");
+  return sanitized.length > 0 ? sanitized : null;
+}
+
+/**
  * Filters out transient props (those starting with $).
  * This prevents React warnings about invalid DOM attributes.
+ *
+ * SECURITY: Uses Object.keys() instead of for...in to prevent prototype
+ * pollution attacks where Object.prototype properties could be copied to DOM elements.
  */
 function filterTransientProps(
   props: Record<string, unknown>
 ): Record<string, unknown> {
   const filtered: Record<string, unknown> = {};
-  for (const key in props) {
+  for (const key of Object.keys(props)) {
     if (key[0] !== "$") {
       filtered[key] = props[key];
     }
@@ -59,7 +118,10 @@ export function __styled<T extends HTMLTag>(
   displayName?: string
 ): ComponentType<any> {
   const Component = (props: any) => {
-    const { as: As = tag, className: userClass, ...rest } = props;
+    const { as: asProp, className: userClass, ...rest } = props;
+
+    // SECURITY: Validate `as` prop to prevent rendering dangerous elements
+    const As = validateAsTag(asProp, tag);
 
     const domProps = filterTransientProps(rest);
     domProps.className = mergeClassNames(className, userClass);
@@ -149,14 +211,20 @@ export function __styledVariants<T extends HTMLTag>(
   displayName?: string
 ): ComponentType<any> {
   const Component = (props: any) => {
-    const { as: As = tag, className: userClass, ...rest } = props;
+    const { as: asProp, className: userClass, ...rest } = props;
 
-    // Build variant classes
+    // SECURITY: Validate `as` prop to prevent rendering dangerous elements
+    const As = validateAsTag(asProp, tag);
+
+    // Build variant classes with sanitized values
     const classes = [baseClass];
     for (const key of variantKeys) {
       const value = rest[key];
       if (value != null) {
-        classes.push(`${baseClass}--${key}-${value}`);
+        const sanitized = sanitizeVariantValue(value);
+        if (sanitized) {
+          classes.push(`${baseClass}--${key}-${sanitized}`);
+        }
         delete rest[key]; // Remove variant prop from DOM
       }
     }
@@ -191,12 +259,15 @@ export function __styledVariantsExtend<P extends { className?: string }>(
   const Component = (props: any) => {
     const { className: userClass, ...rest } = props;
 
-    // Build variant classes
+    // Build variant classes with sanitized values
     const classes = [baseClass];
     for (const key of variantKeys) {
       const value = rest[key];
       if (value != null) {
-        classes.push(`${baseClass}--${key}-${value}`);
+        const sanitized = sanitizeVariantValue(value);
+        if (sanitized) {
+          classes.push(`${baseClass}--${key}-${sanitized}`);
+        }
         delete rest[key]; // Remove variant prop from DOM
       }
     }
@@ -236,7 +307,10 @@ export function __cssVariants(
       for (const key of variantKeys) {
         const value = variants[key];
         if (value != null) {
-          classes.push(`${baseClass}--${key}-${value}`);
+          const sanitized = sanitizeVariantValue(value);
+          if (sanitized) {
+            classes.push(`${baseClass}--${key}-${sanitized}`);
+          }
         }
       }
     }

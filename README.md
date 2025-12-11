@@ -5,6 +5,7 @@ It documents styled-static - a zero-runtime CSS-in-JS library for React 19+
 with Vite.
 
 Key APIs: styled, css, createGlobalStyle, styledVariants, cssVariants, cx
+Theme helpers: initTheme, setTheme, getTheme, onSystemThemeChange
 Runtime: ~300 bytes | Dependencies: 0 | React 19+ required | Vite only
 
 For implementation details, see CLAUDE.md or the source files in src/
@@ -22,6 +23,7 @@ Zero-runtime CSS-in-JS for React 19+ with Vite. Write styled-components syntax, 
 - 🎨 **Familiar API** - styled-components syntax you already know
 - 📦 **Tiny** - ~300 bytes runtime for `as` prop and transient props support
 - 🔧 **Zero Dependencies** - Uses native CSS features and Vite's built-in tools
+- 🌓 **Theme Helpers** - Simple utilities for dark mode and custom themes
 
 ---
 
@@ -36,77 +38,64 @@ Style HTML elements with template literals:
 ```tsx
 const Button = styled.button`
   padding: 0.5rem 1rem;
-  background: blue;
-  color: white;
+  ...
 `;
-```
 
-### styled(Component)
-
-Extend existing styled components:
-
-```tsx
 const PrimaryButton = styled(Button)`
   font-weight: bold;
-  background: darkblue;
+  ...
 `;
-```
 
-### css
-
-Get a scoped class name string:
-
-```tsx
 const activeClass = css`
   outline: 2px solid blue;
+  ...
 `;
 
 <Button className={isActive ? activeClass : ""}>Click</Button>;
-```
 
-### createGlobalStyle
-
-Define global (unscoped) styles:
-
-```tsx
 const GlobalStyle = createGlobalStyle`
   * { box-sizing: border-box; }
   body { margin: 0; font-family: system-ui; }
 `;
 
 <GlobalStyle />; // Render once at app root
-```
 
-### styledVariants
-
-Create components with type-safe variant props:
-
-```tsx
+// With css`` for IDE syntax highlighting (recommended)
 const Button = styledVariants({
   component: "button",
-  css: `padding: 0.5rem 1rem; border-radius: 4px;`,
+  css: css`
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+  `,
   variants: {
     size: {
-      sm: `font-size: 0.875rem;`,
-      lg: `font-size: 1.125rem;`,
+      sm: css`
+        font-size: 0.875rem;
+      `,
+      lg: css`
+        font-size: 1.125rem;
+      `,
     },
   },
 });
 
 <Button size="lg">Large Button</Button>;
-```
 
-### cssVariants
-
-Get variant class strings for any element:
-
-```tsx
 const badgeCss = cssVariants({
-  css: `padding: 0.25rem 0.5rem; border-radius: 4px;`,
+  css: css`
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+  `,
   variants: {
     color: {
-      blue: `background: #e0f2fe; color: #0369a1;`,
-      green: `background: #dcfce7; color: #166534;`,
+      blue: css`
+        background: #e0f2fe;
+        color: #0369a1;
+      `,
+      green: css`
+        background: #dcfce7;
+        color: #166534;
+      `,
     },
   },
 });
@@ -258,6 +247,96 @@ const highlightClass = css`
 </div>
 ```
 
+### keyframes
+
+Create scoped keyframe animations. The animation name is hashed to avoid conflicts between components:
+
+```tsx
+import { styled, keyframes } from "styled-static";
+
+const spin = keyframes`
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+`;
+
+const pulse = keyframes`
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+`;
+
+const Spinner = styled.div`
+  width: 24px;
+  height: 24px;
+  border: 2px solid #3b82f6;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: ${spin} 1s linear infinite;
+`;
+
+const PulsingDot = styled.div`
+  width: 8px;
+  height: 8px;
+  background: #10b981;
+  border-radius: 50%;
+  animation: ${pulse} 2s ease-in-out infinite;
+`;
+```
+
+**How it works:**
+
+- At build time, keyframes CSS is extracted to a static file
+- The animation name is hashed (e.g., `ss-abc123`)
+- References in styled components are replaced with the hashed name
+
+```css
+/* Generated CSS */
+@keyframes ss-abc123 {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+.ss-xyz789 {
+  animation: ss-abc123 1s linear infinite;
+}
+```
+
+### attrs
+
+Set default HTML attributes on styled components using the `.attrs()` method:
+
+```tsx
+import { styled } from 'styled-static';
+
+// Set default type for input
+const PasswordInput = styled.input.attrs({ type: 'password' })`
+  padding: 0.5rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+`;
+
+// Set multiple default attributes
+const SubmitButton = styled.button.attrs({
+  type: 'submit',
+  'aria-label': 'Submit form',
+})`
+  padding: 0.5rem 1rem;
+  background: #3b82f6;
+  color: white;
+`;
+
+// Usage - default attrs are applied, can be overridden
+<PasswordInput placeholder="Enter password" />
+// Renders: <input type="password" placeholder="Enter password" class="ss-abc123" />
+
+<SubmitButton>Send</SubmitButton>
+// Renders: <button type="submit" aria-label="Submit form" class="ss-xyz789">Send</button>
+```
+
+> **Note:** Unlike styled-components, attrs in styled-static must be static objects (no functions). For dynamic attributes, use regular props on your component.
+
 ### cx Utility
 
 Combine class names conditionally with the minimal `cx` utility (~40 bytes):
@@ -319,14 +398,17 @@ createRoot(document.getElementById("root")!).render(
 
 For type-safe variant handling, use `styledVariants` to create components with variant props, or `cssVariants` to get class functions.
 
+> **Tip:** Wrap CSS strings in `css\`...\`` to get IDE syntax highlighting from the styled-components VSCode extension.
+
 #### styledVariants
 
 ```tsx
-import { styledVariants } from "styled-static";
+import { styledVariants, css } from "styled-static";
 
+// With css`` for syntax highlighting (recommended)
 const Button = styledVariants({
   component: "button",
-  css: `
+  css: css`
     padding: 0.5rem 1rem;
     border: none;
     border-radius: 4px;
@@ -334,15 +416,41 @@ const Button = styledVariants({
   `,
   variants: {
     color: {
-      primary: `background: blue; color: white;`,
-      danger: `background: red; color: white;`,
-      success: `background: green; color: white;`,
+      primary: css`
+        background: blue;
+        color: white;
+      `,
+      danger: css`
+        background: red;
+        color: white;
+      `,
+      success: css`
+        background: green;
+        color: white;
+      `,
     },
     size: {
-      sm: `font-size: 0.875rem; padding: 0.25rem 0.5rem;`,
-      md: `font-size: 1rem;`,
-      lg: `font-size: 1.125rem; padding: 0.75rem 1.5rem;`,
+      sm: css`
+        font-size: 0.875rem;
+        padding: 0.25rem 0.5rem;
+      `,
+      md: css`
+        font-size: 1rem;
+      `,
+      lg: css`
+        font-size: 1.125rem;
+        padding: 0.75rem 1.5rem;
+      `,
     },
+  },
+});
+
+// Plain strings also work (no highlighting)
+const SimpleButton = styledVariants({
+  component: "button",
+  css: `padding: 0.5rem;`,
+  variants: {
+    size: { sm: `font-size: 0.875rem;` },
   },
 });
 
@@ -356,19 +464,20 @@ const Button = styledVariants({
 #### cssVariants
 
 ```tsx
-import { cssVariants } from 'styled-static';
+import { cssVariants, css, cx } from 'styled-static';
 
+// With css`` for syntax highlighting (recommended)
 const badgeCss = cssVariants({
-  css: `
+  css: css`
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
     font-size: 0.75rem;
   `,
   variants: {
     variant: {
-      info: `background: #e0f2fe; color: #0369a1;`,
-      success: `background: #dcfce7; color: #166534;`,
-      warning: `background: #fef3c7; color: #92400e;`,
+      info: css`background: #e0f2fe; color: #0369a1;`,
+      success: css`background: #dcfce7; color: #166534;`,
+      warning: css`background: #fef3c7; color: #92400e;`,
     },
   },
 });
@@ -467,7 +576,37 @@ const Card = styled.div`
 
 Since CSS is extracted at build time, you cannot use runtime interpolations like `${props => props.color}`. Instead, use these patterns:
 
-### 1. Class Toggling with cx
+### 1. Variants API (Recommended)
+
+For type-safe variant handling, use `styledVariants` or `cssVariants`:
+
+```tsx
+import { styledVariants, css } from "styled-static";
+
+const Button = styledVariants({
+  component: "button",
+  css: css`
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+  `,
+  variants: {
+    color: {
+      primary: css`background: blue; color: white;`,
+      danger: css`background: red; color: white;`,
+      success: css`background: green; color: white;`,
+    },
+  },
+});
+
+// Usage - variant props are type-safe
+<Button color="primary">Click</Button>
+<Button color="danger">Delete</Button>
+```
+
+See the [Variants API](#variants-api) section for full documentation.
+
+### 2. Class Toggling with cx
 
 ```tsx
 import { styled, css, cx } from "styled-static";
@@ -488,7 +627,7 @@ const Button = styled.button`
 <Button className={cx(isPrimary ? primaryClass : dangerClass)}>Click</Button>;
 ```
 
-### 2. Data Attributes
+### 3. Data Attributes
 
 ```tsx
 const Button = styled.button`
@@ -509,7 +648,7 @@ const Button = styled.button`
 <Button data-variant={variant}>Click</Button>;
 ```
 
-### 3. CSS Variables
+### 4. CSS Variables
 
 ```tsx
 const Button = styled.button`
@@ -521,9 +660,172 @@ const Button = styled.button`
 <Button style={{ "--btn-bg": color, "--btn-color": textColor }}>Click</Button>;
 ```
 
-### 4. Variants API (Recommended)
+---
 
-For type-safe variant handling, use `styledVariants` or `cssVariants` as shown above.
+## Theming
+
+styled-static provides a simple, CSS-first approach to theming using CSS variables and `data-theme` attributes. No runtime overhead—just pure CSS.
+
+### Defining Themes
+
+Use `createGlobalStyle` to define your theme tokens:
+
+```tsx
+import { createGlobalStyle, styled } from "styled-static";
+
+const GlobalStyle = createGlobalStyle`
+  :root, [data-theme="light"] {
+    --color-bg: #ffffff;
+    --color-text: #1a1a1a;
+    --color-primary: #3b82f6;
+    --color-accent: #8b5cf6;
+  }
+  
+  [data-theme="dark"] {
+    --color-bg: #0f172a;
+    --color-text: #f1f5f9;
+    --color-primary: #60a5fa;
+    --color-accent: #a78bfa;
+  }
+  
+  /* Custom themes */
+  [data-theme="pokemon"] {
+    --color-bg: #ffcb05;
+    --color-text: #2a75bb;
+    --color-primary: #cc0000;
+    --color-accent: #3d7dca;
+  }
+  
+  [data-theme="star-trek"] {
+    --color-bg: #000000;
+    --color-text: #ff9900;
+    --color-primary: #3366cc;
+    --color-accent: #cc0000;
+  }
+`;
+
+// Use CSS variables in your components
+const Button = styled.button`
+  background: var(--color-primary);
+  color: var(--color-bg);
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+
+  &:hover {
+    background: var(--color-accent);
+  }
+`;
+```
+
+### Theme Helper Functions
+
+styled-static provides helper functions for theme switching:
+
+```tsx
+import {
+  initTheme,
+  setTheme,
+  getTheme,
+  onSystemThemeChange,
+} from "styled-static";
+
+// Initialize on app load (reads from localStorage, falls back to default)
+initTheme({
+  defaultTheme: "light",
+  useSystemPreference: true, // Optional: detect OS dark mode
+});
+
+// Get current theme
+const current = getTheme(); // 'light' | 'dark' | 'pokemon' | etc.
+
+// Change theme (persists to localStorage by default)
+setTheme("dark");
+
+// Change without persisting (useful for previews)
+setTheme("pokemon", false);
+
+// Listen for OS theme changes
+const unsubscribe = onSystemThemeChange((prefersDark) => {
+  if (!localStorage.getItem("theme")) {
+    setTheme(prefersDark ? "dark" : "light", false);
+  }
+});
+```
+
+### Theme Toggle Example
+
+```tsx
+import { getTheme, setTheme } from "styled-static";
+
+function ThemeToggle() {
+  const toggleTheme = () => {
+    const current = getTheme();
+    setTheme(current === "dark" ? "light" : "dark");
+  };
+
+  return <button onClick={toggleTheme}>Toggle Theme</button>;
+}
+
+function ThemeSelector() {
+  return (
+    <select onChange={(e) => setTheme(e.target.value)}>
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+      <option value="pokemon">Pokemon</option>
+      <option value="star-trek">Star Trek</option>
+    </select>
+  );
+}
+```
+
+### System Preference Detection
+
+Combine `useSystemPreference` with CSS for automatic system theme detection:
+
+```tsx
+const GlobalStyle = createGlobalStyle`
+  :root {
+    --color-bg: #ffffff;
+    --color-text: #1a1a1a;
+  }
+  
+  /* Automatic system preference (when no explicit theme set) */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+      --color-bg: #0f172a;
+      --color-text: #f1f5f9;
+    }
+  }
+  
+  /* Explicit theme overrides */
+  [data-theme="light"] { --color-bg: #ffffff; --color-text: #1a1a1a; }
+  [data-theme="dark"] { --color-bg: #0f172a; --color-text: #f1f5f9; }
+`;
+
+// Initialize with system preference detection
+initTheme({ useSystemPreference: true });
+```
+
+### API Reference
+
+| Function                              | Description                                                                          |
+| ------------------------------------- | ------------------------------------------------------------------------------------ |
+| `getTheme(attribute?)`                | Get current theme from `data-theme` attribute. Returns `'light'` as default.         |
+| `setTheme(theme, persist?, options?)` | Set theme on document. Persists to localStorage by default.                          |
+| `initTheme(options?)`                 | Initialize theme on page load. Priority: localStorage → system preference → default. |
+| `onSystemThemeChange(callback)`       | Subscribe to OS theme changes. Returns unsubscribe function.                         |
+
+#### initTheme Options
+
+```ts
+initTheme({
+  defaultTheme: "light", // Default theme if no stored preference
+  storageKey: "theme", // localStorage key (default: 'theme')
+  useSystemPreference: false, // Detect OS dark/light preference
+  attribute: "data-theme", // Attribute to set on documentElement
+});
+```
 
 ---
 

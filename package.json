@@ -1,6 +1,6 @@
 {
-  "name": "styled-static",
-  "version": "0.1.0",
+  "name": "@alexradulescu/styled-static",
+  "version": "0.2.0",
   "description": "Zero-runtime styled components for React 19+ with Vite. CSS extracted at build time.",
   "type": "module",
   "main": "./dist/index.js",
@@ -36,10 +36,11 @@
   },
   "dependencies": {},
   "devDependencies": {
+    "@types/node": "^22.10.1",
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.2",
-    "@types/node": "^22.10.1",
     "@vitejs/plugin-react": "^4.3.4",
+    "acorn": "^8.15.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "typescript": "^5.7.2",

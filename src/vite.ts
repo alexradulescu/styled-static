@@ -86,6 +86,12 @@ export interface StyledStaticOptions {
    * @default 'ss'
    */
   classPrefix?: string;
+  /**
+   * Enable debug logging. Set to true or use DEBUG_STYLED_STATIC=true env var.
+   * SECURITY: Debug logs expose file paths and internal state; disable in production.
+   * @default false
+   */
+  debug?: boolean;
 }
 
 /** Import tracking for styled-static */
@@ -93,6 +99,7 @@ interface StyledStaticImports {
   styled?: string;
   css?: string;
   createGlobalStyle?: string;
+  keyframes?: string;
   styledVariants?: string;
   cssVariants?: string;
   /** The source path of the import (e.g., "styled-static" or "./index") */
@@ -100,7 +107,13 @@ interface StyledStaticImports {
 }
 
 /** Types of styled templates we can transform */
-type TemplateType = "styled" | "styledExtend" | "css" | "createGlobalStyle";
+type TemplateType =
+  | "styled"
+  | "styledExtend"
+  | "styledAttrs"
+  | "css"
+  | "createGlobalStyle"
+  | "keyframes";
 
 /** Types of variant calls we can transform */
 type VariantType = "styledVariants" | "cssVariants";
@@ -112,6 +125,7 @@ interface FoundTemplate {
   tag: string; // HTML tag for styled.element
   baseComponent?: string; // Component name for styled(Component)
   variableName?: string; // Variable name for displayName
+  attrsArg?: string; // Serialized attrs object for styled.element.attrs({})
 }
 
 /** Information about a found variant call */
@@ -141,8 +155,28 @@ interface FoundVariant {
  *   plugins: [styledStatic(), react()],
  * });
  */
+/**
+ * SECURITY: Validates that a string is a safe identifier (alphanumeric + underscore).
+ * Prevents code injection via displayName or component name interpolation.
+ */
+function isValidIdentifier(str: string): boolean {
+  return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(str);
+}
+
+/**
+ * SECURITY: Safely escape a string for use in generated code.
+ * Uses JSON.stringify to properly escape special characters.
+ */
+function safeStringLiteral(str: string): string {
+  return JSON.stringify(str);
+}
+
 export function styledStatic(options: StyledStaticOptions = {}): Plugin {
-  const { classPrefix = "ss" } = options;
+  const { classPrefix = "ss", debug: debugOption } = options;
+
+  // SECURITY: Debug logging can expose file paths and internal state.
+  // Only enable via explicit option or environment variable.
+  const DEBUG = debugOption ?? process.env.DEBUG_STYLED_STATIC === "true";
 
   // Virtual CSS modules: filename -> CSS content
   const cssModules = new Map<string, string>();
@@ -188,7 +222,8 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
       // cached virtual modules.
       if (/\.[tj]sx?$/.test(file)) {
         // Invalidate all virtual CSS modules from this file
-        const fileHash = hash(normalizePath(file)).slice(0, 6);
+        // SECURITY: Use consistent 8-char hash to match transform()
+        const fileHash = hash(normalizePath(file)).slice(0, 8);
         for (const [name] of cssModules) {
           if (name.startsWith(fileHash)) {
             const mod = server.moduleGraph.getModuleById(
@@ -221,53 +256,68 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
         return null;
       }
 
-      console.log("[styled-static] Transforming:", id);
+      if (DEBUG) console.log("[styled-static] Transforming:", id);
 
       // Parse AST using Vite's built-in parser
       // Since we run after React plugin (enforce: 'post'), JSX is already transformed
       let ast: ESTree.Program;
       try {
         ast = this.parse(code) as ESTree.Program;
-        console.log(
-          "[styled-static] AST parsed successfully, body length:",
-          ast.body.length
-        );
+        if (DEBUG) {
+          console.log(
+            "[styled-static] AST parsed successfully, body length:",
+            ast.body.length
+          );
+        }
       } catch (e) {
         // Parse error - this might be a partial file or syntax error
-        console.log("[styled-static] AST parse error:", e);
+        if (DEBUG) console.log("[styled-static] AST parse error:", e);
         return null;
       }
 
       // Find styled-static imports and their local names
       const imports = findStyledStaticImports(ast);
-      console.log("[styled-static] Found imports:", imports);
+      if (DEBUG) console.log("[styled-static] Found imports:", imports);
       const hasTemplateImports =
-        imports.css || imports.styled || imports.createGlobalStyle;
+        imports.css ||
+        imports.styled ||
+        imports.createGlobalStyle ||
+        imports.keyframes;
       const hasVariantImports = imports.styledVariants || imports.cssVariants;
       if (!hasTemplateImports && !hasVariantImports) {
-        console.log("[styled-static] No imports found, skipping");
+        if (DEBUG) console.log("[styled-static] No imports found, skipping");
         return null;
       }
 
       // Find all tagged template literals using our imports
       const templates = hasTemplateImports
-        ? findTaggedTemplates(ast, imports)
+        ? findTaggedTemplates(ast, imports, code)
         : [];
-      console.log("[styled-static] Found templates:", templates.length);
+      if (DEBUG)
+        console.log("[styled-static] Found templates:", templates.length);
 
       // Find all variant calls using our imports
       const variantCalls = hasVariantImports
         ? findVariantCalls(ast, code, imports)
         : [];
-      console.log("[styled-static] Found variant calls:", variantCalls.length);
+      if (DEBUG)
+        console.log(
+          "[styled-static] Found variant calls:",
+          variantCalls.length
+        );
 
       if (templates.length === 0 && variantCalls.length === 0) {
-        console.log("[styled-static] No templates or variants found, skipping");
+        if (DEBUG)
+          console.log(
+            "[styled-static] No templates or variants found, skipping"
+          );
         return null;
       }
 
       const s = new MagicString(code);
-      const fileHash = hash(normalizePath(id)).slice(0, 6);
+      // Use 8-char file hash to match Vite's CSS Modules standard
+      // (8 chars base36 = ~2.8 × 10^12 possibilities)
+      const fileHash = hash(normalizePath(id)).slice(0, 8);
       const cssImports: string[] = [];
       let needsStyledRuntime = false;
       let needsExtendRuntime = false;
@@ -282,7 +332,9 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
         const t = templates[i];
         if (!t) continue; // Guard against undefined (noUncheckedIndexedAccess)
         const cssContent = extractTemplateContent(code, t.node.quasi);
-        const cssHash = hash(cssContent).slice(0, 6);
+        // SECURITY: Use longer hash in production for lower collision probability
+        const hashLength = isDev ? 6 : 8;
+        const cssHash = hash(cssContent).slice(0, hashLength);
         const className = `${classPrefix}-${cssHash}`;
 
         // Wrap CSS in class selector (unless global)
@@ -425,6 +477,7 @@ function findStyledStaticImports(ast: ESTree.Program): StyledStaticImports {
             if (imported === "css") imports.css = local;
             if (imported === "createGlobalStyle")
               imports.createGlobalStyle = local;
+            if (imported === "keyframes") imports.keyframes = local;
             if (imported === "styledVariants") imports.styledVariants = local;
             if (imported === "cssVariants") imports.cssVariants = local;
           }
@@ -442,7 +495,8 @@ function findStyledStaticImports(ast: ESTree.Program): StyledStaticImports {
  */
 function findTaggedTemplates(
   ast: ESTree.Program,
-  imports: StyledStaticImports
+  imports: StyledStaticImports,
+  code: string
 ): FoundTemplate[] {
   const results: FoundTemplate[] = [];
 
@@ -457,7 +511,7 @@ function findTaggedTemplates(
       ) {
         const template = decl.init as TaggedTemplateWithPosition;
         const varName = decl.id.name;
-        const found = classifyTemplate(template, imports, varName);
+        const found = classifyTemplate(template, imports, varName, code);
         if (found) results.push(found);
       }
     }
@@ -487,7 +541,8 @@ function findTaggedTemplates(
 function classifyTemplate(
   node: TaggedTemplateWithPosition,
   imports: StyledStaticImports,
-  variableName: string
+  variableName: string,
+  code: string
 ): FoundTemplate | null {
   const { tag } = node;
 
@@ -542,6 +597,45 @@ function classifyTemplate(
     };
   }
 
+  // keyframes`...`
+  if (tag.type === "Identifier" && tag.name === imports.keyframes) {
+    return {
+      type: "keyframes",
+      node,
+      tag: "",
+      variableName,
+    };
+  }
+
+  // styled.element.attrs({...})`...`
+  // Pattern: CallExpression -> MemberExpression -> MemberExpression
+  if (
+    tag.type === "CallExpression" &&
+    tag.callee.type === "MemberExpression" &&
+    tag.callee.property.type === "Identifier" &&
+    tag.callee.property.name === "attrs" &&
+    tag.callee.object.type === "MemberExpression" &&
+    tag.callee.object.object.type === "Identifier" &&
+    tag.callee.object.object.name === imports.styled &&
+    tag.callee.object.property.type === "Identifier" &&
+    tag.arguments.length === 1
+  ) {
+    const elementTag = (tag.callee.object.property as ESTree.Identifier).name;
+    // Capture the attrs argument as a string for later use
+    const attrsNode = tag.arguments[0] as ESTree.Node & {
+      start: number;
+      end: number;
+    };
+    const attrsArg = code.slice(attrsNode.start, attrsNode.end);
+    return {
+      type: "styledAttrs",
+      node,
+      tag: elementTag,
+      variableName,
+      attrsArg,
+    };
+  }
+
   return null;
 }
 
@@ -567,24 +661,50 @@ function extractTemplateContent(
 
 /**
  * Generate the replacement code for a styled template.
+ *
+ * SECURITY: Uses safeStringLiteral() for displayName to prevent code injection
+ * via malicious variable names or edge cases with Unicode/escape sequences.
  */
 function generateReplacement(
   template: FoundTemplate,
   className: string,
   isDev: boolean
 ): string {
-  const displayName = isDev ? template.variableName : undefined;
-  const displayNameArg = displayName ? `, "${displayName}"` : "";
+  // SECURITY: Validate and safely escape displayName to prevent code injection
+  let displayNameArg = "";
+  if (isDev && template.variableName) {
+    // Validate it's a valid identifier before including
+    if (isValidIdentifier(template.variableName)) {
+      displayNameArg = `, ${safeStringLiteral(template.variableName)}`;
+    }
+  }
 
   switch (template.type) {
     case "styled":
-      return `__styled("${template.tag}", "${className}"${displayNameArg})`;
+      return `__styled(${safeStringLiteral(template.tag)}, ${safeStringLiteral(
+        className
+      )}${displayNameArg})`;
 
     case "styledExtend":
-      return `__styledExtend(${template.baseComponent}, "${className}"${displayNameArg})`;
+      // baseComponent is a reference to an existing variable, not a string literal
+      return `__styledExtend(${template.baseComponent}, ${safeStringLiteral(
+        className
+      )}${displayNameArg})`;
+
+    case "styledAttrs":
+      // attrs object is serialized, tag comes from template
+      return `__styledWithAttrs(${safeStringLiteral(
+        template.tag
+      )}, ${safeStringLiteral(className)}, ${
+        template.attrsArg ?? "{}"
+      }${displayNameArg})`;
 
     case "css":
-      return `"${className}"`;
+      return safeStringLiteral(className);
+
+    case "keyframes":
+      // Keyframes are replaced with just the scoped animation name
+      return safeStringLiteral(className);
 
     case "createGlobalStyle":
       return `__GlobalStyle`;
@@ -695,7 +815,7 @@ function classifyVariantCall(
       }
     }
 
-    // css: `...`
+    // css: `...` or css: css`...`
     if (propName === "css") {
       if (
         prop.value.type === "Literal" &&
@@ -708,6 +828,17 @@ function classifyVariantCall(
           end: number;
         };
         baseCss = code.slice(tpl.start + 1, tpl.end - 1);
+      } else if (prop.value.type === "TaggedTemplateExpression") {
+        // Support css`...` tagged template for syntax highlighting
+        const tagged = prop.value as ESTree.TaggedTemplateExpression & {
+          quasi: ESTree.TemplateLiteral & { start: number; end: number };
+        };
+        if (
+          tagged.tag.type === "Identifier" &&
+          tagged.tag.name === imports.css
+        ) {
+          baseCss = code.slice(tagged.quasi.start + 1, tagged.quasi.end - 1);
+        }
       }
     }
 
@@ -745,6 +876,21 @@ function classifyVariantCall(
               end: number;
             };
             cssContent = code.slice(tpl.start + 1, tpl.end - 1);
+          } else if (valueProp.value.type === "TaggedTemplateExpression") {
+            // Support css`...` tagged template for syntax highlighting
+            const tagged =
+              valueProp.value as ESTree.TaggedTemplateExpression & {
+                quasi: ESTree.TemplateLiteral & { start: number; end: number };
+              };
+            if (
+              tagged.tag.type === "Identifier" &&
+              tagged.tag.name === imports.css
+            ) {
+              cssContent = code.slice(
+                tagged.quasi.start + 1,
+                tagged.quasi.end - 1
+              );
+            }
           }
 
           if (cssContent) {
@@ -772,6 +918,9 @@ function classifyVariantCall(
 
 /**
  * Generate replacement code for a variant call.
+ *
+ * SECURITY: Validates component names and uses safe string escaping
+ * to prevent code injection attacks.
  */
 function generateVariantReplacement(
   variant: FoundVariant,
@@ -779,22 +928,43 @@ function generateVariantReplacement(
   variantKeys: string[],
   isDev: boolean
 ): string {
-  const displayName = isDev ? variant.variableName : undefined;
-  const displayNameArg = displayName ? `, "${displayName}"` : "";
+  // SECURITY: Validate and safely escape displayName
+  let displayNameArg = "";
+  if (isDev && variant.variableName) {
+    if (isValidIdentifier(variant.variableName)) {
+      displayNameArg = `, ${safeStringLiteral(variant.variableName)}`;
+    }
+  }
   const keysJson = JSON.stringify(variantKeys);
 
   if (variant.type === "styledVariants") {
     // Check if component is an HTML tag (lowercase) or component reference
     const isHtmlTag = variant.component && /^[a-z]/.test(variant.component);
     if (isHtmlTag) {
-      return `__styledVariants("${variant.component}", "${baseClass}", ${keysJson}${displayNameArg})`;
+      // SECURITY: Validate HTML tag name before interpolation
+      if (!variant.component || !/^[a-z][a-z0-9]*$/.test(variant.component)) {
+        throw new Error(
+          `[styled-static] Invalid HTML tag name: ${variant.component}`
+        );
+      }
+      return `__styledVariants(${safeStringLiteral(
+        variant.component
+      )}, ${safeStringLiteral(baseClass)}, ${keysJson}${displayNameArg})`;
     } else {
-      return `__styledVariantsExtend(${variant.component}, "${baseClass}", ${keysJson}${displayNameArg})`;
+      // SECURITY: Validate component reference is a valid identifier
+      if (!variant.component || !isValidIdentifier(variant.component)) {
+        throw new Error(
+          `[styled-static] Invalid component name: ${variant.component}`
+        );
+      }
+      return `__styledVariantsExtend(${variant.component}, ${safeStringLiteral(
+        baseClass
+      )}, ${keysJson}${displayNameArg})`;
     }
   }
 
   // cssVariants
-  return `__cssVariants("${baseClass}", ${keysJson})`;
+  return `__cssVariants(${safeStringLiteral(baseClass)}, ${keysJson})`;
 }
 
 // Default export for convenience

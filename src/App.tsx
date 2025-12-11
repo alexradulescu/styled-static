@@ -351,9 +351,10 @@ function ClassNameMergingDemo() {
 // Variants Demo - styledVariants and cssVariants
 // =============================================================================
 
+// Using css`` for IDE syntax highlighting (recommended)
 const VariantButton = styledVariants({
   component: "button",
-  css: `
+  css: css`
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -368,32 +369,38 @@ const VariantButton = styledVariants({
   `,
   variants: {
     color: {
-      primary: `
+      primary: css`
         background: var(--color-primary);
         color: white;
-        &:hover { background: var(--color-primary-hover); }
+        &:hover {
+          background: var(--color-primary-hover);
+        }
       `,
-      danger: `
+      danger: css`
         background: var(--color-danger);
         color: white;
-        &:hover { background: #dc2626; }
+        &:hover {
+          background: #dc2626;
+        }
       `,
-      success: `
+      success: css`
         background: var(--color-success);
         color: white;
-        &:hover { background: #059669; }
+        &:hover {
+          background: #059669;
+        }
       `,
     },
     size: {
-      sm: `
+      sm: css`
         padding: 0.25rem 0.5rem;
         font-size: 0.75rem;
       `,
-      md: `
+      md: css`
         padding: 0.5rem 1rem;
         font-size: 0.875rem;
       `,
-      lg: `
+      lg: css`
         padding: 0.75rem 1.5rem;
         font-size: 1rem;
       `,
@@ -402,7 +409,7 @@ const VariantButton = styledVariants({
 });
 
 const badgeCss = cssVariants({
-  css: `
+  css: css`
     display: inline-flex;
     align-items: center;
     padding: 0.25rem 0.5rem;
@@ -412,10 +419,22 @@ const badgeCss = cssVariants({
   `,
   variants: {
     variant: {
-      info: `background: #e0f2fe; color: #0369a1;`,
-      success: `background: #dcfce7; color: #166534;`,
-      warning: `background: #fef3c7; color: #92400e;`,
-      error: `background: #fee2e2; color: #991b1b;`,
+      info: css`
+        background: #e0f2fe;
+        color: #0369a1;
+      `,
+      success: css`
+        background: #dcfce7;
+        color: #166534;
+      `,
+      warning: css`
+        background: #fef3c7;
+        color: #92400e;
+      `,
+      error: css`
+        background: #fee2e2;
+        color: #991b1b;
+      `,
     },
   },
 });
@@ -468,13 +487,14 @@ function VariantsDemo() {
       </ButtonGroup>
 
       <Code>{`// styledVariants - creates a component
+// Use css\`...\` for IDE syntax highlighting
 const Button = styledVariants({
   component: 'button',
-  css: \`padding: 0.5rem 1rem;\`,
+  css: css\`padding: 0.5rem 1rem;\`,
   variants: {
     color: {
-      primary: \`background: blue;\`,
-      danger: \`background: red;\`,
+      primary: css\`background: blue;\`,
+      danger: css\`background: red;\`,
     },
   },
 });
@@ -482,9 +502,9 @@ const Button = styledVariants({
 
 // cssVariants - returns class function
 const badgeCss = cssVariants({
-  css: \`padding: 0.25rem 0.5rem;\`,
+  css: css\`padding: 0.25rem 0.5rem;\`,
   variants: {
-    variant: { info: \`color: blue;\` },
+    variant: { info: css\`color: blue;\` },
   },
 });
 <span className={badgeCss({ variant: 'info' })}>Badge</span>`}</Code>

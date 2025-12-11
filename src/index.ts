@@ -54,7 +54,17 @@ export type {
   VariantProps,
   StyledVariantComponent,
   CssVariantsFunction,
+  Keyframes,
 } from "./types";
+
+// Theme helpers - runtime utilities for theme switching
+export {
+  getTheme,
+  setTheme,
+  initTheme,
+  onSystemThemeChange,
+  type InitThemeOptions,
+} from "./theme";
 
 function throwConfigError(name: string): never {
   throw new Error(
@@ -117,6 +127,31 @@ export function css(
   ..._interpolations: never[]
 ): string {
   throwConfigError("css");
+}
+
+/**
+ * Create scoped keyframes for animations.
+ * The animation name is hashed to avoid conflicts between components.
+ *
+ * @example
+ * const spin = keyframes`
+ *   from { transform: rotate(0deg); }
+ *   to { transform: rotate(360deg); }
+ * `;
+ *
+ * const Spinner = styled.div`
+ *   animation: ${spin} 1s linear infinite;
+ * `;
+ *
+ * // In CSS output:
+ * // @keyframes ss-abc123 { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+ * // .ss-xyz789 { animation: ss-abc123 1s linear infinite; }
+ */
+export function keyframes(
+  _strings: TemplateStringsArray,
+  ..._interpolations: never[]
+): string {
+  throwConfigError("keyframes");
 }
 
 /**
@@ -188,23 +223,31 @@ export function cx(...args: (string | false | null | undefined)[]): string {
  * Variant props are mapped to modifier classes at runtime.
  *
  * @example
+ * // With css`` for IDE syntax highlighting (recommended)
  * const Button = styledVariants({
  *   component: 'button',
- *   css: `
+ *   css: css`
  *     padding: 0.5rem 1rem;
  *     border: none;
  *     border-radius: 4px;
  *   `,
  *   variants: {
  *     color: {
- *       primary: `background: blue; color: white;`,
- *       danger: `background: red; color: white;`,
+ *       primary: css`background: blue; color: white;`,
+ *       danger: css`background: red; color: white;`,
  *     },
  *     size: {
- *       sm: `font-size: 0.875rem;`,
- *       lg: `font-size: 1.125rem;`,
+ *       sm: css`font-size: 0.875rem;`,
+ *       lg: css`font-size: 1.125rem;`,
  *     },
  *   },
+ * });
+ *
+ * // Plain strings also work (no highlighting)
+ * const SimpleButton = styledVariants({
+ *   component: 'button',
+ *   css: `padding: 0.5rem;`,
+ *   variants: { size: { sm: `font-size: 0.875rem;` } },
  * });
  *
  * // Usage - variant props become modifier classes
@@ -226,15 +269,16 @@ export function styledVariants<
  * The function maps variant selections to class names at runtime.
  *
  * @example
+ * // With css`` for IDE syntax highlighting (recommended)
  * const buttonCss = cssVariants({
- *   css: `
+ *   css: css`
  *     padding: 0.5rem 1rem;
  *     border-radius: 4px;
  *   `,
  *   variants: {
  *     color: {
- *       primary: `background: blue;`,
- *       danger: `background: red;`,
+ *       primary: css`background: blue;`,
+ *       danger: css`background: red;`,
  *     },
  *   },
  * });

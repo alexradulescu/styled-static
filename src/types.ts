@@ -4,6 +4,17 @@ import type { ComponentType, JSX } from "react";
 export type HTMLTag = keyof JSX.IntrinsicElements;
 
 // ============================================================================
+// Keyframes Types
+// ============================================================================
+
+/**
+ * Represents a scoped keyframes animation name.
+ * At build time, the keyframes CSS is extracted and the name is hashed.
+ * This is essentially a string, but branded for type safety.
+ */
+export type Keyframes = string & { readonly __brand: "keyframes" };
+
+// ============================================================================
 // Variant Types
 // ============================================================================
 
@@ -111,6 +122,42 @@ export type StyledComponent<T extends HTMLTag | ComponentType<any>> =
     ? ComponentType<P & TransientProps>
     : never;
 
+// ============================================================================
+// Attrs Types
+// ============================================================================
+
+/**
+ * Default attributes for a styled component.
+ * Can be a static object or a function that receives props and returns attrs.
+ */
+export type AttrsArg<P> = Partial<P> | ((props: P) => Partial<P>);
+
+/**
+ * Styled element builder with attrs support.
+ * Returns a template tag function that creates a styled component.
+ */
+export interface StyledElementBuilder<T extends HTMLTag> {
+  /**
+   * Add default attributes to the component.
+   * @example
+   * styled.input.attrs({ type: 'password' })`padding: 0.5rem;`
+   */
+  attrs<A extends Partial<JSX.IntrinsicElements[T]>>(
+    attrs: A | ((props: JSX.IntrinsicElements[T] & TransientProps) => A)
+  ): (
+    strings: TemplateStringsArray,
+    ...interpolations: never[]
+  ) => StyledComponent<T>;
+
+  /**
+   * Template tag to create styled component.
+   */
+  (
+    strings: TemplateStringsArray,
+    ...interpolations: never[]
+  ): StyledComponent<T>;
+}
+
 /**
  * The main styled function type.
  * Supports both `styled.element` and `styled(Component)` syntax.
@@ -137,14 +184,11 @@ export type StyledFunction = {
   ) => StyledComponent<ComponentType<P>>;
 } & {
   /**
-   * Shorthand for all HTML elements.
+   * Shorthand for all HTML elements with attrs support.
    * @example
    * styled.div`...`
    * styled.button`...`
-   * styled.input`...`
+   * styled.input.attrs({ type: 'text' })`...`
    */
-  [K in HTMLTag]: (
-    strings: TemplateStringsArray,
-    ...interpolations: never[]
-  ) => StyledComponent<K>;
+  [K in HTMLTag]: StyledElementBuilder<K>;
 };
