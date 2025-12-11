@@ -147,9 +147,9 @@ Configure the Vite plugin:
 
 ```ts
 // vite.config.ts
-import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { styledStatic } from "styled-static/vite";
+import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [styledStatic(), react()],
@@ -252,7 +252,7 @@ const highlightClass = css`
 Create scoped keyframe animations. The animation name is hashed to avoid conflicts between components:
 
 ```tsx
-import { styled, keyframes } from "styled-static";
+import { keyframes, styled } from "styled-static";
 
 const spin = keyframes`
   from { transform: rotate(0deg); }
@@ -403,7 +403,7 @@ For type-safe variant handling, use `styledVariants` to create components with v
 #### styledVariants
 
 ```tsx
-import { styledVariants, css } from "styled-static";
+import { css, styledVariants } from "styled-static";
 
 // With css`` for syntax highlighting (recommended)
 const Button = styledVariants({
@@ -609,7 +609,7 @@ See the [Variants API](#variants-api) section for full documentation.
 ### 2. Class Toggling with cx
 
 ```tsx
-import { styled, css, cx } from "styled-static";
+import { css, cx, styled } from "styled-static";
 
 const primaryClass = css`
   background: blue;
@@ -724,10 +724,10 @@ styled-static provides helper functions for theme switching:
 
 ```tsx
 import {
-  initTheme,
-  setTheme,
   getTheme,
+  initTheme,
   onSystemThemeChange,
+  setTheme,
 } from "styled-static";
 
 // Initialize on app load (reads from localStorage, falls back to default)

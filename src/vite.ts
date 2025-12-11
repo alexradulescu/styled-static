@@ -58,10 +58,9 @@
  * // CSS cascade: padding → background → custom overrides
  * ```
  */
-
-import type { Plugin, ResolvedConfig } from "vite";
 import type * as ESTree from "estree";
 import MagicString from "magic-string";
+import type { Plugin, ResolvedConfig } from "vite";
 import { hash } from "./hash.js";
 
 // ============================================================================

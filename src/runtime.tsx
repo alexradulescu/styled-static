@@ -11,8 +11,7 @@
  *
  * React 19's automatic ref forwarding handles refs without explicit forwardRef.
  */
-
-import { createElement, type ComponentType, type JSX } from "react";
+import { type ComponentType, type JSX, createElement } from "react";
 
 type HTMLTag = keyof JSX.IntrinsicElements;
 

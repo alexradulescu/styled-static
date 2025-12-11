@@ -5,11 +5,10 @@
  * and edge case handling. We mock Vite's plugin context to test the
  * transform function in isolation.
  */
-
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { styledStatic } from "./vite";
-import type { Plugin } from "vite";
 import { parse } from "acorn";
+import type { Plugin } from "vite";
+import {  beforeEach, describe, expect, it, vi } from "vitest";
+import { styledStatic } from "./vite";
 
 // =============================================================================
 // Test Utilities

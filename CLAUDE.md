@@ -51,7 +51,7 @@ const GlobalStyle = createGlobalStyle`* { box-sizing: border-box; }`;
 ## Key Design Decisions
 
 1. **AST over Regex** - Uses Vite's built-in parser for robustness
-2. **No forwardRef** - React 19 handles ref forwarding automatically  
+2. **No forwardRef** - React 19 handles ref forwarding automatically
 3. **className order** - Base → Extension → User for correct cascade
 4. **Transient props** - $-prefixed props filtered to prevent DOM warnings
 5. **Virtual CSS modules** - Each styled block becomes a virtual .css import
@@ -68,14 +68,19 @@ cd example && bun dev # Run example app
 ## How Transformation Works
 
 **Input:**
+
 ```tsx
-const Button = styled.button`padding: 1rem;`;
+const Button = styled.button`
+  padding: 1rem;
+`;
 ```
 
 **Output:**
+
 ```tsx
 import { __styled } from "styled-static/runtime";
 import "styled-static:abc123-0.css";
+
 const Button = __styled("button", "ss-abc123", "Button");
 ```
 
@@ -84,11 +89,13 @@ The CSS is extracted to a virtual module, and the styled call is replaced with a
 ## Code Patterns
 
 **Runtime functions:**
+
 - `__styled(tag, className, displayName?)` - Creates styled component
 - `__styledExtend(Base, className, displayName?)` - Extends existing component
 - `__GlobalStyle` - No-op component (CSS injected via import)
 
 **Plugin hooks used:**
+
 - `configResolved` - Capture dev/prod mode
 - `resolveId` - Handle virtual CSS module IDs
 - `load` - Return CSS content for virtual modules

@@ -16,25 +16,32 @@ A build-time CSS-in-JS library that provides a styled-components-like API with z
 ## Key Design Decisions
 
 ### 1. No Fork of ecsstatic
+
 Initially considered forking ecsstatic, but analysis revealed its complexity (esbuild for interpolation, SCSS support, acorn-walk) was unnecessary. Built standalone implementation from scratch.
 
 ### 2. AST over Regex
+
 Uses Vite's built-in parser (Rollup's acorn) for robustness:
+
 - Regex breaks on edge cases (CSS containing backticks, nested templates)
 - No extra dependencies needed
 - Accurate node positions for sourcemaps
 - More maintainable
 
 ### 3. Minimal Runtime (~300 bytes)
+
 Runtime includes only:
+
 - `as` prop polymorphism
 - Transient props filtering ($-prefix)
 - className merging (base → extension → user order)
 
 ### 4. className Order
+
 Base → Extension → User for correct CSS cascade. Extended components prepend their class to the base's class.
 
 ### 5. Transient Props
+
 Props prefixed with `$` are filtered from DOM to prevent React warnings and DOM pollution.
 
 ## Architecture
@@ -104,12 +111,15 @@ styled-static/
 ## Code Transformation Examples
 
 **Input:**
+
 ```tsx
-import { styled, css, createGlobalStyle } from 'styled-static';
+import { createGlobalStyle, css, styled } from "styled-static";
 
 const Button = styled.button`
   padding: 1rem;
-  &:hover { background: blue; }
+  &:hover {
+    background: blue;
+  }
 `;
 
 const Primary = styled(Button)`
@@ -128,8 +138,9 @@ const GlobalStyle = createGlobalStyle`
 ```
 
 **Output:**
+
 ```tsx
-import { __styled, __styledExtend, __GlobalStyle } from "styled-static/runtime";
+import { __GlobalStyle, __styled, __styledExtend } from "styled-static/runtime";
 import "styled-static:abc123-0.css";
 import "styled-static:abc123-1.css";
 import "styled-static:abc123-2.css";
@@ -169,13 +180,15 @@ function __styledExtend(Base, className, displayName?) {
 }
 
 // __GlobalStyle: No-op component (CSS already injected via import)
-function __GlobalStyle() { return null; }
+function __GlobalStyle() {
+  return null;
+}
 
 // filterTransientProps: Remove $-prefixed props from DOM
 function filterTransientProps(props) {
   const result = {};
   for (const key in props) {
-    if (!key.startsWith('$')) result[key] = props[key];
+    if (!key.startsWith("$")) result[key] = props[key];
   }
   return result;
 }
@@ -184,6 +197,7 @@ function filterTransientProps(props) {
 ## Virtual CSS Modules
 
 Plugin uses Vite's `resolveId`/`load` hooks:
+
 - **resolveId**: Intercepts `styled-static:*.css` imports, prefixes with `\0` for virtual module
 - **load**: Returns processed CSS content for virtual module ID
 - **HMR**: Invalidates modules on source file change
@@ -223,21 +237,21 @@ const GlobalStyle = createGlobalStyle`
 
 ```ts
 // vite.config.ts
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import { styledStatic } from 'styled-static/vite';
+import react from "@vitejs/plugin-react";
+import { styledStatic } from "styled-static/vite";
+import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [
     styledStatic({
       // Class name prefix (default: 'ss')
-      classPrefix: 'ss',
+      classPrefix: "ss",
       // Autoprefixer browser targets (or false to disable)
       autoprefixer: [
-        'last 2 Chrome versions',
-        'last 2 Firefox versions',
-        'last 2 Safari versions',
-        'last 2 Edge versions',
+        "last 2 Chrome versions",
+        "last 2 Firefox versions",
+        "last 2 Safari versions",
+        "last 2 Edge versions",
       ],
     }),
     react(),
@@ -265,6 +279,7 @@ export default defineConfig({
 ## Test Coverage
 
 Comprehensive test suite covers:
+
 - Plugin configuration and options
 - File filtering (.tsx, .jsx, .ts, .js, node_modules, non-styled files)
 - styled.element transformations (button, div, a, input, span, multiple)
@@ -278,30 +293,32 @@ Comprehensive test suite covers:
 - Source maps generation
 - Custom class prefix
 - Virtual module resolution
-- Runtime functions (__styled, __styledExtend, __GlobalStyle)
+- Runtime functions (**styled, **styledExtend, \_\_GlobalStyle)
 - Hash function consistency
 
 ## Comparison with Alternatives
 
-| Feature | styled-static | styled-components | Emotion | Linaria |
-|---------|--------------|-------------------|---------|---------|
-| Zero Runtime | ✅ | ❌ | ❌ | ✅ |
-| Runtime Interpolation | ❌ | ✅ | ✅ | ❌ |
-| `as` prop | ✅ | ✅ | ✅ | ❌ |
-| Component Extension | ✅ | ✅ | ✅ | ✅ |
-| Bundle Size | ~300B | ~12KB | ~11KB | ~0B |
-| Dependencies | 4 | 7 | 5 | 300+ |
-| Attack Surface | Minimal | Medium | Medium | Large |
+| Feature               | styled-static | styled-components | Emotion | Linaria |
+| --------------------- | ------------- | ----------------- | ------- | ------- |
+| Zero Runtime          | ✅            | ❌                | ❌      | ✅      |
+| Runtime Interpolation | ❌            | ✅                | ✅      | ❌      |
+| `as` prop             | ✅            | ✅                | ✅      | ❌      |
+| Component Extension   | ✅            | ✅                | ✅      | ✅      |
+| Bundle Size           | ~300B         | ~12KB             | ~11KB   | ~0B     |
+| Dependencies          | 4             | 7                 | 5       | 300+    |
+| Attack Surface        | Minimal       | Medium            | Medium  | Large   |
 
 ## Security Advantage
 
 **styled-static (4 packages, ~50 transitive, ~5MB):**
+
 - magic-string, postcss, postcss-nested, autoprefixer
 - All mature, heavily audited, 15M-50M weekly downloads
 - Zero known vulnerabilities
 - Minimal attack surface
 
 **Linaria/wyw-in-js (8-12 direct, 300+ transitive, ~40-60MB):**
+
 - Full Babel ecosystem required
 - @linaria/vite: "Not healthy" per Socket.dev
 - Past security issues (ansi-regex CVE)
@@ -310,6 +327,7 @@ Comprehensive test suite covers:
 ## Current State
 
 The project is fully implemented with:
+
 - All source files in `/home/claude/styled-static/`
 - Working example app in `/home/claude/styled-static/example/`
 - Comprehensive test suite
@@ -317,6 +335,7 @@ The project is fully implemented with:
 ## Next Steps
 
 1. **Install & Build:**
+
    ```bash
    cd styled-static
    bun install
@@ -324,11 +343,13 @@ The project is fully implemented with:
    ```
 
 2. **Run Tests:**
+
    ```bash
    bun test
    ```
 
 3. **Test Example App:**
+
    ```bash
    cd example
    bun install
@@ -364,15 +385,18 @@ README.md          - Documentation
 ## Key Code Patterns
 
 **AST Traversal (simple-walk pattern):**
+
 ```ts
 function walk(node: Node, callback: (node: Node) => void) {
   callback(node);
   for (const key in node) {
     const child = (node as any)[key];
-    if (child && typeof child === 'object') {
+    if (child && typeof child === "object") {
       if (Array.isArray(child)) {
-        child.forEach(c => c && typeof c.type === 'string' && walk(c, callback));
-      } else if (typeof child.type === 'string') {
+        child.forEach(
+          (c) => c && typeof c.type === "string" && walk(c, callback)
+        );
+      } else if (typeof child.type === "string") {
         walk(child, callback);
       }
     }
@@ -381,6 +405,7 @@ function walk(node: Node, callback: (node: Node) => void) {
 ```
 
 **Virtual Module Pattern:**
+
 ```ts
 resolveId(id) {
   if (id.startsWith('styled-static:')) return '\0' + id;
@@ -395,10 +420,13 @@ load(id) {
 ```
 
 **CSS Processing:**
+
 ```ts
 const processor = postcss([
   postcssNested(),
-  ...(autoprefixerConfig ? [autoprefixer({ overrideBrowserslist: autoprefixerConfig })] : []),
+  ...(autoprefixerConfig
+    ? [autoprefixer({ overrideBrowserslist: autoprefixerConfig })]
+    : []),
 ]);
 
 const processed = await processor.process(wrappedCss, { from: undefined });

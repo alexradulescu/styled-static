@@ -6,14 +6,13 @@
  * 1. SSR fallback behavior (when document is undefined)
  * 2. Export verification
  */
-
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
+  type InitThemeOptions,
   getTheme,
-  setTheme,
   initTheme,
   onSystemThemeChange,
-  type InitThemeOptions,
+  setTheme,
 } from "./theme";
 
 // =============================================================================

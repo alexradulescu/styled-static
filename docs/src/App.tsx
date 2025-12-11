@@ -1,34 +1,33 @@
-import { useState, useEffect, useRef, lazy, Suspense } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import {
-  styled,
-  css,
-  createGlobalStyle,
-  styledVariants,
-  cssVariants,
-  cx,
-  initTheme,
-  setTheme,
-  getTheme,
-  onSystemThemeChange,
-} from "styled-static";
-import {
+  Atom,
+  Ban,
+  Github,
   Globe,
   HeartCrack,
-  Sparkles,
-  Shield,
-  Target,
-  PartyPopper,
-  Ban,
-  Atom,
-  Zap,
-  Lightbulb,
   Info,
-  Sun,
+  Lightbulb,
   Moon,
-  Search,
-  Github,
   Palette,
+  PartyPopper,
+  Search,
+  Shield,
+  Sparkles,
+  Sun,
+  Target,
+  Zap,
 } from "lucide-react";
+import {
+  createGlobalStyle,
+  css,
+  cssVariants,
+  getTheme,
+  initTheme,
+  onSystemThemeChange,
+  setTheme,
+  styled,
+} from "styled-static";
+import { CodeBlock } from "./sections/shared";
 import { CodeBlock } from "./sections/shared";
 
 // Lazy-loaded sections for code splitting
@@ -159,7 +158,9 @@ const Sidebar = styled.aside`
   display: flex;
   flex-direction: column;
   z-index: 100;
-  transition: background var(--transition), border-color var(--transition);
+  transition:
+    background var(--transition),
+    border-color var(--transition);
 `;
 
 const SidebarHeader = styled.div`
@@ -205,7 +206,9 @@ const SearchField = styled.input`
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   outline: none;
-  transition: border-color var(--transition), background var(--transition);
+  transition:
+    border-color var(--transition),
+    background var(--transition);
 
   &::placeholder {
     color: var(--color-text-secondary);
@@ -675,12 +678,15 @@ export function App() {
     : sections;
 
   // Group sections by their group
-  const groupedSections = filteredSections.reduce((acc, section) => {
-    const group = section.group || "Other";
-    if (!acc[group]) acc[group] = [];
-    acc[group].push(section);
-    return acc;
-  }, {} as Record<string, SectionInfo[]>);
+  const groupedSections = filteredSections.reduce(
+    (acc, section) => {
+      const group = section.group || "Other";
+      if (!acc[group]) acc[group] = [];
+      acc[group].push(section);
+      return acc;
+    },
+    {} as Record<string, SectionInfo[]>
+  );
 
   return (
     <>

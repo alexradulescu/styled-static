@@ -1,6 +1,6 @@
 {
   "name": "@alex.radulescu/styled-static",
-  "version": "0.2.0",
+  "version": "0.3.1",
   "description": "Zero-runtime styled components for React 19+ with Vite. CSS extracted at build time.",
   "type": "module",
   "private": false,
@@ -32,6 +32,8 @@
     "dev": "vite",
     "dev:watch": "tsc --watch",
     "test": "vitest",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
@@ -40,11 +42,13 @@
   },
   "dependencies": {},
   "devDependencies": {
+    "@trivago/prettier-plugin-sort-imports": "^6.0.0",
     "@types/node": "^22.10.1",
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.2",
     "@vitejs/plugin-react": "^4.3.4",
     "acorn": "^8.15.0",
+    "prettier": "^3.7.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "typescript": "^5.7.2",

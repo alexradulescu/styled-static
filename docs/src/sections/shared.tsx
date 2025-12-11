@@ -2,11 +2,10 @@
  * Shared components and utilities for documentation sections.
  * These are used by the lazy-loaded API and Features sections.
  */
-
-import { useState, type ReactNode } from "react";
-import { styled, css, styledVariants, cssVariants, cx } from "styled-static";
+import { type ReactNode, useState } from "react";
+import { AlertTriangle, Check, Copy, Info, Lightbulb } from "lucide-react";
+import { css, cssVariants, cx, styled, styledVariants } from "styled-static";
 import { highlight } from "sugar-high";
-import { Copy, Check, Info, Lightbulb, AlertTriangle } from "lucide-react";
 
 // =============================================================================
 // Typography Components

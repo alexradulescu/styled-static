@@ -1,7 +1,8 @@
-import { defineConfig, type PluginOption } from "vite";
 import react from "@vitejs/plugin-react";
-import { styledStatic } from "../src/vite";
 import path from "path";
+import { type PluginOption, defineConfig } from "vite";
+import { styledStatic } from "../src/vite";
+import { styledStatic } from "../src/vite";
 
 export default defineConfig({
   base: "/styled-static/",

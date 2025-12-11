@@ -2,24 +2,39 @@
  * Features Section - Lazy loaded
  * Contains: as prop, transient props, CSS nesting, theming
  */
-
-import { styled, css, setTheme, getTheme } from "styled-static";
-import { Sun, Moon } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
+import { css, getTheme, setTheme, styled } from "styled-static";
 import {
-  Section,
-  SectionTitle,
-  SubsectionTitle,
-  Paragraph,
-  InlineCode,
+  AlertTriangle,
+  Button,
+  ButtonGroup,
+  Callout,
+  CodeBlock,
   DemoArea,
   DemoLabel,
-  ButtonGroup,
-  Button,
-  StyledButton,
-  CodeBlock,
-  Callout,
+  InlineCode,
   Lightbulb,
+  Paragraph,
+  Section,
+  SectionTitle,
+  StyledButton,
+  SubsectionTitle,
+} from "./shared";
+import {
   AlertTriangle,
+  Button,
+  ButtonGroup,
+  Callout,
+  CodeBlock,
+  DemoArea,
+  DemoLabel,
+  InlineCode,
+  Lightbulb,
+  Paragraph,
+  Section,
+  SectionTitle,
+  StyledButton,
+  SubsectionTitle,
 } from "./shared";
 
 interface FeaturesSectionProps {

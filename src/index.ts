@@ -256,7 +256,7 @@ export function cx(...args: (string | false | null | undefined)[]): string {
  */
 export function styledVariants<
   T extends import("./types").HTMLTag | import("react").ComponentType<any>,
-  V extends import("./types").VariantsConfig
+  V extends import("./types").VariantsConfig,
 >(
   _config: import("./types").StyledVariantsDefinition<V> & { component: T }
 ): import("./types").StyledVariantComponent<T, V> {

@@ -41,7 +41,7 @@ export interface VariantsDefinition<V extends VariantsConfig = VariantsConfig> {
  * Configuration for styledVariants (includes component).
  */
 export interface StyledVariantsDefinition<
-  V extends VariantsConfig = VariantsConfig
+  V extends VariantsConfig = VariantsConfig,
 > extends VariantsDefinition<V> {
   /** HTML tag or component to render */
   component: HTMLTag | ComponentType<any>;
@@ -65,12 +65,12 @@ export type VariantProps<V extends VariantsConfig> = {
  */
 export type StyledVariantComponent<
   T extends HTMLTag | ComponentType<any>,
-  V extends VariantsConfig
+  V extends VariantsConfig,
 > = T extends HTMLTag
   ? ComponentType<JSX.IntrinsicElements[T] & VariantProps<V> & TransientProps>
   : T extends ComponentType<infer P>
-  ? ComponentType<P & VariantProps<V> & TransientProps>
-  : never;
+    ? ComponentType<P & VariantProps<V> & TransientProps>
+    : never;
 
 /**
  * Function returned by cssVariants.
@@ -84,8 +84,8 @@ export type CssVariantsFunction<V extends VariantsConfig> = (
 export type PropsOf<T> = T extends HTMLTag
   ? JSX.IntrinsicElements[T]
   : T extends ComponentType<infer P>
-  ? P
-  : never;
+    ? P
+    : never;
 
 /**
  * Transient props - prefixed with $ to prevent forwarding to DOM.
@@ -119,8 +119,8 @@ export type StyledComponent<T extends HTMLTag | ComponentType<any>> =
   T extends HTMLTag
     ? ComponentType<PropsOf<T> & TransientProps & AsProp>
     : T extends ComponentType<infer P>
-    ? ComponentType<P & TransientProps>
-    : never;
+      ? ComponentType<P & TransientProps>
+      : never;
 
 // ============================================================================
 // Attrs Types
@@ -168,7 +168,9 @@ export type StyledFunction = {
    * @example
    * const Button = styled.button`padding: 1rem;`;
    */
-  <T extends HTMLTag>(tag: T): (
+  <T extends HTMLTag>(
+    tag: T
+  ): (
     strings: TemplateStringsArray,
     ...interpolations: never[]
   ) => StyledComponent<T>;
@@ -178,7 +180,9 @@ export type StyledFunction = {
    * @example
    * const PrimaryButton = styled(Button)`background: blue;`;
    */
-  <P extends { className?: string }>(component: ComponentType<P>): (
+  <P extends { className?: string }>(
+    component: ComponentType<P>
+  ): (
     strings: TemplateStringsArray,
     ...interpolations: never[]
   ) => StyledComponent<ComponentType<P>>;

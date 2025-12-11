@@ -2,27 +2,45 @@
  * API Section - Lazy loaded
  * Contains: styled, extension, css, cx, keyframes, attrs, variants, global
  */
-
 import { useState } from "react";
-import { styled, css, cx } from "styled-static";
+import { css, cx, styled } from "styled-static";
 import {
-  Section,
-  SectionTitle,
-  SubsectionTitle,
-  Paragraph,
-  InlineCode,
+  AlertTriangle,
+  Button,
+  ButtonGroup,
+  Callout,
+  CodeBlock,
   DemoArea,
   DemoLabel,
-  ButtonGroup,
-  Button,
-  StyledButton,
   ExtendedButton,
-  highlightClass,
-  CodeBlock,
-  Callout,
   Info,
+  InlineCode,
   Lightbulb,
+  Paragraph,
+  Section,
+  SectionTitle,
+  StyledButton,
+  SubsectionTitle,
+  highlightClass,
+} from "./shared";
+import {
   AlertTriangle,
+  Button,
+  ButtonGroup,
+  Callout,
+  CodeBlock,
+  DemoArea,
+  DemoLabel,
+  ExtendedButton,
+  Info,
+  InlineCode,
+  Lightbulb,
+  Paragraph,
+  Section,
+  SectionTitle,
+  StyledButton,
+  SubsectionTitle,
+  highlightClass,
 } from "./shared";
 
 export function ApiSection() {
