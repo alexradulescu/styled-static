@@ -14,15 +14,30 @@ import { highlight } from "sugar-high";
 export const Section = styled.section`
   margin-bottom: 4rem;
   scroll-margin-top: calc(var(--header-height) + 2rem);
+
+  @media (max-width: 767px) {
+    margin-bottom: 3rem;
+    scroll-margin-top: calc(var(--mobile-header-height) + 1rem);
+  }
+`;
+
+export const Breadcrumb = styled.span`
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-primary);
+  margin-bottom: 0.5rem;
 `;
 
 export const SectionTitle = styled.h2`
-  font-size: 1.5rem;
+  font-size: 1.625rem;
   font-weight: 600;
-  margin: 0 0 1rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid var(--color-border);
-  letter-spacing: -0.01em;
+  margin: 0 0 1.25rem;
+  letter-spacing: -0.02em;
+
+  @media (max-width: 767px) {
+    font-size: 1.375rem;
+  }
 `;
 
 export const SubsectionTitle = styled.h3`
@@ -55,6 +70,13 @@ export const DemoArea = styled.div`
   background: var(--color-bg-sidebar);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
+  max-width: 100%;
+  overflow-x: auto;
+
+  @media (max-width: 767px) {
+    padding: 1rem;
+    margin: 1rem 0;
+  }
 `;
 
 export const DemoLabel = styled.div`
@@ -183,50 +205,73 @@ export const Counter = styled.div`
 
 const CodeBlockWrapper = styled.div`
   margin: 1.5rem 0;
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  border: 1px solid var(--color-border);
+  border: 1px solid #2a2a2a;
+  background: var(--color-bg-code);
+  max-width: 100%;
 `;
 
 const CodeBlockHeader = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.5rem 1rem;
-  background: #2d2d2d;
-  border-bottom: 1px solid #3a3a3a;
+  padding: 0 1rem;
+  background: #1a1a1a;
+  border-bottom: 1px solid #2a2a2a;
+  min-height: 44px;
+`;
+
+const TabLabel = styled.span`
+  display: inline-flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 0.75rem;
+  margin-right: 0.25rem;
   font-size: 0.8125rem;
-  color: #9ca3af;
+  font-weight: 500;
+  color: #e5e7eb;
+  background: var(--color-bg-code);
+  border-radius: 8px 8px 0 0;
+  position: relative;
+  top: 1px;
 `;
 
 const CodeBlockContent = styled.pre`
   margin: 0;
-  padding: 1rem;
+  padding: 1.25rem 1rem;
   background: var(--color-bg-code);
   color: #e5e7eb;
   font-family: "Fira Code", "Monaco", monospace;
-  font-size: 0.875rem;
-  line-height: 1.6;
+  font-size: 0.8125rem;
+  line-height: 1.7;
   overflow-x: auto;
+  max-width: 100%;
+
+  @media (max-width: 767px) {
+    padding: 1rem 0.75rem;
+    font-size: 0.75rem;
+  }
 `;
 
 const CopyButton = styled.button`
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem 0.5rem;
+  gap: 0.375rem;
+  padding: 0.375rem 0.625rem;
   font-size: 0.75rem;
   font-family: inherit;
   color: #9ca3af;
   background: transparent;
   border: 1px solid #3a3a3a;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   transition: all var(--transition);
 
   &:hover {
-    background: #3a3a3a;
-    color: white;
+    background: #2a2a2a;
+    color: #e5e7eb;
+    border-color: #4a4a4a;
   }
 `;
 
@@ -250,22 +295,20 @@ export function CodeBlock({
 
   return (
     <CodeBlockWrapper>
-      {filename && (
-        <CodeBlockHeader>
-          <span>{filename}</span>
-          <CopyButton onClick={handleCopy}>
-            {copied ? (
-              <>
-                <Check size={14} /> Copied
-              </>
-            ) : (
-              <>
-                <Copy size={14} /> Copy
-              </>
-            )}
-          </CopyButton>
-        </CodeBlockHeader>
-      )}
+      <CodeBlockHeader>
+        <TabLabel>{filename || "code"}</TabLabel>
+        <CopyButton onClick={handleCopy}>
+          {copied ? (
+            <>
+              <Check size={14} /> Copied
+            </>
+          ) : (
+            <>
+              <Copy size={14} /> Copy
+            </>
+          )}
+        </CopyButton>
+      </CodeBlockHeader>
       <CodeBlockContent dangerouslySetInnerHTML={{ __html: highlightedCode }} />
     </CodeBlockWrapper>
   );
@@ -278,8 +321,8 @@ export function CodeBlock({
 const calloutStyles = cssVariants({
   css: css`
     display: flex;
-    gap: 0.75rem;
-    padding: 1rem;
+    gap: 0.875rem;
+    padding: 1.125rem 1.25rem;
     margin: 1.5rem 0;
     border-radius: var(--radius);
     font-size: 0.9375rem;

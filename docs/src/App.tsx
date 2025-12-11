@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import {
   Atom,
   Ban,
+  Code2,
   Github,
   Globe,
   HeartCrack,
@@ -10,6 +11,7 @@ import {
   Moon,
   Palette,
   PartyPopper,
+  Rocket,
   Search,
   Shield,
   Sparkles,
@@ -46,22 +48,26 @@ const FeaturesSection = lazy(() =>
 const GlobalStyle = createGlobalStyle`
   :root {
     --color-bg: #ffffff;
-    --color-bg-sidebar: #f9fafb;
-    --color-bg-code: #1e1e1e;
+    --color-bg-sidebar: #fafafa;
+    --color-bg-code: #0f0f0f;
     --color-bg-callout: #f0fdf4;
-    --color-border: #e5e7eb;
-    --color-text: #1a1a1a;
-    --color-text-secondary: #6b7280;
+    --color-border: #e2e8f0;
+    --color-border-subtle: #f1f5f9;
+    --color-text: #0f172a;
+    --color-text-secondary: #64748b;
+    --color-text-muted: #94a3b8;
     --color-primary: #10b981;
     --color-primary-hover: #059669;
-    --color-nav-active: rgba(16, 185, 129, 0.1);
+    --color-nav-active: rgba(16, 185, 129, 0.08);
     --sidebar-width: 260px;
     --header-height: 60px;
+    --mobile-header-height: 56px;
     --content-max-width: 720px;
     --radius: 8px;
-    --transition: 0.2s ease;
-    --scrollbar-thumb: rgba(0, 0, 0, 0.15);
-    --scrollbar-thumb-hover: rgba(0, 0, 0, 0.25);
+    --radius-lg: 12px;
+    --transition: 0.15s ease;
+    --scrollbar-thumb: rgba(0, 0, 0, 0.12);
+    --scrollbar-thumb-hover: rgba(0, 0, 0, 0.2);
 
     /* Sugar High syntax highlighting (dark theme for code blocks) */
     --sh-class: #4ec9b0;
@@ -76,15 +82,17 @@ const GlobalStyle = createGlobalStyle`
   }
 
   [data-theme="dark"] {
-    --color-bg: #0f0f0f;
-    --color-bg-sidebar: #1a1a1a;
-    --color-bg-code: #1e1e1e;
+    --color-bg: #0a0a0a;
+    --color-bg-sidebar: #111111;
+    --color-bg-code: #0f0f0f;
     --color-bg-callout: #0c2915;
-    --color-border: #2a2a2a;
-    --color-text: #e5e7eb;
-    --color-text-secondary: #9ca3af;
-    --scrollbar-thumb: rgba(255, 255, 255, 0.15);
-    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.25);
+    --color-border: #1f1f1f;
+    --color-border-subtle: #171717;
+    --color-text: #f1f5f9;
+    --color-text-secondary: #94a3b8;
+    --color-text-muted: #64748b;
+    --scrollbar-thumb: rgba(255, 255, 255, 0.12);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
   }
 
   * {
@@ -125,10 +133,12 @@ const GlobalStyle = createGlobalStyle`
     margin: 0;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: 15px;
-    line-height: 1.7;
+    line-height: 1.65;
     color: var(--color-text);
     background: var(--color-bg);
     transition: background var(--transition), color var(--transition);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   ::selection {
@@ -144,6 +154,72 @@ const GlobalStyle = createGlobalStyle`
 const Layout = styled.div`
   display: flex;
   min-height: 100vh;
+  overflow-x: hidden;
+`;
+
+const MobileHeader = styled.header`
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--mobile-header-height);
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  padding: 0 12px;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 150;
+  transition: background var(--transition), border-color var(--transition);
+
+  @media (max-width: 767px) {
+    display: flex;
+  }
+`;
+
+const BurgerButton = styled.button`
+  background: none;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+
+  span {
+    display: block;
+    width: 20px;
+    height: 2px;
+    background: var(--color-text);
+    border-radius: 1px;
+    transition: background var(--transition);
+  }
+`;
+
+const HeaderTitle = styled.span`
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--color-text);
+`;
+
+const Overlay = styled.div`
+  display: none;
+
+  @media (max-width: 767px) {
+    display: block;
+    position: fixed;
+    inset: var(--mobile-header-height) 0 0 0;
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 99;
+
+    &[data-visible="true"] {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
 `;
 
 const Sidebar = styled.aside`
@@ -160,6 +236,24 @@ const Sidebar = styled.aside`
   transition:
     background var(--transition),
     border-color var(--transition);
+
+  [data-theme="light"] & {
+    box-shadow: 1px 0 3px rgba(0, 0, 0, 0.02);
+  }
+
+  @media (max-width: 767px) {
+    top: var(--mobile-header-height);
+    height: calc(100vh - var(--mobile-header-height));
+    transform: translateX(-100%);
+    transition:
+      background var(--transition),
+      border-color var(--transition),
+      transform 0.2s ease;
+
+    &[data-open="true"] {
+      transform: translateX(0);
+    }
+  }
 `;
 
 const SidebarHeader = styled.div`
@@ -247,33 +341,37 @@ const NavGroupTitle = styled.div`
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem;
-  font-size: 0.8125rem;
+  padding: 0.5rem 0.5rem 0.375rem;
+  font-size: 0.6875rem;
   font-weight: 600;
-  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
+  margin-top: 0.25rem;
 `;
 
 const activeNavItem = css`
   background: var(--color-nav-active);
   color: var(--color-primary);
   font-weight: 500;
+  border-left: 2px solid var(--color-primary);
+  padding-left: calc(0.75rem - 2px);
 `;
 
 const NavItem = styled.a`
   display: block;
-  padding: 0.5rem 0.75rem;
-  margin: 0.125rem 0;
+  padding: 0.4375rem 0.75rem;
+  margin: 0.0625rem 0;
   font-size: 0.875rem;
   color: var(--color-text-secondary);
   text-decoration: none;
   border-radius: 6px;
+  border-left: 2px solid transparent;
   transition: all var(--transition);
 
   &:hover {
     color: var(--color-text);
-    background: var(--color-border);
+    background: var(--color-border-subtle);
   }
 `;
 
@@ -288,9 +386,10 @@ const SidebarFooter = styled.div`
 const ThemeToggle = styled.button`
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
   font-family: inherit;
   color: var(--color-text-secondary);
   background: transparent;
@@ -300,8 +399,31 @@ const ThemeToggle = styled.button`
   transition: all var(--transition);
 
   &:hover {
-    background: var(--color-border);
+    background: var(--color-border-subtle);
     color: var(--color-text);
+    border-color: var(--color-text-secondary);
+  }
+`;
+
+const IconLink = styled.a`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all var(--transition);
+  text-decoration: none;
+
+  &:hover {
+    background: var(--color-border-subtle);
+    color: var(--color-text);
+    border-color: var(--color-text-secondary);
   }
 `;
 
@@ -309,12 +431,23 @@ const Main = styled.main`
   flex: 1;
   margin-left: var(--sidebar-width);
   min-height: 100vh;
+  min-width: 0;
+
+  @media (max-width: 767px) {
+    margin-left: 0;
+    margin-top: var(--mobile-header-height);
+  }
 `;
 
 const Content = styled.div`
   max-width: var(--content-max-width);
   margin: 0 auto;
   padding: 3rem 2rem 6rem;
+
+  @media (max-width: 767px) {
+    max-width: 100%;
+    padding: 2rem 12px 4rem;
+  }
 `;
 
 // =============================================================================
@@ -326,27 +459,85 @@ const PageTitle = styled.h1`
   font-weight: 700;
   margin: 0 0 1rem;
   letter-spacing: -0.02em;
+
+  @media (max-width: 767px) {
+    font-size: 1.75rem;
+  }
 `;
 
 const PageSubtitle = styled.p`
   font-size: 1.125rem;
   color: var(--color-text-secondary);
-  margin: 0 0 3rem;
+  margin: 0 0 1.5rem;
   line-height: 1.6;
+`;
+
+const HeroBanner = styled.div`
+  height: 140px;
+  margin: 0 0 3rem;
+  background: linear-gradient(135deg, #0a0a0a 0%, #0f1f12 50%, #0a1a0d 100%);
+  border-radius: var(--radius-lg);
+  position: relative;
+  overflow: hidden;
+
+  /* Geometric pattern using pseudo-elements */
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background:
+      linear-gradient(135deg, transparent 40%, rgba(16, 185, 129, 0.08) 40%, rgba(16, 185, 129, 0.08) 60%, transparent 60%),
+      linear-gradient(225deg, transparent 30%, rgba(16, 185, 129, 0.05) 30%, rgba(16, 185, 129, 0.05) 50%, transparent 50%);
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 20%;
+    right: 10%;
+    width: 200px;
+    height: 200px;
+    background: linear-gradient(45deg, transparent 45%, rgba(16, 185, 129, 0.12) 45%, rgba(16, 185, 129, 0.12) 55%, transparent 55%);
+    transform: rotate(15deg);
+  }
+
+  @media (max-width: 767px) {
+    height: 100px;
+    margin: 0 0 2rem;
+    border-radius: var(--radius);
+  }
 `;
 
 const Section = styled.section`
   margin-bottom: 4rem;
   scroll-margin-top: calc(var(--header-height) + 2rem);
+
+  @media (max-width: 767px) {
+    margin-bottom: 3rem;
+    scroll-margin-top: calc(var(--mobile-header-height) + 1rem);
+  }
+`;
+
+const Breadcrumb = styled.span`
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-primary);
+  margin-bottom: 0.5rem;
 `;
 
 const SectionTitle = styled.h2`
-  font-size: 1.5rem;
+  font-size: 1.625rem;
   font-weight: 600;
-  margin: 0 0 1rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid var(--color-border);
-  letter-spacing: -0.01em;
+  margin: 0 0 1.25rem;
+  letter-spacing: -0.02em;
+
+  @media (max-width: 767px) {
+    font-size: 1.375rem;
+  }
 `;
 
 const Paragraph = styled.p`
@@ -363,47 +554,14 @@ const InlineCode = styled.code`
 `;
 
 // =============================================================================
-// Code Block (inline for Getting Started)
-// =============================================================================
-
-const CodeBlockWrapper = styled.div`
-  margin: 1.5rem 0;
-  border-radius: var(--radius);
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-`;
-
-const CodeBlockHeader = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.5rem 1rem;
-  background: #2d2d2d;
-  border-bottom: 1px solid #3a3a3a;
-  font-size: 0.8125rem;
-  color: #9ca3af;
-`;
-
-const CodeBlockContent = styled.pre`
-  margin: 0;
-  padding: 1rem;
-  background: var(--color-bg-code);
-  color: #e5e7eb;
-  font-family: "Fira Code", "Monaco", monospace;
-  font-size: 0.875rem;
-  line-height: 1.6;
-  overflow-x: auto;
-`;
-
-// =============================================================================
 // Callout (inline for Getting Started)
 // =============================================================================
 
 const calloutStyles = cssVariants({
   css: css`
     display: flex;
-    gap: 0.75rem;
-    padding: 1rem;
+    gap: 0.875rem;
+    padding: 1.125rem 1.25rem;
     margin: 1.5rem 0;
     border-radius: var(--radius);
     font-size: 0.9375rem;
@@ -581,6 +739,7 @@ export function App() {
   });
   const [activeSection, setActiveSection] = useState("introduction");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Theme toggle using styled-static helpers
@@ -687,11 +846,24 @@ export function App() {
     {} as Record<string, SectionInfo[]>
   );
 
+  const closeSidebar = () => setSidebarOpen(false);
+
   return (
     <>
       <GlobalStyle />
       <Layout>
-        <Sidebar>
+        <MobileHeader>
+          <HeaderTitle>styled-static</HeaderTitle>
+          <BurgerButton
+            onClick={() => setSidebarOpen((prev) => !prev)}
+            aria-label="Toggle menu"
+          >
+            <span />
+            <span />
+          </BurgerButton>
+        </MobileHeader>
+        <Overlay data-visible={sidebarOpen} onClick={closeSidebar} />
+        <Sidebar data-open={sidebarOpen}>
           <SidebarHeader>
             <Logo href="#">
               <Palette size={24} />
@@ -715,13 +887,21 @@ export function App() {
           <NavSection>
             {Object.entries(groupedSections).map(([group, items]) => (
               <NavGroup key={group}>
-                <NavGroupTitle>{group}</NavGroupTitle>
+                <NavGroupTitle>
+                  {group === "Getting Started" && <Rocket size={12} />}
+                  {group === "API" && <Code2 size={12} />}
+                  {group === "Features" && <Sparkles size={12} />}
+                  {group}
+                </NavGroupTitle>
                 {items.map((item) => (
                   <NavItem
                     key={item.id}
                     href={`#${item.id}`}
                     className={activeSection === item.id ? activeNavItem : ""}
-                    onClick={() => setSearchQuery("")}
+                    onClick={() => {
+                      setSearchQuery("");
+                      closeSidebar();
+                    }}
                   >
                     {item.title}
                   </NavItem>
@@ -731,18 +911,17 @@ export function App() {
           </NavSection>
 
           <SidebarFooter>
-            <ThemeToggle onClick={toggleTheme}>
-              {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
-              {theme === "light" ? "Dark" : "Light"}
+            <ThemeToggle onClick={toggleTheme} aria-label="Toggle theme">
+              {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
             </ThemeToggle>
-            <NavItem
+            <IconLink
               href="https://github.com/nicholascostadev/styled-static"
               target="_blank"
               rel="noopener noreferrer"
-              style={{ padding: "0.5rem" }}
+              aria-label="GitHub repository"
             >
-              <Github size={20} />
-            </NavItem>
+              <Github size={18} />
+            </IconLink>
           </SidebarFooter>
         </Sidebar>
 
@@ -754,6 +933,7 @@ export function App() {
               Zero-runtime CSS-in-JS for React 19+ with Vite. Write
               styled-components syntax, get static CSS extracted at build time.
             </PageSubtitle>
+            <HeroBanner />
 
             {/* ========================================== */}
             {/* GETTING STARTED - Inline (not lazy loaded) */}
@@ -761,6 +941,7 @@ export function App() {
 
             {/* Quick Overview */}
             <Section id="quick-overview">
+              <Breadcrumb>Getting Started</Breadcrumb>
               <SectionTitle>Quick Overview</SectionTitle>
               <Paragraph>
                 All the APIs you need at a glance. styled-static provides 6 core
@@ -791,6 +972,7 @@ const Btn = styledVariants({
 
             {/* Why styled-static? */}
             <Section id="why">
+              <Breadcrumb>Getting Started</Breadcrumb>
               <SectionTitle>Why styled-static?</SectionTitle>
 
               <div className={calloutStyles({ type: "tip" })}>
@@ -862,6 +1044,7 @@ const Btn = styledVariants({
 
             {/* What We Don't Do */}
             <Section id="what-we-dont-do">
+              <Breadcrumb>Getting Started</Breadcrumb>
               <SectionTitle>What We Don't Do</SectionTitle>
               <Paragraph>
                 styled-static is intentionally limited. Here's what we don't
@@ -918,6 +1101,7 @@ const Btn = styledVariants({
 
             {/* Installation */}
             <Section id="installation">
+              <Breadcrumb>Getting Started</Breadcrumb>
               <SectionTitle>Installation</SectionTitle>
               <Paragraph>
                 Install the package with your preferred package manager:

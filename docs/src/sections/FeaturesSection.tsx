@@ -3,25 +3,9 @@
  * Contains: as prop, transient props, CSS nesting, theming
  */
 import { Moon, Sun } from "lucide-react";
-import { css, getTheme, setTheme, styled } from "styled-static";
 import {
   AlertTriangle,
-  Button,
-  ButtonGroup,
-  Callout,
-  CodeBlock,
-  DemoArea,
-  DemoLabel,
-  InlineCode,
-  Lightbulb,
-  Paragraph,
-  Section,
-  SectionTitle,
-  StyledButton,
-  SubsectionTitle,
-} from "./shared";
-import {
-  AlertTriangle,
+  Breadcrumb,
   Button,
   ButtonGroup,
   Callout,
@@ -47,6 +31,7 @@ export function FeaturesSection({ theme, toggleTheme }: FeaturesSectionProps) {
     <>
       {/* as prop */}
       <Section id="as-prop">
+        <Breadcrumb>Features</Breadcrumb>
         <SectionTitle>Polymorphic as Prop</SectionTitle>
         <Paragraph>
           Change the rendered element using the <InlineCode>as</InlineCode>{" "}
@@ -82,6 +67,7 @@ export function FeaturesSection({ theme, toggleTheme }: FeaturesSectionProps) {
 
       {/* Transient Props */}
       <Section id="transient">
+        <Breadcrumb>Features</Breadcrumb>
         <SectionTitle>Transient Props</SectionTitle>
         <Paragraph>
           Props prefixed with <InlineCode>$</InlineCode> are filtered out before
@@ -107,6 +93,7 @@ export function FeaturesSection({ theme, toggleTheme }: FeaturesSectionProps) {
 
       {/* CSS Nesting */}
       <Section id="nesting">
+        <Breadcrumb>Features</Breadcrumb>
         <SectionTitle>CSS Nesting</SectionTitle>
         <Paragraph>
           styled-static uses native CSS nesting (supported in all modern
@@ -147,6 +134,7 @@ export function FeaturesSection({ theme, toggleTheme }: FeaturesSectionProps) {
 
       {/* Theming */}
       <Section id="theming">
+        <Breadcrumb>Features</Breadcrumb>
         <SectionTitle>Theming</SectionTitle>
         <Paragraph>
           styled-static provides a CSS-first approach to theming using CSS

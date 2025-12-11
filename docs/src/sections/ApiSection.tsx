@@ -3,9 +3,10 @@
  * Contains: styled, extension, css, cx, keyframes, attrs, variants, global
  */
 import { useState } from "react";
-import { css, cx, styled } from "styled-static";
+import { cx } from "styled-static";
 import {
   AlertTriangle,
+  Breadcrumb,
   Button,
   ButtonGroup,
   Callout,
@@ -13,6 +14,7 @@ import {
   DemoArea,
   DemoLabel,
   ExtendedButton,
+  highlightClass,
   Info,
   InlineCode,
   Lightbulb,
@@ -21,26 +23,6 @@ import {
   SectionTitle,
   StyledButton,
   SubsectionTitle,
-  highlightClass,
-} from "./shared";
-import {
-  AlertTriangle,
-  Button,
-  ButtonGroup,
-  Callout,
-  CodeBlock,
-  DemoArea,
-  DemoLabel,
-  ExtendedButton,
-  Info,
-  InlineCode,
-  Lightbulb,
-  Paragraph,
-  Section,
-  SectionTitle,
-  StyledButton,
-  SubsectionTitle,
-  highlightClass,
 } from "./shared";
 
 export function ApiSection() {
@@ -50,6 +32,7 @@ export function ApiSection() {
     <>
       {/* styled */}
       <Section id="styled">
+        <Breadcrumb>API</Breadcrumb>
         <SectionTitle>styled</SectionTitle>
         <Paragraph>
           Create styled React components with zero runtime overhead. CSS is
@@ -80,6 +63,7 @@ const Button = styled.button\`
 
       {/* Extension */}
       <Section id="extension">
+        <Breadcrumb>API</Breadcrumb>
         <SectionTitle>Component Extension</SectionTitle>
         <Paragraph>
           Extend existing styled components by passing them to{" "}
@@ -107,6 +91,7 @@ const BoldButton = styled(Button)\`
 
       {/* css */}
       <Section id="css">
+        <Breadcrumb>API</Breadcrumb>
         <SectionTitle>css Helper</SectionTitle>
         <Paragraph>
           The <InlineCode>css</InlineCode> helper returns a scoped class name
@@ -140,6 +125,7 @@ const highlightClass = css\`
 
       {/* cx */}
       <Section id="cx">
+        <Breadcrumb>API</Breadcrumb>
         <SectionTitle>cx Utility</SectionTitle>
         <Paragraph>
           A minimal (~40 byte) utility for conditionally joining class names.
@@ -163,6 +149,7 @@ cx('a', null, undefined, false, 'b') // → 'a b'`}</CodeBlock>
 
       {/* keyframes */}
       <Section id="keyframes">
+        <Breadcrumb>API</Breadcrumb>
         <SectionTitle>keyframes</SectionTitle>
         <Paragraph>
           Create scoped keyframe animations. The animation name is hashed to
@@ -205,6 +192,7 @@ const PulsingDot = styled.div\`
 
       {/* attrs */}
       <Section id="attrs">
+        <Breadcrumb>API</Breadcrumb>
         <SectionTitle>attrs</SectionTitle>
         <Paragraph>
           Set default HTML attributes on styled components using the{" "}
@@ -244,6 +232,7 @@ const SubmitButton = styled.button.attrs({
 
       {/* Variants */}
       <Section id="variants">
+        <Breadcrumb>API</Breadcrumb>
         <SectionTitle>Variants API</SectionTitle>
         <Paragraph>
           For type-safe variant handling, use{" "}
@@ -346,6 +335,7 @@ const badgeCss = cssVariants({
 
       {/* Global Styles */}
       <Section id="global">
+        <Breadcrumb>API</Breadcrumb>
         <SectionTitle>Global Styles</SectionTitle>
         <Paragraph>
           Use <InlineCode>createGlobalStyle</InlineCode> for global CSS like
