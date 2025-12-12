@@ -5,7 +5,17 @@ description: Use when writing styles with styled-static, creating styled compone
 
 # styled-static
 
-Zero-runtime CSS-in-JS for React 19+ with Vite. All CSS extracted at build time, ~300 byte runtime.
+Near-zero-runtime CSS-in-JS for React 19+ with Vite. CSS generation happens at build time (zero runtime cost). The ~300 byte runtime handles `as` prop, transient props, and className merging.
+
+## Tree-Shakable Runtime
+
+The runtime is split into separate modules for optimal tree-shaking:
+- `runtime/core.ts` - Shared utilities
+- `runtime/styled.ts` - __styled, __styledExtend (~80 bytes)
+- `runtime/variants.ts` - Variant functions (~150 bytes)
+- `runtime/global.ts` - __GlobalStyle (~10 bytes)
+
+Apps automatically bundle only what they use. No variants? Save ~150 bytes. No styled components? Save ~80 bytes.
 
 ## Key Difference from Emotion/styled-components
 
@@ -43,7 +53,11 @@ const PrimaryButton = styled(Button)`
 ```
 
 **Props:**
-- `as` - Polymorphic rendering: `<Button as="a" href="/">Link</Button>`
+- `as` - Polymorphic rendering with HTML elements or React components:
+  ```tsx
+  <Button as="a" href="/">Link</Button>
+  <Button as={Link} to="/path">Router Link</Button>
+  ```
 - `className` - Merged after styled classes (wins in cascade)
 - `$propName` - Transient props, filtered from DOM
 
@@ -285,7 +299,9 @@ const Primary = styled(Button)`background: blue;`; // .ss-def
 ## Security
 
 ### Blocked Elements
-The `as` prop blocks dangerous elements: `script`, `iframe`, `style`, `meta`, `link`, `embed`, `object`, `base`, `noscript`, `template`
+The `as` prop blocks dangerous HTML elements: `script`, `iframe`, `style`, `meta`, `link`, `embed`, `object`, `base`, `noscript`, `template`
+
+React components passed to `as` are not validated (they come from code, not user input).
 
 ### Variant Sanitization
 Variant values are auto-sanitized to alphanumeric + hyphens only, preventing class injection attacks.

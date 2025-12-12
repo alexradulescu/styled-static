@@ -35,7 +35,7 @@ export function FeaturesSection({ theme, toggleTheme }: FeaturesSectionProps) {
         <SectionTitle>Polymorphic as Prop</SectionTitle>
         <Paragraph>
           Change the rendered element using the <InlineCode>as</InlineCode>{" "}
-          prop. Useful for semantic HTML or accessibility.
+          prop. Works with HTML elements and React components.
         </Paragraph>
         <CodeBlock>{`const Button = styled.button\`
   padding: 0.5rem 1rem;
@@ -43,14 +43,16 @@ export function FeaturesSection({ theme, toggleTheme }: FeaturesSectionProps) {
   color: white;
 \`;
 
-// Render as anchor
+// Render as HTML element
 <Button as="a" href="/link">
   I'm a link!
 </Button>
 
-// Render as span
-<Button as="span">
-  I'm a span!
+// Render as React component (e.g., react-router Link)
+import { Link } from 'react-router-dom';
+
+<Button as={Link} to="/path">
+  I'm a router link!
 </Button>`}</CodeBlock>
         <DemoArea>
           <DemoLabel>Result</DemoLabel>
@@ -138,8 +140,8 @@ export function FeaturesSection({ theme, toggleTheme }: FeaturesSectionProps) {
         <SectionTitle>Theming</SectionTitle>
         <Paragraph>
           styled-static provides a CSS-first approach to theming using CSS
-          variables and <InlineCode>data-theme</InlineCode> attributes. Zero
-          runtime overhead—just pure CSS.
+          variables and <InlineCode>data-theme</InlineCode> attributes. Themes
+          are pure CSS—no runtime theme injection.
         </Paragraph>
 
         <SubsectionTitle>Defining Themes</SubsectionTitle>

@@ -35,7 +35,7 @@ export function ApiSection() {
         <Breadcrumb>API</Breadcrumb>
         <SectionTitle>styled</SectionTitle>
         <Paragraph>
-          Create styled React components with zero runtime overhead. CSS is
+          Create styled React components with static CSS extraction. CSS is
           extracted at build time.
         </Paragraph>
         <CodeBlock filename="Button.tsx">{`import { styled } from 'styled-static';

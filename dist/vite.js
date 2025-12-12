@@ -1,64 +1,4 @@
-/**
- * styled-static Vite Plugin
- *
- * Transforms styled-static syntax into optimized React components with
- * static CSS extraction.
- *
- * ## Why AST over Regex?
- *
- * We use Vite's built-in parser (via Rollup's acorn) instead of regex because:
- *
- * 1. **Robustness**: Regex breaks on edge cases like CSS containing backticks,
- *    strings that look like styled calls, or complex nesting.
- *
- *    Example that would break regex:
- *    ```tsx
- *    const x = styled.div`content: "styled.button\`test\`";`;
- *    const comment = "// styled.div`fake`"; // This isn't actually a styled call
- *    ```
- *
- * 2. **No extra dependencies**: Vite provides `this.parse()` for free via Rollup.
- *    We don't need acorn or acorn-walk as separate dependencies.
- *
- * 3. **Accuracy**: AST gives us exact node positions for surgical code replacement
- *    with proper source maps. Regex can't reliably handle nested backticks or
- *    escaped characters.
- *
- * 4. **Maintainability**: Adding new syntax patterns is straightforward with AST
- *    visitors vs. increasingly complex regex patterns that become unmaintainable.
- *
- * ## Transformation Pipeline
- *
- * 1. Parse source with Vite's parser
- * 2. Find all styled/css/createGlobalStyle tagged template literals
- * 3. For each:
- *    - Extract CSS content
- *    - Hash it to generate unique class name
- *    - Process CSS (nesting, autoprefixer)
- *    - Create virtual CSS module
- *    - Replace original code with runtime call + import
- * 4. Return transformed code with source map
- *
- * ## className Order (CSS Cascade)
- *
- * When components are extended, classes are ordered for proper cascade:
- * - Base styles first
- * - Extension styles second (override base)
- * - User className last (override all)
- *
- * Example:
- * ```tsx
- * const Button = styled.button`padding: 1rem;`;        // .ss-abc
- * const Primary = styled(Button)`background: blue;`;   // .ss-def
- * <Primary className="custom" />
- * // Renders: class="ss-abc ss-def custom"
- * // CSS cascade: padding → background → custom overrides
- * ```
- */
 import MagicString from "magic-string";
-import postcss from "postcss";
-import postcssNested from "postcss-nested";
-import autoprefixer from "autoprefixer";
 import { hash } from "./hash.js";
 // ============================================================================
 // Plugin
@@ -75,20 +15,32 @@ import { hash } from "./hash.js";
  *   plugins: [styledStatic(), react()],
  * });
  */
+/**
+ * SECURITY: Validates that a string is a safe identifier (alphanumeric + underscore).
+ * Prevents code injection via displayName or component name interpolation.
+ */
+function isValidIdentifier(str) {
+    return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(str);
+}
+/**
+ * SECURITY: Safely escape a string for use in generated code.
+ * Uses JSON.stringify to properly escape special characters.
+ */
+function safeStringLiteral(str) {
+    return JSON.stringify(str);
+}
 export function styledStatic(options = {}) {
-    const { classPrefix = "ss", autoprefixer: autoprefixerOption = [
-        "last 2 Chrome versions",
-        "last 2 Firefox versions",
-        "last 2 Safari versions",
-        "last 2 Edge versions",
-    ], } = options;
+    const { classPrefix = "ss", debug: debugOption } = options;
+    // SECURITY: Debug logging can expose file paths and internal state.
+    // Only enable via explicit option or environment variable.
+    const DEBUG = debugOption ?? process.env.DEBUG_STYLED_STATIC === "true";
     // Virtual CSS modules: filename -> CSS content
     const cssModules = new Map();
     let config;
     let isDev = false;
     return {
         name: "styled-static",
-        enforce: "pre", // Run before other plugins (especially React)
+        enforce: "post", // Run AFTER React plugin (JSX already transformed)
         configResolved(resolvedConfig) {
             config = resolvedConfig;
             isDev = config.command === "serve";
@@ -120,7 +72,8 @@ export function styledStatic(options = {}) {
             // cached virtual modules.
             if (/\.[tj]sx?$/.test(file)) {
                 // Invalidate all virtual CSS modules from this file
-                const fileHash = hash(normalizePath(file)).slice(0, 6);
+                // SECURITY: Use consistent 8-char hash to match transform()
+                const fileHash = hash(normalizePath(file)).slice(0, 8);
                 for (const [name] of cssModules) {
                     if (name.startsWith(fileHash)) {
                         const mod = server.moduleGraph.getModuleById(`\0styled-static:${name}`);
@@ -132,57 +85,97 @@ export function styledStatic(options = {}) {
             }
         },
         async transform(code, id) {
-            // Only process .tsx/.jsx/.ts/.js files, skip node_modules
-            if (!/\.[tj]sx?$/.test(id) || /node_modules/.test(id)) {
+            // Process all JS/TS files, skip node_modules
+            // Matches: .js, .jsx, .ts, .tsx, .mjs, .cjs, .mts, .cts
+            if (!/\.[cm]?[jt]sx?$/.test(id) || /node_modules/.test(id)) {
                 return null;
             }
-            // Quick check: does file import from styled-static?
-            if (!code.includes("styled-static")) {
+            // Quick check: does file import from styled-static or local index?
+            // This avoids parsing files that don't use the library
+            const hasStyledStaticImport = code.includes("styled-static");
+            const hasLocalIndexImport = code.includes('from "./index"') ||
+                code.includes("from './index'") ||
+                code.includes('from "../index"') ||
+                code.includes("from '../index'");
+            if (!hasStyledStaticImport && !hasLocalIndexImport) {
                 return null;
             }
-            console.log("[styled-static] Transforming:", id);
+            if (DEBUG)
+                console.log("[styled-static] Transforming:", id);
             // Parse AST using Vite's built-in parser
+            // Since we run after React plugin (enforce: 'post'), JSX is already transformed
             let ast;
             try {
                 ast = this.parse(code);
-                console.log("[styled-static] AST parsed successfully, body length:", ast.body.length);
+                if (DEBUG) {
+                    console.log("[styled-static] AST parsed successfully, body length:", ast.body.length);
+                }
             }
             catch (e) {
                 // Parse error - this might be a partial file or syntax error
-                console.log("[styled-static] AST parse error:", e);
+                if (DEBUG)
+                    console.log("[styled-static] AST parse error:", e);
                 return null;
             }
             // Find styled-static imports and their local names
             const imports = findStyledStaticImports(ast);
-            console.log("[styled-static] Found imports:", imports);
-            if (!imports.css && !imports.styled && !imports.createGlobalStyle) {
-                console.log("[styled-static] No imports found, skipping");
+            if (DEBUG)
+                console.log("[styled-static] Found imports:", imports);
+            const hasTemplateImports = imports.css ||
+                imports.styled ||
+                imports.createGlobalStyle ||
+                imports.keyframes;
+            const hasVariantImports = imports.styledVariants || imports.cssVariants;
+            if (!hasTemplateImports && !hasVariantImports) {
+                if (DEBUG)
+                    console.log("[styled-static] No imports found, skipping");
                 return null;
             }
             // Find all tagged template literals using our imports
-            const templates = findTaggedTemplates(ast, imports);
-            console.log("[styled-static] Found templates:", templates.length);
-            if (templates.length === 0) {
-                console.log("[styled-static] No templates found, skipping");
+            const templates = hasTemplateImports
+                ? findTaggedTemplates(ast, imports, code)
+                : [];
+            if (DEBUG)
+                console.log("[styled-static] Found templates:", templates.length);
+            // Find all variant calls using our imports
+            const variantCalls = hasVariantImports
+                ? findVariantCalls(ast, code, imports)
+                : [];
+            if (DEBUG)
+                console.log("[styled-static] Found variant calls:", variantCalls.length);
+            if (templates.length === 0 && variantCalls.length === 0) {
+                if (DEBUG)
+                    console.log("[styled-static] No templates or variants found, skipping");
                 return null;
             }
             const s = new MagicString(code);
-            const fileHash = hash(normalizePath(id)).slice(0, 6);
+            // Use 8-char file hash to match Vite's CSS Modules standard
+            // (8 chars base36 = ~2.8 × 10^12 possibilities)
+            const fileHash = hash(normalizePath(id)).slice(0, 8);
             const cssImports = [];
             let needsStyledRuntime = false;
             let needsExtendRuntime = false;
             let needsGlobalRuntime = false;
+            let needsStyledVariantsRuntime = false;
+            let needsStyledVariantsExtendRuntime = false;
+            let needsCssVariantsRuntime = false;
+            let cssIndex = 0;
             for (let i = 0; i < templates.length; i++) {
                 const t = templates[i];
                 if (!t)
                     continue; // Guard against undefined (noUncheckedIndexedAccess)
                 const cssContent = extractTemplateContent(code, t.node.quasi);
-                const cssHash = hash(cssContent).slice(0, 6);
+                // SECURITY: Use longer hash in production for lower collision probability
+                const hashLength = isDev ? 6 : 8;
+                const cssHash = hash(cssContent).slice(0, hashLength);
                 const className = `${classPrefix}-${cssHash}`;
-                // Process CSS
-                const processedCss = await processCSS(cssContent, className, t.type === "createGlobalStyle", autoprefixerOption);
+                // Wrap CSS in class selector (unless global)
+                // Lightning CSS (via Vite's CSS pipeline) handles nesting, prefixes, etc.
+                const processedCss = t.type === "createGlobalStyle"
+                    ? cssContent
+                    : `.${className} { ${cssContent} }`;
                 // Create virtual CSS module
-                const cssFilename = `${fileHash}-${i}.css`;
+                const cssFilename = `${fileHash}-${cssIndex++}.css`;
                 cssModules.set(cssFilename, processedCss);
                 cssImports.push(`import "styled-static:${cssFilename}";`);
                 // Generate replacement code and track runtime needs
@@ -195,21 +188,81 @@ export function styledStatic(options = {}) {
                 if (t.type === "createGlobalStyle")
                     needsGlobalRuntime = true;
             }
-            // Build runtime imports
+            // Process variant calls
+            for (const v of variantCalls) {
+                const baseHash = hash(v.baseCss || "").slice(0, 6);
+                const baseClass = `${classPrefix}-${baseHash}`;
+                // Generate CSS for base and all variants
+                let allCss = "";
+                // Base CSS
+                if (v.baseCss) {
+                    allCss += `.${baseClass} { ${v.baseCss} }\n`;
+                }
+                // Variant CSS (modifiers)
+                for (const [variantName, values] of v.variants) {
+                    for (const [valueName, cssContent] of values) {
+                        const modifierClass = `${baseClass}--${variantName}-${valueName}`;
+                        allCss += `.${modifierClass} { ${cssContent} }\n`;
+                    }
+                }
+                // Create virtual CSS module
+                const cssFilename = `${fileHash}-${cssIndex++}.css`;
+                cssModules.set(cssFilename, allCss);
+                cssImports.push(`import "styled-static:${cssFilename}";`);
+                // Generate replacement code
+                const variantKeys = Array.from(v.variants.keys());
+                const replacement = generateVariantReplacement(v, baseClass, variantKeys, isDev);
+                s.overwrite(v.start, v.end, replacement);
+                // Track runtime needs
+                if (v.type === "styledVariants") {
+                    // Check if component is a string (HTML tag) or reference (component)
+                    if (v.component && /^[a-z]/.test(v.component)) {
+                        needsStyledVariantsRuntime = true;
+                    }
+                    else {
+                        needsStyledVariantsExtendRuntime = true;
+                    }
+                }
+                if (v.type === "cssVariants")
+                    needsCssVariantsRuntime = true;
+            }
+            // Build runtime imports from specific modules for tree-shaking
+            // Determine the runtime base path based on original import source
+            const runtimeBasePath = imports.source === "./index" || imports.source === "../index"
+                ? imports.source.replace("/index", "/runtime")
+                : "styled-static/runtime";
             const runtimeImports = [];
+            // styled.ts imports
+            const styledImports = [];
             if (needsStyledRuntime)
-                runtimeImports.push("__styled");
+                styledImports.push("__styled");
             if (needsExtendRuntime)
-                runtimeImports.push("__styledExtend");
-            if (needsGlobalRuntime)
-                runtimeImports.push("__GlobalStyle");
+                styledImports.push("__styledExtend");
+            if (styledImports.length > 0) {
+                runtimeImports.push(`import { ${styledImports.join(", ")} } from "${runtimeBasePath}/styled";`);
+            }
+            // variants.ts imports
+            const variantImports = [];
+            if (needsStyledVariantsRuntime)
+                variantImports.push("__styledVariants");
+            if (needsStyledVariantsExtendRuntime)
+                variantImports.push("__styledVariantsExtend");
+            if (needsCssVariantsRuntime)
+                variantImports.push("__cssVariants");
+            if (variantImports.length > 0) {
+                runtimeImports.push(`import { ${variantImports.join(", ")} } from "${runtimeBasePath}/variants";`);
+            }
+            // global.ts imports
+            if (needsGlobalRuntime) {
+                runtimeImports.push(`import { __GlobalStyle } from "${runtimeBasePath}/global";`);
+            }
             // Prepend imports (CSS first, then runtime)
             let prepend = "";
             if (cssImports.length > 0) {
                 prepend += cssImports.join("\n") + "\n";
             }
             if (runtimeImports.length > 0) {
-                prepend += `import { ${runtimeImports.join(", ")} } from "styled-static/runtime";\n`;
+                prepend += runtimeImports.join("\n") + "\n";
             }
             if (prepend) {
                 s.prepend(prepend);
@@ -231,18 +284,32 @@ export function styledStatic(options = {}) {
 function findStyledStaticImports(ast) {
     const imports = {};
     for (const node of ast.body) {
-        if (node.type === "ImportDeclaration" &&
-            node.source.value === "styled-static") {
-            for (const spec of node.specifiers) {
-                if (spec.type === "ImportSpecifier") {
-                    const imported = spec.imported.name;
-                    const local = spec.local.name;
-                    if (imported === "styled")
-                        imports.styled = local;
-                    if (imported === "css")
-                        imports.css = local;
-                    if (imported === "createGlobalStyle")
-                        imports.createGlobalStyle = local;
+        if (node.type === "ImportDeclaration") {
+            const source = node.source.value;
+            // Match both "styled-static" (package) and "./index" (local dev)
+            const isStyledStaticImport = source === "styled-static" ||
+                source === "./index" ||
+                source === "../index";
+            if (isStyledStaticImport) {
+                // Track the source for determining runtime import path
+                imports.source = source;
+                for (const spec of node.specifiers) {
+                    if (spec.type === "ImportSpecifier") {
+                        const imported = spec.imported.name;
+                        const local = spec.local.name;
+                        if (imported === "styled")
+                            imports.styled = local;
+                        if (imported === "css")
+                            imports.css = local;
+                        if (imported === "createGlobalStyle")
+                            imports.createGlobalStyle = local;
+                        if (imported === "keyframes")
+                            imports.keyframes = local;
+                        if (imported === "styledVariants")
+                            imports.styledVariants = local;
+                        if (imported === "cssVariants")
+                            imports.cssVariants = local;
+                    }
                 }
             }
         }
@@ -253,7 +320,7 @@ function findStyledStaticImports(ast) {
  * Find all tagged template literals that use styled-static imports.
  * Walks the AST to find variable declarations with our tagged templates.
  */
-function findTaggedTemplates(ast, imports) {
+function findTaggedTemplates(ast, imports, code) {
     const results = [];
     /**
      * Process a variable declaration that might contain a styled template
@@ -264,7 +331,7 @@ function findTaggedTemplates(ast, imports) {
                 decl.id.type === "Identifier") {
                 const template = decl.init;
                 const varName = decl.id.name;
-                const found = classifyTemplate(template, imports, varName);
+                const found = classifyTemplate(template, imports, varName, code);
                 if (found)
                     results.push(found);
             }
@@ -286,7 +353,7 @@ function findTaggedTemplates(ast, imports) {
 /**
  * Classify a tagged template expression into one of our supported types.
  */
-function classifyTemplate(node, imports, variableName) {
+function classifyTemplate(node, imports, variableName, code) {
     const { tag } = node;
     // styled.element`...`
     if (tag.type === "MemberExpression" &&
@@ -331,6 +398,38 @@ function classifyTemplate(node, imports, variableName) {
             variableName,
         };
     }
+    // keyframes`...`
+    if (tag.type === "Identifier" && tag.name === imports.keyframes) {
+        return {
+            type: "keyframes",
+            node,
+            tag: "",
+            variableName,
+        };
+    }
+    // styled.element.attrs({...})`...`
+    // Pattern: CallExpression -> MemberExpression -> MemberExpression
+    if (tag.type === "CallExpression" &&
+        tag.callee.type === "MemberExpression" &&
+        tag.callee.property.type === "Identifier" &&
+        tag.callee.property.name === "attrs" &&
+        tag.callee.object.type === "MemberExpression" &&
+        tag.callee.object.object.type === "Identifier" &&
+        tag.callee.object.object.name === imports.styled &&
+        tag.callee.object.property.type === "Identifier" &&
+        tag.arguments.length === 1) {
+        const elementTag = tag.callee.object.property.name;
+        // Capture the attrs argument as a string for later use
+        const attrsNode = tag.arguments[0];
+        const attrsArg = code.slice(attrsNode.start, attrsNode.end);
+        return {
+            type: "styledAttrs",
+            node,
+            tag: elementTag,
+            variableName,
+            attrsArg,
+        };
+    }
     return null;
 }
 // ============================================================================
@@ -344,42 +443,38 @@ function extractTemplateContent(code, quasi) {
     // Get raw content between backticks
     return code.slice(quasi.start + 1, quasi.end - 1);
 }
-/**
- * Process CSS with PostCSS.
- * - Wraps in class selector (unless global)
- * - Processes nested selectors
- * - Adds vendor prefixes
- */
-async function processCSS(content, className, isGlobal, autoprefixerOption) {
-    // Wrap in class selector unless global
-    const wrapped = isGlobal ? content : `.${className} { ${content} }`;
-    // Build PostCSS plugins
-    const plugins = [postcssNested()];
-    if (autoprefixerOption !== false) {
-        plugins.push(autoprefixer({
-            overrideBrowserslist: autoprefixerOption,
-        }));
-    }
-    // Process with PostCSS
-    const result = await postcss(plugins).process(wrapped, { from: undefined });
-    return result.css;
-}
 // ============================================================================
 // Code Generation
 // ============================================================================
 /**
  * Generate the replacement code for a styled template.
+ *
+ * SECURITY: Uses safeStringLiteral() for displayName to prevent code injection
+ * via malicious variable names or edge cases with Unicode/escape sequences.
  */
 function generateReplacement(template, className, isDev) {
-    const displayName = isDev ? template.variableName : undefined;
-    const displayNameArg = displayName ? `, "${displayName}"` : "";
+    // SECURITY: Validate and safely escape displayName to prevent code injection
+    let displayNameArg = "";
+    if (isDev && template.variableName) {
+        // Validate it's a valid identifier before including
+        if (isValidIdentifier(template.variableName)) {
+            displayNameArg = `, ${safeStringLiteral(template.variableName)}`;
+        }
+    }
     switch (template.type) {
         case "styled":
-            return `__styled("${template.tag}", "${className}"${displayNameArg})`;
+            return `__styled(${safeStringLiteral(template.tag)}, ${safeStringLiteral(className)}${displayNameArg})`;
         case "styledExtend":
-            return `__styledExtend(${template.baseComponent}, "${className}"${displayNameArg})`;
+            // baseComponent is a reference to an existing variable, not a string literal
+            return `__styledExtend(${template.baseComponent}, ${safeStringLiteral(className)}${displayNameArg})`;
+        case "styledAttrs":
+            // attrs object is serialized, tag comes from template
+            return `__styledWithAttrs(${safeStringLiteral(template.tag)}, ${safeStringLiteral(className)}, ${template.attrsArg ?? "{}"}${displayNameArg})`;
         case "css":
-            return `"${className}"`;
+            return safeStringLiteral(className);
+        case "keyframes":
+            // Keyframes are replaced with just the scoped animation name
+            return safeStringLiteral(className);
         case "createGlobalStyle":
             return `__GlobalStyle`;
     }
@@ -389,6 +484,180 @@ function generateReplacement(template, className, isDev) {
  */
 function normalizePath(p) {
     return p.replace(/\\/g, "/").toLowerCase();
+}
+// ============================================================================
+// Variant Detection
+// ============================================================================
+/**
+ * Find all styledVariants and cssVariants calls in the AST.
+ */
+function findVariantCalls(ast, code, imports) {
+    const results = [];
+    function processVariableDeclaration(node) {
+        for (const decl of node.declarations) {
+            if (decl.init?.type === "CallExpression" &&
+                decl.id.type === "Identifier") {
+                const call = decl.init;
+                const varName = decl.id.name;
+                const found = classifyVariantCall(call, code, imports, varName);
+                if (found)
+                    results.push(found);
+            }
+        }
+    }
+    for (const node of ast.body) {
+        // Regular variable declaration: const X = styledVariants({...})
+        if (node.type === "VariableDeclaration") {
+            processVariableDeclaration(node);
+        }
+        // Exported variable: export const X = styledVariants({...})
+        if (node.type === "ExportNamedDeclaration" &&
+            node.declaration?.type === "VariableDeclaration") {
+            processVariableDeclaration(node.declaration);
+        }
+    }
+    return results;
+}
+/**
+ * Classify a call expression as styledVariants or cssVariants.
+ */
+function classifyVariantCall(node, code, imports, variableName) {
+    if (node.callee.type !== "Identifier")
+        return null;
+    const calleeName = node.callee.name;
+    const isStyledVariants = calleeName === imports.styledVariants;
+    const isCssVariants = calleeName === imports.cssVariants;
+    if (!isStyledVariants && !isCssVariants)
+        return null;
+    // The argument should be an object expression
+    if (node.arguments.length !== 1 ||
+        node.arguments[0]?.type !== "ObjectExpression") {
+        return null;
+    }
+    const configObj = node.arguments[0];
+    let component;
+    let baseCss;
+    const variants = new Map();
+    for (const prop of configObj.properties) {
+        if (prop.type !== "Property" || prop.key.type !== "Identifier")
+            continue;
+        const propName = prop.key.name;
+        // component: 'button' or component: Button
+        if (propName === "component") {
+            if (prop.value.type === "Literal" &&
+                typeof prop.value.value === "string") {
+                component = prop.value.value;
+            }
+            else if (prop.value.type === "Identifier") {
+                component = prop.value.name;
+            }
+        }
+        // css: `...` or css: css`...`
+        if (propName === "css") {
+            if (prop.value.type === "Literal" &&
+                typeof prop.value.value === "string") {
+                baseCss = prop.value.value;
+            }
+            else if (prop.value.type === "TemplateLiteral") {
+                const tpl = prop.value;
+                baseCss = code.slice(tpl.start + 1, tpl.end - 1);
+            }
+            else if (prop.value.type === "TaggedTemplateExpression") {
+                // Support css`...` tagged template for syntax highlighting
+                const tagged = prop.value;
+                if (tagged.tag.type === "Identifier" &&
+                    tagged.tag.name === imports.css) {
+                    baseCss = code.slice(tagged.quasi.start + 1, tagged.quasi.end - 1);
+                }
+            }
+        }
+        // variants: { color: { primary: `...` }, size: { sm: `...` } }
+        if (propName === "variants" && prop.value.type === "ObjectExpression") {
+            for (const variantProp of prop.value.properties) {
+                if (variantProp.type !== "Property" ||
+                    variantProp.key.type !== "Identifier")
+                    continue;
+                if (variantProp.value.type !== "ObjectExpression")
+                    continue;
+                const variantName = variantProp.key.name;
+                const variantValues = new Map();
+                for (const valueProp of variantProp.value.properties) {
+                    if (valueProp.type !== "Property" ||
+                        valueProp.key.type !== "Identifier")
+                        continue;
+                    const valueName = valueProp.key.name;
+                    let cssContent;
+                    if (valueProp.value.type === "Literal" &&
+                        typeof valueProp.value.value === "string") {
+                        cssContent = valueProp.value.value;
+                    }
+                    else if (valueProp.value.type === "TemplateLiteral") {
+                        const tpl = valueProp.value;
+                        cssContent = code.slice(tpl.start + 1, tpl.end - 1);
+                    }
+                    else if (valueProp.value.type === "TaggedTemplateExpression") {
+                        // Support css`...` tagged template for syntax highlighting
+                        const tagged = valueProp.value;
+                        if (tagged.tag.type === "Identifier" &&
+                            tagged.tag.name === imports.css) {
+                            cssContent = code.slice(tagged.quasi.start + 1, tagged.quasi.end - 1);
+                        }
+                    }
+                    if (cssContent) {
+                        variantValues.set(valueName, cssContent);
+                    }
+                }
+                if (variantValues.size > 0) {
+                    variants.set(variantName, variantValues);
+                }
+            }
+        }
+    }
+    return {
+        type: isStyledVariants ? "styledVariants" : "cssVariants",
+        start: node.start,
+        end: node.end,
+        component,
+        baseCss,
+        variants,
+        variableName,
+    };
+}
+/**
+ * Generate replacement code for a variant call.
+ *
+ * SECURITY: Validates component names and uses safe string escaping
+ * to prevent code injection attacks.
+ */
+function generateVariantReplacement(variant, baseClass, variantKeys, isDev) {
+    // SECURITY: Validate and safely escape displayName
+    let displayNameArg = "";
+    if (isDev && variant.variableName) {
+        if (isValidIdentifier(variant.variableName)) {
+            displayNameArg = `, ${safeStringLiteral(variant.variableName)}`;
+        }
+    }
+    const keysJson = JSON.stringify(variantKeys);
+    if (variant.type === "styledVariants") {
+        // Check if component is an HTML tag (lowercase) or component reference
+        const isHtmlTag = variant.component && /^[a-z]/.test(variant.component);
+        if (isHtmlTag) {
+            // SECURITY: Validate HTML tag name before interpolation
+            if (!variant.component || !/^[a-z][a-z0-9]*$/.test(variant.component)) {
+                throw new Error(`[styled-static] Invalid HTML tag name: ${variant.component}`);
+            }
+            return `__styledVariants(${safeStringLiteral(variant.component)}, ${safeStringLiteral(baseClass)}, ${keysJson}${displayNameArg})`;
+        }
+        else {
+            // SECURITY: Validate component reference is a valid identifier
+            if (!variant.component || !isValidIdentifier(variant.component)) {
+                throw new Error(`[styled-static] Invalid component name: ${variant.component}`);
+            }
+            return `__styledVariantsExtend(${variant.component}, ${safeStringLiteral(baseClass)}, ${keysJson}${displayNameArg})`;
+        }
+    }
+    // cssVariants
+    return `__cssVariants(${safeStringLiteral(baseClass)}, ${keysJson})`;
 }
 // Default export for convenience
 export default styledStatic;

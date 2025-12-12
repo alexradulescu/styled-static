@@ -99,14 +99,15 @@ export type TransientProps = { [K in `$${string}`]?: unknown };
 
 /**
  * The `as` prop enables polymorphic rendering.
- * Allows a styled component to render as a different HTML element.
+ * Allows a styled component to render as a different HTML element or component.
  *
  * @example
  * const Button = styled.button`...`;
  * <Button as="a" href="/link">Link styled as button</Button>
+ * <Button as={Link} to="/path">Router link styled as button</Button>
  */
 export type AsProp = {
-  as?: HTMLTag;
+  as?: HTMLTag | ComponentType<{ className?: string }>;
 };
 
 /**

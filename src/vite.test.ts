@@ -402,7 +402,8 @@ const Button = styled.button\`padding: 1rem;\`;
 const activeClass = css\`background: blue;\`;`;
     const result = await transform(plugin, code, "/test.tsx");
 
-    expect(result?.code).toContain("import { __styled, __GlobalStyle }");
+    expect(result?.code).toContain('import { __styled } from "styled-static/runtime/styled"');
+    expect(result?.code).toContain('import { __GlobalStyle } from "styled-static/runtime/global"');
     expect(result?.code).toContain("const GlobalStyle = __GlobalStyle");
     expect(result?.code).toContain('__styled("button"');
     expect(result?.code).toMatch(/const activeClass = "ss-[a-z0-9]+"/);
@@ -848,21 +849,21 @@ describe("virtual modules", () => {
 describe("runtime", () => {
   describe("__styled", () => {
     it("should create a component function", async () => {
-      const { __styled } = await import("./runtime");
+      const { __styled } = await import("./runtime/styled");
       const Button = __styled("button", "ss-test");
 
       expect(typeof Button).toBe("function");
     });
 
     it("should not set displayName when not provided", async () => {
-      const { __styled } = await import("./runtime");
+      const { __styled } = await import("./runtime/styled");
       const Button = __styled("button", "ss-test");
 
       expect(Button.displayName).toBeUndefined();
     });
 
     it("should set displayName when provided", async () => {
-      const { __styled } = await import("./runtime");
+      const { __styled } = await import("./runtime/styled");
       const Button = __styled("button", "ss-test", "Button");
 
       expect(Button.displayName).toBe("Button");
@@ -871,7 +872,7 @@ describe("runtime", () => {
 
   describe("__styledExtend", () => {
     it("should create an extended component function", async () => {
-      const { __styled, __styledExtend } = await import("./runtime");
+      const { __styled, __styledExtend } = await import("./runtime/styled");
       const Button = __styled("button", "ss-base");
       const Primary = __styledExtend(Button, "ss-primary");
 
@@ -879,7 +880,7 @@ describe("runtime", () => {
     });
 
     it("should set displayName on extended component", async () => {
-      const { __styled, __styledExtend } = await import("./runtime");
+      const { __styled, __styledExtend } = await import("./runtime/styled");
       const Button = __styled("button", "ss-base", "Button");
       const Primary = __styledExtend(Button, "ss-primary", "PrimaryButton");
 
@@ -889,13 +890,13 @@ describe("runtime", () => {
 
   describe("__GlobalStyle", () => {
     it("should be a function", async () => {
-      const { __GlobalStyle } = await import("./runtime");
+      const { __GlobalStyle } = await import("./runtime/global");
 
       expect(typeof __GlobalStyle).toBe("function");
     });
 
     it("should return null when called", async () => {
-      const { __GlobalStyle } = await import("./runtime");
+      const { __GlobalStyle } = await import("./runtime/global");
 
       expect(__GlobalStyle({})).toBeNull();
     });
@@ -958,7 +959,7 @@ describe("hash", () => {
 
 describe("security: variant value sanitization", () => {
   it("should sanitize variant values with spaces (class injection)", async () => {
-    const { __cssVariants } = await import("./runtime");
+    const { __cssVariants } = await import("./runtime/variants");
 
     const buttonCss = __cssVariants("ss-abc", ["color"]);
 
@@ -974,7 +975,7 @@ describe("security: variant value sanitization", () => {
   });
 
   it("should sanitize variant values with special characters", async () => {
-    const { __cssVariants } = await import("./runtime");
+    const { __cssVariants } = await import("./runtime/variants");
 
     const buttonCss = __cssVariants("ss-abc", ["size"]);
 
@@ -989,7 +990,7 @@ describe("security: variant value sanitization", () => {
   });
 
   it("should handle empty variant value after sanitization", async () => {
-    const { __cssVariants } = await import("./runtime");
+    const { __cssVariants } = await import("./runtime/variants");
 
     const buttonCss = __cssVariants("ss-abc", ["style"]);
 
@@ -1001,7 +1002,7 @@ describe("security: variant value sanitization", () => {
   });
 
   it("should allow valid alphanumeric variant values", async () => {
-    const { __cssVariants } = await import("./runtime");
+    const { __cssVariants } = await import("./runtime/variants");
 
     const buttonCss = __cssVariants("ss-abc", ["color", "size"]);
 
@@ -1134,7 +1135,7 @@ const Button = styled.button\`padding: 1rem;\`;`;
 
 describe("security: dangerous element blocking", () => {
   it("should block script element in as prop", async () => {
-    const { __styled } = await import("./runtime");
+    const { __styled } = await import("./runtime/styled");
     const { createElement } = await import("react");
 
     const Button = __styled("button", "ss-test");
@@ -1149,7 +1150,7 @@ describe("security: dangerous element blocking", () => {
   });
 
   it("should block iframe element in as prop", async () => {
-    const { __styled } = await import("./runtime");
+    const { __styled } = await import("./runtime/styled");
     const { createElement } = await import("react");
 
     const Button = __styled("button", "ss-test");
@@ -1163,7 +1164,7 @@ describe("security: dangerous element blocking", () => {
   });
 
   it("should allow safe elements in as prop", async () => {
-    const { __styled } = await import("./runtime");
+    const { __styled } = await import("./runtime/styled");
     const { createElement } = await import("react");
 
     const Button = __styled("button", "ss-test");
@@ -1176,6 +1177,135 @@ describe("security: dangerous element blocking", () => {
     expect(aElement.props.as).toBe("a");
     expect(divElement.props.as).toBe("div");
     expect(spanElement.props.as).toBe("span");
+  });
+});
+
+describe("as prop with components", () => {
+  it("should accept a component in as prop", async () => {
+    const { __styled } = await import("./runtime/styled");
+    const { createElement } = await import("react");
+
+    // Mock Link component (like react-router Link)
+    const MockLink = ({ className, to, children }: any) =>
+      createElement("a", { className, href: to }, children);
+
+    const Button = __styled("button", "ss-test");
+    const element = createElement(Button, {
+      as: MockLink,
+      to: "/path",
+      children: "Link",
+    });
+
+    // The as prop should be the MockLink component
+    expect(element.props.as).toBe(MockLink);
+  });
+
+  it("should pass className to component in as prop", async () => {
+    const { __styled } = await import("./runtime/styled");
+    const { createElement } = await import("react");
+    const { renderToString } = await import("react-dom/server");
+
+    // Mock Link component
+    const MockLink = ({ className, to, children }: any) =>
+      createElement("a", { className, href: to }, children);
+
+    const Button = __styled("button", "ss-test");
+    const element = createElement(Button, {
+      as: MockLink,
+      to: "/path",
+      children: "Link",
+    });
+
+    const html = renderToString(element);
+    expect(html).toContain('class="ss-test"');
+    expect(html).toContain('href="/path"');
+  });
+
+  it("should merge user className with component in as prop", async () => {
+    const { __styled } = await import("./runtime/styled");
+    const { createElement } = await import("react");
+    const { renderToString } = await import("react-dom/server");
+
+    const MockLink = ({ className, to, children }: any) =>
+      createElement("a", { className, href: to }, children);
+
+    const Button = __styled("button", "ss-test");
+    const element = createElement(Button, {
+      as: MockLink,
+      to: "/path",
+      className: "user-class",
+      children: "Link",
+    });
+
+    const html = renderToString(element);
+    expect(html).toContain('class="ss-test user-class"');
+  });
+
+  it("should filter transient props when using component in as prop", async () => {
+    const { __styled } = await import("./runtime/styled");
+    const { createElement } = await import("react");
+    const { renderToString } = await import("react-dom/server");
+
+    const MockLink = ({ className, to, children, ...rest }: any) => {
+      // Transient props should not appear in rest
+      expect(rest).not.toHaveProperty("$primary");
+      return createElement("a", { className, href: to }, children);
+    };
+
+    const Button = __styled("button", "ss-test");
+    const element = createElement(Button, {
+      as: MockLink,
+      to: "/path",
+      $primary: true,
+      children: "Link",
+    });
+
+    renderToString(element);
+  });
+
+  it("should preserve className chain with extended components", async () => {
+    const { __styled, __styledExtend } = await import("./runtime/styled");
+    const { createElement } = await import("react");
+    const { renderToString } = await import("react-dom/server");
+
+    const MockLink = ({ className, to, children }: any) =>
+      createElement("a", { className, href: to }, children);
+
+    const Button = __styled("button", "ss-base");
+    const Primary = __styledExtend(Button, "ss-primary");
+
+    // When using as prop on extended component, it receives the extension's className
+    const element = createElement(Primary, {
+      as: MockLink,
+      to: "/path",
+      className: "user-class",
+      children: "Link",
+    });
+
+    const html = renderToString(element);
+    // Full chain: Button's ss-base + Primary's ss-primary + user-class
+    expect(html).toContain('class="ss-base ss-primary user-class"');
+  });
+
+  it("should work with __styledVariants and component in as prop", async () => {
+    const { __styledVariants } = await import("./runtime/variants");
+    const { createElement } = await import("react");
+    const { renderToString } = await import("react-dom/server");
+
+    const MockLink = ({ className, to, children }: any) =>
+      createElement("a", { className, href: to }, children);
+
+    const Button = __styledVariants("button", "ss-btn", ["size"], "Button");
+    const element = createElement(Button, {
+      as: MockLink,
+      to: "/path",
+      size: "lg",
+      children: "Link",
+    });
+
+    const html = renderToString(element);
+    expect(html).toContain('class="ss-btn ss-btn--size-lg"');
+    expect(html).toContain('href="/path"');
   });
 });
 

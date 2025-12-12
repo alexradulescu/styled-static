@@ -930,7 +930,7 @@ export function App() {
             {/* Hero */}
             <PageTitle>styled-static</PageTitle>
             <PageSubtitle>
-              Zero-runtime CSS-in-JS for React 19+ with Vite. Write
+              Near-zero-runtime CSS-in-JS for React 19+ with Vite. Write
               styled-components syntax, get static CSS extracted at build time.
             </PageSubtitle>
             <HeroBanner />
@@ -995,6 +995,18 @@ const Btn = styledVariants({
                   <strong>CSS-in-JS fatigue is real.</strong> Most libraries are
                   now obsolete, overly complex, or have large runtime overhead.
                   The ecosystem needs simpler solutions.
+                </CalloutContent>
+              </div>
+
+              <div className={calloutStyles({ type: "tip" })}>
+                <CalloutIcon>
+                  <Sparkles size={20} />
+                </CalloutIcon>
+                <CalloutContent>
+                  <strong>Static CSS, minimal runtime.</strong> CSS generation happens
+                  at build time (zero runtime cost). A tiny ~300 byte runtime handles
+                  dynamic features like <InlineCode>as</InlineCode> prop polymorphism
+                  and transient props.
                 </CalloutContent>
               </div>
 

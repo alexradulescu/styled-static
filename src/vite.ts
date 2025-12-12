@@ -405,21 +405,43 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
         if (v.type === "cssVariants") needsCssVariantsRuntime = true;
       }
 
-      // Build runtime imports
-      const runtimeImports: string[] = [];
-      if (needsStyledRuntime) runtimeImports.push("__styled");
-      if (needsExtendRuntime) runtimeImports.push("__styledExtend");
-      if (needsGlobalRuntime) runtimeImports.push("__GlobalStyle");
-      if (needsStyledVariantsRuntime) runtimeImports.push("__styledVariants");
-      if (needsStyledVariantsExtendRuntime)
-        runtimeImports.push("__styledVariantsExtend");
-      if (needsCssVariantsRuntime) runtimeImports.push("__cssVariants");
-
-      // Determine the runtime import path based on original import source
-      const runtimePath =
+      // Build runtime imports from specific modules for tree-shaking
+      // Determine the runtime base path based on original import source
+      const runtimeBasePath =
         imports.source === "./index" || imports.source === "../index"
           ? imports.source.replace("/index", "/runtime")
           : "styled-static/runtime";
+
+      const runtimeImports: string[] = [];
+
+      // styled.ts imports
+      const styledImports: string[] = [];
+      if (needsStyledRuntime) styledImports.push("__styled");
+      if (needsExtendRuntime) styledImports.push("__styledExtend");
+      if (styledImports.length > 0) {
+        runtimeImports.push(
+          `import { ${styledImports.join(", ")} } from "${runtimeBasePath}/styled";`
+        );
+      }
+
+      // variants.ts imports
+      const variantImports: string[] = [];
+      if (needsStyledVariantsRuntime) variantImports.push("__styledVariants");
+      if (needsStyledVariantsExtendRuntime)
+        variantImports.push("__styledVariantsExtend");
+      if (needsCssVariantsRuntime) variantImports.push("__cssVariants");
+      if (variantImports.length > 0) {
+        runtimeImports.push(
+          `import { ${variantImports.join(", ")} } from "${runtimeBasePath}/variants";`
+        );
+      }
+
+      // global.ts imports
+      if (needsGlobalRuntime) {
+        runtimeImports.push(
+          `import { __GlobalStyle } from "${runtimeBasePath}/global";`
+        );
+      }
 
       // Prepend imports (CSS first, then runtime)
       let prepend = "";
@@ -427,9 +449,7 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
         prepend += cssImports.join("\n") + "\n";
       }
       if (runtimeImports.length > 0) {
-        prepend += `import { ${runtimeImports.join(
-          ", "
-        )} } from "${runtimePath}";\n`;
+        prepend += runtimeImports.join("\n") + "\n";
       }
       if (prepend) {
         s.prepend(prepend);

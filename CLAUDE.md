@@ -2,7 +2,7 @@
 
 ## What is this?
 
-**styled-static** is a zero-runtime CSS-in-JS library for React 19+ with Vite. It provides a styled-components-like API but extracts all CSS at build time, leaving only a ~300 byte runtime.
+**styled-static** is a near-zero-runtime CSS-in-JS library for React 19+ with Vite. It provides a styled-components-like API and extracts all CSS at build time. The ~300 byte runtime handles dynamic features (`as` prop, transient props, className merging) that require runtime props.
 
 ## Tech Stack
 
@@ -18,7 +18,11 @@
 ```
 src/
   vite.ts       # Main Vite plugin - AST transformation, CSS extraction
-  runtime.tsx   # Minimal runtime (~300B) - as prop, transient props, className merge
+  runtime/      # Tree-shakable runtime modules
+    core.ts     # Shared utilities (validateAsTag, filterTransientProps, etc.)
+    styled.ts   # __styled, __styledExtend
+    variants.ts # __styledVariants, __styledVariantsExtend, __cssVariants
+    global.ts   # __GlobalStyle
   index.ts      # Public API exports (styled, css, createGlobalStyle)
   types.ts      # TypeScript types (StyledComponent, StyledFunction, etc.)
   hash.ts       # Murmurhash for class name generation
@@ -78,7 +82,7 @@ const Button = styled.button`
 **Output:**
 
 ```tsx
-import { __styled } from "styled-static/runtime";
+import { __styled } from "styled-static/runtime/styled";
 import "styled-static:abc123-0.css";
 
 const Button = __styled("button", "ss-abc123", "Button");
@@ -86,12 +90,26 @@ const Button = __styled("button", "ss-abc123", "Button");
 
 The CSS is extracted to a virtual module, and the styled call is replaced with a thin runtime wrapper.
 
+## Runtime Structure (Tree-Shakable)
+
+The runtime is split into separate modules for optimal tree-shaking. Bundlers automatically exclude unused modules, reducing bundle size:
+
+- **`runtime/core.ts`** - Shared utilities (validateAsTag, filterTransientProps, mergeClassNames)
+- **`runtime/styled.ts`** - __styled, __styledExtend (~80 bytes)
+- **`runtime/variants.ts`** - __styledVariants, __styledVariantsExtend, __cssVariants (~150 bytes)
+- **`runtime/global.ts`** - __GlobalStyle (~10 bytes)
+
+The Vite plugin automatically imports only what it needs. Apps that don't use variants save ~150 bytes, apps that don't use styled components save ~80 bytes.
+
 ## Code Patterns
 
 **Runtime functions:**
 
 - `__styled(tag, className, displayName?)` - Creates styled component
 - `__styledExtend(Base, className, displayName?)` - Extends existing component
+- `__styledVariants(tag, baseClass, variantKeys, displayName?)` - Creates component with variants
+- `__styledVariantsExtend(Base, baseClass, variantKeys, displayName?)` - Extends component with variants
+- `__cssVariants(baseClass, variantKeys)` - Returns variant class string function
 - `__GlobalStyle` - No-op component (CSS injected via import)
 
 **Plugin hooks used:**

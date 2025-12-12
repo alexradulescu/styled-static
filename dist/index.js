@@ -42,6 +42,8 @@
  * <PrimaryButton className={activeClass}>Active</PrimaryButton>
  * ```
  */
+// Theme helpers - runtime utilities for theme switching
+export { getTheme, setTheme, initTheme, onSystemThemeChange, } from "./theme";
 function throwConfigError(name) {
     throw new Error(`${name} was not transformed at build time. ` +
         `Ensure the styled-static plugin is configured in vite.config.ts:\n\n` +
@@ -74,8 +76,8 @@ function throwConfigError(name) {
  * <Button $primary={true}>Click</Button>
  */
 export const styled = new Proxy({}, {
-    get: () => () => throwConfigError('styled'),
-    apply: () => throwConfigError('styled'),
+    get: () => () => throwConfigError("styled"),
+    apply: () => throwConfigError("styled"),
 });
 /**
  * Get a scoped class name for CSS.
@@ -95,7 +97,28 @@ export const styled = new Proxy({}, {
  * <Button className={`${activeClass} ${highlightClass}`}>Mixed</Button>
  */
 export function css(_strings, ..._interpolations) {
-    throwConfigError('css');
+    throwConfigError("css");
+}
+/**
+ * Create scoped keyframes for animations.
+ * The animation name is hashed to avoid conflicts between components.
+ *
+ * @example
+ * const spin = keyframes`
+ *   from { transform: rotate(0deg); }
+ *   to { transform: rotate(360deg); }
+ * `;
+ *
+ * const Spinner = styled.div`
+ *   animation: ${spin} 1s linear infinite;
+ * `;
+ *
+ * // In CSS output:
+ * // @keyframes ss-abc123 { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+ * // .ss-xyz789 { animation: ss-abc123 1s linear infinite; }
+ */
+export function keyframes(_strings, ..._interpolations) {
+    throwConfigError("keyframes");
 }
 /**
  * Create global (unscoped) styles.
@@ -128,6 +151,100 @@ export function css(_strings, ..._interpolations) {
  * );
  */
 export function createGlobalStyle(_strings, ..._interpolations) {
-    throwConfigError('createGlobalStyle');
+    throwConfigError("createGlobalStyle");
+}
+/**
+ * Utility for conditionally joining class names.
+ * A minimal (~40B) alternative to clsx/classnames.
+ *
+ * @example
+ * // Multiple class names
+ * cx('base', 'active')           // → 'base active'
+ *
+ * // Conditional classes
+ * cx('btn', isActive && 'active') // → 'btn active' or 'btn'
+ *
+ * // With css helper
+ * const activeClass = css`color: blue;`;
+ * cx('btn', isActive && activeClass)
+ *
+ * // Falsy values are filtered
+ * cx('a', null, undefined, false, 'b') // → 'a b'
+ */
+export function cx(...args) {
+    return args.filter(Boolean).join(" ");
+}
+// ============================================================================
+// Variant APIs
+// ============================================================================
+/**
+ * Create a styled component with variant support.
+ * CSS for base and all variants is extracted at build time.
+ * Variant props are mapped to modifier classes at runtime.
+ *
+ * @example
+ * // With css`` for IDE syntax highlighting (recommended)
+ * const Button = styledVariants({
+ *   component: 'button',
+ *   css: css`
+ *     padding: 0.5rem 1rem;
+ *     border: none;
+ *     border-radius: 4px;
+ *   `,
+ *   variants: {
+ *     color: {
+ *       primary: css`background: blue; color: white;`,
+ *       danger: css`background: red; color: white;`,
+ *     },
+ *     size: {
+ *       sm: css`font-size: 0.875rem;`,
+ *       lg: css`font-size: 1.125rem;`,
+ *     },
+ *   },
+ * });
+ *
+ * // Plain strings also work (no highlighting)
+ * const SimpleButton = styledVariants({
+ *   component: 'button',
+ *   css: `padding: 0.5rem;`,
+ *   variants: { size: { sm: `font-size: 0.875rem;` } },
+ * });
+ *
+ * // Usage - variant props become modifier classes
+ * <Button color="primary" size="lg">Click me</Button>
+ * // Renders: <button class="ss-abc ss-abc--color-primary ss-abc--size-lg">
+ */
+export function styledVariants(_config) {
+    throwConfigError("styledVariants");
+}
+/**
+ * Create a variant function that returns class strings.
+ * CSS for base and all variants is extracted at build time.
+ * The function maps variant selections to class names at runtime.
+ *
+ * @example
+ * // With css`` for IDE syntax highlighting (recommended)
+ * const buttonCss = cssVariants({
+ *   css: css`
+ *     padding: 0.5rem 1rem;
+ *     border-radius: 4px;
+ *   `,
+ *   variants: {
+ *     color: {
+ *       primary: css`background: blue;`,
+ *       danger: css`background: red;`,
+ *     },
+ *   },
+ * });
+ *
+ * // Usage - returns class string
+ * <div className={buttonCss({ color: 'primary' })}>
+ * // Returns: "ss-xyz ss-xyz--color-primary"
+ *
+ * // Combine with cx
+ * <div className={cx(buttonCss({ color: 'primary' }), isActive && activeClass)}>
+ */
+export function cssVariants(_config) {
+    throwConfigError("cssVariants");
 }
 //# sourceMappingURL=index.js.map

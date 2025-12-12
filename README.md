@@ -1,8 +1,8 @@
 <!--
 ═══════════════════════════════════════════════════════════════════════════════
 This README serves as both user documentation and LLM context (LLMs.txt).
-It documents styled-static - a zero-runtime CSS-in-JS library for React 19+
-with Vite.
+It documents styled-static - a near-zero-runtime CSS-in-JS library for React 19+
+with Vite. CSS is extracted at build time; ~300 byte runtime handles dynamic features.
 
 Key APIs: styled, css, createGlobalStyle, styledVariants, cssVariants, cx
 Theme helpers: initTheme, setTheme, getTheme, onSystemThemeChange
@@ -14,15 +14,18 @@ For implementation details, see CLAUDE.md or the source files in src/
 
 # styled-static
 
-Zero-runtime CSS-in-JS for React 19+ with Vite. Write styled-components syntax, get static CSS extracted at build time.
+Near-zero-runtime CSS-in-JS for React 19+ with Vite. Write styled-components syntax, get static CSS extracted at build time.
+
+**What's "zero"?** CSS generation happens at build time (the expensive part). A tiny ~300 byte runtime handles `as` prop polymorphism, transient props, and className merging - features that require runtime props.
 
 ## Features
 
-- ⚡ **Zero Runtime** - CSS extracted at build time, no CSS-in-JS overhead
+- ⚡ **Static CSS** - All CSS extracted at build time, no runtime stylesheet generation
 - 🎯 **Type-Safe** - Full TypeScript support with proper prop inference
 - 🎨 **Familiar API** - styled-components syntax you already know
 - 📦 **Tiny** - ~300 bytes runtime for `as` prop and transient props support
 - 🔧 **Zero Dependencies** - Uses native CSS features and Vite's built-in tools
+- 🌳 **Tree-Shakable** - Runtime split into modules; only ship what you use
 - 🌓 **Theme Helpers** - Simple utilities for dark mode and custom themes
 
 ---
@@ -498,7 +501,7 @@ const badgeCss = cssVariants({
 
 ### Polymorphic `as` Prop
 
-Render a styled component as a different HTML element:
+Render a styled component as a different HTML element or React component:
 
 ```tsx
 const Button = styled.button`
@@ -511,7 +514,18 @@ const Button = styled.button`
 <Button as="a" href="/link">
   I'm a link styled as a button
 </Button>;
+
+// Render as a React component (e.g., react-router Link)
+import { Link } from 'react-router-dom';
+
+<Button as={Link} to="/path">
+  I'm a router link styled as a button
+</Button>;
 ```
+
+The `as` prop accepts:
+- **HTML elements**: `"a"`, `"div"`, `"span"`, etc.
+- **React components**: Any component that accepts a `className` prop
 
 ### Transient Props
 
