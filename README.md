@@ -115,7 +115,7 @@ const badgeCss = cssVariants({
 
 - 🔒 **Supply chain security matters.** Zero dependencies means a minimal attack surface. No transitive dependencies to audit or worry about.
 
-- 🎯 **Intentionally simple.** 95% native browser foundation + 5% sprinkles on top. We leverage what browsers already do well.
+- 🎯 **Intentionally simple.** 95% native browser foundation + 5% sprinkles on top. We leverage what browsers and vite already do great.
 
 - 🎉 **Built for fun.** Sometimes the best projects come from curiosity and the joy of building something useful.
 
@@ -125,7 +125,7 @@ const badgeCss = cssVariants({
 
 styled-static is intentionally limited. Here's what we don't support—and why:
 
-- 🚫 **No runtime interpolation.** You can't write `${props => props.color}`. CSS is extracted at build time, so values must be static. Use CSS variables, data attributes, or the Variants API for dynamic styles.
+- 🚫 **No runtime interpolation.** You can't write `${props => props.color}`. CSS is extracted at build time, so values must be static. Use Variants API, CSS variables or data attributes for dynamic styles.
 
 - ⚛️ **React 19+ only.** We rely on automatic ref forwarding instead of `forwardRef`. This keeps the runtime tiny but requires React 19.
 
