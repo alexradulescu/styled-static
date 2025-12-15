@@ -443,7 +443,7 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
         );
       }
 
-      // Prepend imports (CSS first, then runtime)
+      // Prepend imports (CSS first, then runtime, with blank line separator)
       let prepend = "";
       if (cssImports.length > 0) {
         prepend += cssImports.join("\n") + "\n";
@@ -452,7 +452,8 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
         prepend += runtimeImports.join("\n") + "\n";
       }
       if (prepend) {
-        s.prepend(prepend);
+        // Add extra newline after imports for better readability
+        s.prepend(prepend + "\n");
       }
 
       return {
@@ -690,25 +691,24 @@ function generateReplacement(
   isDev: boolean
 ): string {
   // SECURITY: Validate and safely escape displayName to prevent code injection
-  let displayNameArg = "";
-  if (isDev && template.variableName) {
-    // Validate it's a valid identifier before including
-    if (isValidIdentifier(template.variableName)) {
-      displayNameArg = `, ${safeStringLiteral(template.variableName)}`;
-    }
-  }
+  const displayNameProp =
+    isDev && template.variableName && isValidIdentifier(template.variableName)
+      ? `,\n  displayName: ${safeStringLiteral(template.variableName)}`
+      : "";
 
   switch (template.type) {
     case "styled":
-      return `__styled(${safeStringLiteral(template.tag)}, ${safeStringLiteral(
-        className
-      )}${displayNameArg})`;
+      return `__styled({
+  tag: ${safeStringLiteral(template.tag)},
+  className: ${safeStringLiteral(className)}${displayNameProp}
+})`;
 
     case "styledExtend":
       // baseComponent is a reference to an existing variable, not a string literal
-      return `__styledExtend(${template.baseComponent}, ${safeStringLiteral(
-        className
-      )}${displayNameArg})`;
+      return `__styledExtend({
+  base: ${template.baseComponent},
+  className: ${safeStringLiteral(className)}${displayNameProp}
+})`;
 
     case "styledAttrs":
       // attrs object is serialized, tag comes from template
@@ -716,7 +716,7 @@ function generateReplacement(
         template.tag
       )}, ${safeStringLiteral(className)}, ${
         template.attrsArg ?? "{}"
-      }${displayNameArg})`;
+      }${displayNameProp ? `, ${safeStringLiteral(template.variableName!)}` : ""})`;
 
     case "css":
       return safeStringLiteral(className);
@@ -948,12 +948,10 @@ function generateVariantReplacement(
   isDev: boolean
 ): string {
   // SECURITY: Validate and safely escape displayName
-  let displayNameArg = "";
-  if (isDev && variant.variableName) {
-    if (isValidIdentifier(variant.variableName)) {
-      displayNameArg = `, ${safeStringLiteral(variant.variableName)}`;
-    }
-  }
+  const displayNameProp =
+    isDev && variant.variableName && isValidIdentifier(variant.variableName)
+      ? `,\n  displayName: ${safeStringLiteral(variant.variableName)}`
+      : "";
   const keysJson = JSON.stringify(variantKeys);
 
   if (variant.type === "styledVariants") {
@@ -966,9 +964,11 @@ function generateVariantReplacement(
           `[styled-static] Invalid HTML tag name: ${variant.component}`
         );
       }
-      return `__styledVariants(${safeStringLiteral(
-        variant.component
-      )}, ${safeStringLiteral(baseClass)}, ${keysJson}${displayNameArg})`;
+      return `__styledVariants({
+  tag: ${safeStringLiteral(variant.component)},
+  baseClass: ${safeStringLiteral(baseClass)},
+  variantKeys: ${keysJson}${displayNameProp}
+})`;
     } else {
       // SECURITY: Validate component reference is a valid identifier
       if (!variant.component || !isValidIdentifier(variant.component)) {
@@ -976,14 +976,19 @@ function generateVariantReplacement(
           `[styled-static] Invalid component name: ${variant.component}`
         );
       }
-      return `__styledVariantsExtend(${variant.component}, ${safeStringLiteral(
-        baseClass
-      )}, ${keysJson}${displayNameArg})`;
+      return `__styledVariantsExtend({
+  base: ${variant.component},
+  baseClass: ${safeStringLiteral(baseClass)},
+  variantKeys: ${keysJson}${displayNameProp}
+})`;
     }
   }
 
   // cssVariants
-  return `__cssVariants(${safeStringLiteral(baseClass)}, ${keysJson})`;
+  return `__cssVariants({
+  baseClass: ${safeStringLiteral(baseClass)},
+  variantKeys: ${keysJson}
+})`;
 }
 
 // Default export for convenience

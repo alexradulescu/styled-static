@@ -1,7 +1,7 @@
 {
   "name": "@alex.radulescu/styled-static",
-  "version": "0.5.0",
-  "description": "Near-zero-runtime styled components for React 19+ with Vite. CSS extracted at build time, ~300 byte runtime.",
+  "version": "0.6.0",
+  "description": "Near-zero-runtime styled components for React 19+ with Vite. CSS extracted at build time, minimal runtime.",
   "type": "module",
   "private": false,
   "publishConfig": {
@@ -40,7 +40,9 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && bun run build:minify && bun run build:sizes",
+    "build:minify": "bun scripts/minify.ts",
+    "build:sizes": "bun scripts/sizes.ts",
     "dev": "vite",
     "dev:watch": "tsc --watch",
     "test": "vitest",

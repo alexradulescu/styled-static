@@ -27,7 +27,7 @@ This library implements several security measures:
 - **Build-time CSS extraction** - No runtime CSS parsing reduces XSS attack surface
 - **Input sanitization** - User-controlled values are sanitized before use
 - **Defense-in-depth** - Multiple layers of protection against common web vulnerabilities
-- **Minimal runtime** - Small attack surface (~300 bytes)
+- **Minimal runtime** - Small attack surface
 
 ## Security Updates
 

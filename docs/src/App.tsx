@@ -40,6 +40,11 @@ const FeaturesSection = lazy(() =>
     default: m.FeaturesSection,
   }))
 );
+const HowItWorksSection = lazy(() =>
+  import("./sections/HowItWorksSection").then((m) => ({
+    default: m.HowItWorksSection,
+  }))
+);
 
 // =============================================================================
 // Theme & Global Styles
@@ -709,12 +714,6 @@ const sections: SectionInfo[] = [
     keywords: ["as", "polymorphic", "element", "render"],
   },
   {
-    id: "transient",
-    title: "Transient Props",
-    group: "Features",
-    keywords: ["transient", "$", "filter", "dom"],
-  },
-  {
     id: "nesting",
     title: "CSS Nesting",
     group: "Features",
@@ -725,6 +724,42 @@ const sections: SectionInfo[] = [
     title: "Theming",
     group: "Features",
     keywords: ["theme", "dark", "light", "mode", "toggle", "custom"],
+  },
+  {
+    id: "how-it-works",
+    title: "Overview",
+    group: "Internals",
+    keywords: ["how", "works", "build", "compile", "transform"],
+  },
+  {
+    id: "transformation",
+    title: "Build-Time Transformation",
+    group: "Internals",
+    keywords: ["transform", "ast", "vite", "plugin", "compile"],
+  },
+  {
+    id: "virtual-css",
+    title: "Virtual CSS Modules",
+    group: "Internals",
+    keywords: ["virtual", "css", "modules", "import", "extract"],
+  },
+  {
+    id: "runtime",
+    title: "Runtime Wrappers",
+    group: "Internals",
+    keywords: ["runtime", "wrapper", "component", "size"],
+  },
+  {
+    id: "bundle-size",
+    title: "Bundle Size Comparison",
+    group: "Internals",
+    keywords: ["bundle", "size", "comparison", "emotion", "styled-components"],
+  },
+  {
+    id: "comparison",
+    title: "Library Comparison",
+    group: "Internals",
+    keywords: ["comparison", "emotion", "linaria", "panda", "css-in-js", "alternatives"],
   },
 ];
 
@@ -1004,9 +1039,9 @@ const Btn = styledVariants({
                 </CalloutIcon>
                 <CalloutContent>
                   <strong>Static CSS, minimal runtime.</strong> CSS generation happens
-                  at build time (zero runtime cost). A tiny ~300 byte runtime handles
+                  at build time (zero runtime cost). A minimal runtime handles
                   dynamic features like <InlineCode>as</InlineCode> prop polymorphism
-                  and transient props.
+                  and className merging.
                 </CalloutContent>
               </div>
 
@@ -1158,6 +1193,17 @@ export default defineConfig({
               }
             >
               <FeaturesSection theme={theme} toggleTheme={toggleTheme} />
+            </Suspense>
+
+            {/* ========================================== */}
+            {/* HOW IT WORKS SECTION - Lazy loaded */}
+            {/* ========================================== */}
+            <Suspense
+              fallback={
+                <LoadingWrapper>Loading How It Works docs...</LoadingWrapper>
+              }
+            >
+              <HowItWorksSection />
             </Suspense>
           </Content>
         </Main>

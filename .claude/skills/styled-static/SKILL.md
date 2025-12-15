@@ -5,17 +5,20 @@ description: Use when writing styles with styled-static, creating styled compone
 
 # styled-static
 
-Near-zero-runtime CSS-in-JS for React 19+ with Vite. CSS generation happens at build time (zero runtime cost). The ~300 byte runtime handles `as` prop, transient props, and className merging.
+Near-zero-runtime CSS-in-JS for React 19+ with Vite. CSS generation happens at build time (zero runtime cost). A minimal runtime handles `as` prop and className merging.
 
 ## Tree-Shakable Runtime
 
 The runtime is split into separate modules for optimal tree-shaking:
-- `runtime/core.ts` - Shared utilities
-- `runtime/styled.ts` - __styled, __styledExtend (~80 bytes)
-- `runtime/variants.ts` - Variant functions (~150 bytes)
-- `runtime/global.ts` - __GlobalStyle (~10 bytes)
 
-Apps automatically bundle only what they use. No variants? Save ~150 bytes. No styled components? Save ~80 bytes.
+| Module | Minified | Brotli |
+|--------|----------|--------|
+| core.js | 544 B | 298 B |
+| styled.js | 1.1 KB | 491 B |
+| variants.js | 1.7 KB | 734 B |
+| global.js | 43 B | 47 B |
+
+Apps bundle only what they use. Typical styled-only app: ~1.6 KB minified.
 
 ## Key Difference from Emotion/styled-components
 
@@ -59,7 +62,32 @@ const PrimaryButton = styled(Button)`
   <Button as={Link} to="/path">Router Link</Button>
   ```
 - `className` - Merged after styled classes (wins in cascade)
-- `$propName` - Transient props, filtered from DOM
+
+**Pre-configured `as` (alternative to `withComponent`):**
+```tsx
+import type { ComponentProps } from 'react';
+
+// Zero-overhead pattern for always rendering as a specific element/component
+const LinkButton = (props: ComponentProps<typeof Link>) => (
+  <Button as={Link} {...props} />
+);
+
+<LinkButton to="/home">Home</LinkButton>
+```
+
+> We don't provide `.withComponent()` — this pattern is simple, explicit, and adds zero bytes.
+
+**attrs:**
+```tsx
+const PasswordInput = styled.input.attrs({ type: 'password' })`
+  padding: 0.5rem;
+`;
+
+const SubmitButton = styled.button.attrs({ type: 'submit' })`
+  background: blue;
+`;
+```
+> Note: attrs must be static objects (no functions).
 
 ### css
 
@@ -275,16 +303,44 @@ export default defineConfig({
 });
 ```
 
-### 5. No css Prop
+### 5. No css Prop (By Design)
 ```tsx
-// WRONG - css prop not supported
+// NOT SUPPORTED
 <div css={css`color: red;`}>
 
-// RIGHT - use className
-<div className={css`color: red;`}>
+// USE THIS INSTEAD
+const redText = css`color: red;`;
+<div className={redText}>
 ```
 
-### 6. Cascade Order
+**Why?** The `css` prop saves ~10 characters of naming but adds ~100 lines of plugin complexity. Named variables encourage reusable styles and are easier to refactor. The "friction" of naming is a feature, not a bug.
+
+### 6. No shouldForwardProp (Not Needed)
+
+`shouldForwardProp` exists in styled-components/Emotion to filter custom props used for runtime interpolation. Since styled-static has no runtime interpolation, you don't pass custom styling props in the first place.
+
+**Workarounds for edge cases:**
+```tsx
+// 1. Destructure before passing
+function MyButton({ isActive, ...rest }) {
+  return <Button className={cx(isActive && activeClass)} {...rest} />;
+}
+
+// 2. Use data attributes (valid HTML)
+const Button = styled.button`
+  &[data-active="true"] { background: blue; }
+`;
+<Button data-active={isActive} />
+
+// 3. Use variants (auto-stripped)
+const Button = styledVariants({
+  component: 'button',
+  variants: { active: { true: css`...` } }
+});
+<Button active />  // "active" never reaches DOM
+```
+
+### 7. Cascade Order
 Classes merge as: Base → Extension → User className
 ```tsx
 const Button = styled.button`padding: 1rem;`;      // .ss-abc
@@ -306,21 +362,34 @@ React components passed to `as` are not validated (they come from code, not user
 ### Variant Sanitization
 Variant values are auto-sanitized to alphanumeric + hyphens only, preventing class injection attacks.
 
-### Transient Props
-Props prefixed with `$` are filtered from DOM output:
-```tsx
-<Button $primary={true} $size="lg">
-// DOM: <button class="...">  (no $primary or $size attributes)
-```
-
 ---
 
 ## Vite Plugin Options
 
 ```ts
 styledStatic({
-  classPrefix: 'ss',        // Custom prefix (default: 'ss')
-  debug: false,             // Debug logging (don't use in prod)
-  autoprefixer: ['> 1%'],   // Browser targets, or false to disable
+  classPrefix: 'ss',  // Custom prefix (default: 'ss')
+  debug: false,       // Debug logging (don't use in prod)
 })
 ```
+
+### Autoprefixing with Lightning CSS
+
+styled-static has **zero dependencies** and delegates CSS processing to Vite's pipeline. For autoprefixing, use Lightning CSS:
+
+```bash
+npm install lightningcss
+```
+
+```ts
+// vite.config.ts
+export default defineConfig({
+  css: { transformer: 'lightningcss' },
+  plugins: [styledStatic(), react()],
+});
+```
+
+Lightning CSS provides:
+- Automatic vendor prefixes
+- CSS minification
+- Faster builds than PostCSS

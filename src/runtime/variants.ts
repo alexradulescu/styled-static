@@ -7,7 +7,7 @@
  * - cssVariants: Returns variant class strings
  */
 import { type ComponentType, type JSX, createElement } from "react";
-import { filterTransientProps, mergeClassNames, validateAsTag } from "./core";
+import { debugLog, mergeClassNames, validateAsTag } from "./core";
 
 type HTMLTag = keyof JSX.IntrinsicElements;
 
@@ -26,60 +26,78 @@ function sanitizeVariantValue(value: unknown): string | null {
 }
 
 /**
+ * Config object for __styledVariants function
+ */
+type StyledVariantsConfig<T extends HTMLTag> = {
+  tag: T;
+  baseClass: string;
+  variantKeys: string[];
+  displayName?: string;
+};
+
+/**
  * Creates a styled component with variant support.
  *
- * At build time, this receives:
- * - tag: HTML element or component to render
- * - baseClass: The base class name
- * - variantKeys: Array of variant property names (e.g., ['color', 'size'])
- * - displayName: Optional component name for DevTools
- *
  * @example
- * __styledVariants('button', 'ss-abc123', ['color', 'size'], 'Button')
+ * __styledVariants({ tag: 'button', baseClass: 'ss-abc123', variantKeys: ['color', 'size'] })
  * // With variant props: <Button color="primary" size="sm" />
  * // Renders: <button class="ss-abc123 ss-abc123--color-primary ss-abc123--size-sm">
+ *
+ * @param config - Configuration object
+ * @param config.tag - HTML element or component to render
+ * @param config.baseClass - The base class name
+ * @param config.variantKeys - Array of variant property names (e.g., ['color', 'size'])
+ * @param config.displayName - Optional component name for DevTools
  */
 export function __styledVariants<T extends HTMLTag>(
-  tag: T,
-  baseClass: string,
-  variantKeys: string[],
-  displayName?: string
+  config: StyledVariantsConfig<T>
 ): ComponentType<any> {
+  const { tag, baseClass, variantKeys, displayName } = config;
+
   const Component = (props: any) => {
-    const { as: asProp, className: userClass, ...rest } = props;
+    const { as: asProp, className: userClass, __debug, ...rest } = props;
 
     // Build variant classes with sanitized values
     const classes = [baseClass];
+    const activeVariants: Record<string, string> = {};
     for (const key of variantKeys) {
       const value = rest[key];
       if (value != null) {
         const sanitized = sanitizeVariantValue(value);
         if (sanitized) {
           classes.push(`${baseClass}--${key}-${sanitized}`);
+          activeVariants[key] = sanitized;
         }
         delete rest[key]; // Remove variant prop from DOM
       }
     }
 
-    const domProps = filterTransientProps(rest);
-    domProps.className = mergeClassNames(classes.join(" "), userClass);
+    if (__debug) {
+      debugLog(displayName || tag, [
+        ["Props", { as: asProp, className: userClass }],
+        ["Active variants", activeVariants],
+        ["Final className", mergeClassNames(classes.join(" "), userClass)],
+      ]);
+    }
+
+    rest.className = mergeClassNames(classes.join(" "), userClass);
 
     // No as prop - use default tag
     if (asProp === undefined) {
-      return createElement(tag, domProps);
+      return createElement(tag, rest);
     }
 
     // String (HTML element) - validate for security
     if (typeof asProp === "string") {
       const validatedTag = validateAsTag(asProp, tag);
-      return createElement(validatedTag, domProps);
+      return createElement(validatedTag, rest);
     }
 
     // Component - render directly (no validation needed, comes from code not user input)
-    return createElement(asProp, domProps);
+    return createElement(asProp, rest);
   };
 
-  if (displayName) {
+  if (process.env.NODE_ENV !== "production" && displayName) {
     Component.displayName = displayName;
   }
 
@@ -87,42 +105,62 @@ export function __styledVariants<T extends HTMLTag>(
 }
 
 /**
+ * Config object for __styledVariantsExtend function
+ */
+type StyledVariantsExtendConfig<P> = {
+  base: ComponentType<P>;
+  baseClass: string;
+  variantKeys: string[];
+  displayName?: string;
+};
+
+/**
  * Creates a styled component with variants by extending an existing component.
  *
- * @param Base - Component to extend
- * @param baseClass - The base class name for this extension
- * @param variantKeys - Array of variant property names
- * @param displayName - Optional component name for DevTools
+ * @param config - Configuration object
+ * @param config.base - Component to extend
+ * @param config.baseClass - The base class name for this extension
+ * @param config.variantKeys - Array of variant property names
+ * @param config.displayName - Optional component name for DevTools
  */
 export function __styledVariantsExtend<P extends { className?: string }>(
-  Base: ComponentType<P>,
-  baseClass: string,
-  variantKeys: string[],
-  displayName?: string
+  config: StyledVariantsExtendConfig<P>
 ): ComponentType<any> {
+  const { base: Base, baseClass, variantKeys, displayName } = config;
+
   const Component = (props: any) => {
-    const { className: userClass, ...rest } = props;
+    const { className: userClass, __debug, ...rest } = props;
 
     // Build variant classes with sanitized values
     const classes = [baseClass];
+    const activeVariants: Record<string, string> = {};
     for (const key of variantKeys) {
       const value = rest[key];
       if (value != null) {
         const sanitized = sanitizeVariantValue(value);
         if (sanitized) {
           classes.push(`${baseClass}--${key}-${sanitized}`);
+          activeVariants[key] = sanitized;
         }
         delete rest[key]; // Remove variant prop from DOM
       }
     }
 
-    const cleanProps = filterTransientProps(rest);
-    cleanProps.className = mergeClassNames(classes.join(" "), userClass);
+    if (__debug) {
+      debugLog(displayName || Base.displayName || "Component", [
+        ["Props", { className: userClass }],
+        ["Active variants", activeVariants],
+        ["Extension className", baseClass],
+        ["Final className", mergeClassNames(classes.join(" "), userClass)],
+      ]);
+    }
 
-    return createElement(Base, cleanProps as P);
+    rest.className = mergeClassNames(classes.join(" "), userClass);
+
+    return createElement(Base, rest as P);
   };
 
-  if (displayName) {
+  if (process.env.NODE_ENV !== "production" && displayName) {
     Component.displayName = displayName;
   }
 
@@ -130,21 +168,30 @@ export function __styledVariantsExtend<P extends { className?: string }>(
 }
 
 /**
+ * Config object for __cssVariants function
+ */
+type CssVariantsConfig = {
+  baseClass: string;
+  variantKeys: string[];
+};
+
+/**
  * Creates a cssVariants function.
  *
- * At build time, this receives:
- * - baseClass: The base class name
- * - variantKeys: Array of variant property names
- *
  * @example
- * const buttonCss = __cssVariants('ss-xyz789', ['color', 'size']);
+ * const buttonCss = __cssVariants({ baseClass: 'ss-xyz789', variantKeys: ['color', 'size'] });
  * buttonCss({ color: 'primary', size: 'sm' })
  * // Returns: 'ss-xyz789 ss-xyz789--color-primary ss-xyz789--size-sm'
+ *
+ * @param config - Configuration object
+ * @param config.baseClass - The base class name
+ * @param config.variantKeys - Array of variant property names
  */
 export function __cssVariants(
-  baseClass: string,
-  variantKeys: string[]
+  config: CssVariantsConfig
 ): (variants?: Record<string, string | undefined>) => string {
+  const { baseClass, variantKeys } = config;
+
   return (variants) => {
     const classes = [baseClass];
     if (variants) {

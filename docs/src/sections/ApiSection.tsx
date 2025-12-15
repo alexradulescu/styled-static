@@ -128,7 +128,7 @@ const highlightClass = css\`
         <Breadcrumb>API</Breadcrumb>
         <SectionTitle>cx Utility</SectionTitle>
         <Paragraph>
-          A minimal (~40 byte) utility for conditionally joining class names.
+          A minimal utility for conditionally joining class names.
           Filters out falsy values automatically.
         </Paragraph>
         <CodeBlock>{`import { cx } from 'styled-static';

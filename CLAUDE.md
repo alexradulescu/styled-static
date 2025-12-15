@@ -2,7 +2,7 @@
 
 ## What is this?
 
-**styled-static** is a near-zero-runtime CSS-in-JS library for React 19+ with Vite. It provides a styled-components-like API and extracts all CSS at build time. The ~300 byte runtime handles dynamic features (`as` prop, transient props, className merging) that require runtime props.
+**styled-static** is a near-zero-runtime CSS-in-JS library for React 19+ with Vite. It provides a styled-components-like API and extracts all CSS at build time. A minimal runtime handles dynamic features (`as` prop, className merging) that require runtime props.
 
 ## Tech Stack
 
@@ -11,7 +11,7 @@
 - **Language**: TypeScript (strict mode)
 - **Package Manager**: Bun
 - **Testing**: Vitest
-- **Dependencies**: magic-string, postcss, postcss-nested, autoprefixer (4 total)
+- **Dependencies**: Zero runtime dependencies (uses Vite's built-in tools)
 
 ## Project Structure
 
@@ -19,7 +19,7 @@
 src/
   vite.ts       # Main Vite plugin - AST transformation, CSS extraction
   runtime/      # Tree-shakable runtime modules
-    core.ts     # Shared utilities (validateAsTag, filterTransientProps, etc.)
+    core.ts     # Shared utilities (validateAsTag, mergeClassNames)
     styled.ts   # __styled, __styledExtend
     variants.ts # __styledVariants, __styledVariantsExtend, __cssVariants
     global.ts   # __GlobalStyle
@@ -48,8 +48,13 @@ const GlobalStyle = createGlobalStyle`* { box-sizing: border-box; }`;
 // Polymorphic as prop
 <Button as="a" href="/">Link</Button>
 
-// Transient props (filtered from DOM)
-<Button $primary={true}>Click</Button>
+// Pre-configured as (zero-overhead alternative to withComponent)
+const LinkButton = (props: ComponentProps<typeof Link>) => (
+  <Button as={Link} {...props} />
+);
+
+// Default attributes
+const PasswordInput = styled.input.attrs({ type: 'password' })`...`;
 ```
 
 ## Key Design Decisions
@@ -57,8 +62,10 @@ const GlobalStyle = createGlobalStyle`* { box-sizing: border-box; }`;
 1. **AST over Regex** - Uses Vite's built-in parser for robustness
 2. **No forwardRef** - React 19 handles ref forwarding automatically
 3. **className order** - Base → Extension → User for correct cascade
-4. **Transient props** - $-prefixed props filtered to prevent DOM warnings
-5. **Virtual CSS modules** - Each styled block becomes a virtual .css import
+4. **Virtual CSS modules** - Each styled block becomes a virtual .css import
+5. **Zero dependencies** - Delegates CSS processing to Vite's pipeline; use Lightning CSS for autoprefixing
+6. **No `css` prop** - Intentionally omitted. Named `css` variables encourage reusable styles and add zero plugin complexity
+7. **No `shouldForwardProp`** - Not needed. No runtime interpolation means no custom styling props to filter. Variants auto-strip their props; use destructuring or data attributes for edge cases
 
 ## Commands
 
@@ -94,12 +101,15 @@ The CSS is extracted to a virtual module, and the styled call is replaced with a
 
 The runtime is split into separate modules for optimal tree-shaking. Bundlers automatically exclude unused modules, reducing bundle size:
 
-- **`runtime/core.ts`** - Shared utilities (validateAsTag, filterTransientProps, mergeClassNames)
-- **`runtime/styled.ts`** - __styled, __styledExtend (~80 bytes)
-- **`runtime/variants.ts`** - __styledVariants, __styledVariantsExtend, __cssVariants (~150 bytes)
-- **`runtime/global.ts`** - __GlobalStyle (~10 bytes)
+| Module | Minified | Gzip | Brotli |
+|--------|----------|------|--------|
+| `runtime/core.ts` | 544 B | 390 B | 298 B |
+| `runtime/styled.ts` | 1.1 KB | 590 B | 491 B |
+| `runtime/variants.ts` | 1.7 KB | 894 B | 734 B |
+| `runtime/global.ts` | 43 B | 63 B | 47 B |
+| **Total** | **3.4 KB** | **1.9 KB** | **1.5 KB** |
 
-The Vite plugin automatically imports only what it needs. Apps that don't use variants save ~150 bytes, apps that don't use styled components save ~80 bytes.
+The Vite plugin automatically imports only what it needs. Apps bundle only the runtime modules they use (e.g., styled-only apps: ~1.6 KB minified).
 
 ## Code Patterns
 
@@ -128,8 +138,4 @@ The Vite plugin automatically imports only what it needs. Apps that don't use va
 
 ## Potential Future Work
 
-- `keyframes` helper for scoped animation names
-- `css` prop support
-- `attrs()` helper for default props
-- `shouldForwardProp` customization
 - npm publish + CI/CD

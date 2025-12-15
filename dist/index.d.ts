@@ -63,6 +63,11 @@ export { getTheme, setTheme, initTheme, onSystemThemeChange, type InitThemeOptio
  * // Use with `as` prop for polymorphism
  * <Button as="a" href="/link">Click</Button>
  *
+ * // Pre-configure as prop (zero overhead alternative to withComponent)
+ * const LinkButton = (props: ComponentProps<typeof Link>) => (
+ *   <Button as={Link} {...props} />
+ * );
+ *
  * // Use transient props (won't reach DOM)
  * <Button $primary={true}>Click</Button>
  */

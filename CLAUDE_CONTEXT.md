@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-A build-time CSS-in-JS library that provides a styled-components-like API with zero runtime overhead. CSS is extracted at build time via a Vite plugin, leaving only a ~300 byte runtime for polymorphic `as` prop support and transient props filtering.
+A build-time CSS-in-JS library that provides a styled-components-like API with zero runtime overhead. CSS is extracted at build time via a Vite plugin, leaving only a minimal runtime for polymorphic `as` prop support and transient props filtering.
 
 ## Core Requirements
 
@@ -11,7 +11,7 @@ A build-time CSS-in-JS library that provides a styled-components-like API with z
 - **Vite only**: Uses Vite's built-in parser and plugin system
 - **TypeScript**: Full type inference with proper props
 - **Zero runtime interpolation**: Plain CSS with CSS variables only
-- **Minimal dependencies**: 4 total (magic-string, postcss, postcss-nested, autoprefixer)
+- **Zero dependencies**: Uses native CSS nesting and Vite's built-in tools; Lightning CSS recommended for autoprefixing
 
 ## Key Design Decisions
 
@@ -28,7 +28,7 @@ Uses Vite's built-in parser (Rollup's acorn) for robustness:
 - Accurate node positions for sourcemaps
 - More maintainable
 
-### 3. Minimal Runtime (~300 bytes)
+### 3. Minimal Runtime
 
 Runtime includes only:
 
@@ -50,7 +50,7 @@ Props prefixed with `$` are filtered from DOM to prevent React warnings and DOM 
 styled-static/
 ├── src/
 │   ├── vite.ts          # Main Vite plugin (~400 lines)
-│   ├── runtime.tsx      # Minimal runtime (~300 bytes minified)
+│   ├── runtime.tsx      # Minimal runtime
 │   ├── index.ts         # Public API exports
 │   ├── types.ts         # TypeScript types
 │   ├── hash.ts          # Murmurhash implementation
@@ -72,12 +72,7 @@ styled-static/
 
 ```json
 {
-  "dependencies": {
-    "magic-string": "^0.30.14",
-    "postcss": "^8.4.49",
-    "postcss-nested": "^7.0.2",
-    "autoprefixer": "^10.4.20"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.1",
@@ -103,7 +98,7 @@ styled-static/
 3. **For each match**:
    - Extract CSS content from template literal
    - Hash content → generate unique class name (ss-{hash})
-   - Process CSS (postcss-nested, autoprefixer)
+   - Wrap CSS in class selector (uses native CSS nesting)
    - Create virtual CSS module
    - Replace source with runtime call + CSS import
 4. **Return** transformed code with sourcemap
@@ -242,17 +237,12 @@ import { styledStatic } from "styled-static/vite";
 import { defineConfig } from "vite";
 
 export default defineConfig({
+  // Optional: Use Lightning CSS for autoprefixing
+  css: { transformer: "lightningcss" },
   plugins: [
     styledStatic({
       // Class name prefix (default: 'ss')
       classPrefix: "ss",
-      // Autoprefixer browser targets (or false to disable)
-      autoprefixer: [
-        "last 2 Chrome versions",
-        "last 2 Firefox versions",
-        "last 2 Safari versions",
-        "last 2 Edge versions",
-      ],
     }),
     react(),
   ],
@@ -304,18 +294,17 @@ Comprehensive test suite covers:
 | Runtime Interpolation | ❌            | ✅                | ✅      | ❌      |
 | `as` prop             | ✅            | ✅                | ✅      | ❌      |
 | Component Extension   | ✅            | ✅                | ✅      | ✅      |
-| Bundle Size           | ~300B         | ~12KB             | ~11KB   | ~0B     |
-| Dependencies          | 4             | 7                 | 5       | 300+    |
+| Bundle Size           | ~1.6KB        | ~12KB             | ~11KB   | ~0B     |
+| Dependencies          | 0             | 7                 | 5       | 300+    |
 | Attack Surface        | Minimal       | Medium            | Medium  | Large   |
 
 ## Security Advantage
 
-**styled-static (4 packages, ~50 transitive, ~5MB):**
+**styled-static (0 runtime dependencies):**
 
-- magic-string, postcss, postcss-nested, autoprefixer
-- All mature, heavily audited, 15M-50M weekly downloads
-- Zero known vulnerabilities
+- Zero dependencies - uses Vite's built-in tools
 - Minimal attack surface
+- No transitive dependencies to audit
 
 **Linaria/wyw-in-js (8-12 direct, 300+ transitive, ~40-60MB):**
 
@@ -422,12 +411,8 @@ load(id) {
 **CSS Processing:**
 
 ```ts
-const processor = postcss([
-  postcssNested(),
-  ...(autoprefixerConfig
-    ? [autoprefixer({ overrideBrowserslist: autoprefixerConfig })]
-    : []),
-]);
-
-const processed = await processor.process(wrappedCss, { from: undefined });
+// CSS is wrapped in class selector and passed to Vite's pipeline
+// Uses native CSS nesting (no PostCSS needed)
+const processedCss = `.${className} { ${cssContent} }`;
+cssModules.set(cssFilename, processedCss);
 ```

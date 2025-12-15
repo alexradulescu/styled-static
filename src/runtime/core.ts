@@ -48,29 +48,28 @@ export function validateAsTag(as: unknown, defaultTag: string): string {
 }
 
 /**
- * Filters out transient props (those starting with $).
- * This prevents React warnings about invalid DOM attributes.
- *
- * SECURITY: Uses Object.keys() instead of for...in to prevent prototype
- * pollution attacks where Object.prototype properties could be copied to DOM elements.
- */
-export function filterTransientProps(
-  props: Record<string, unknown>
-): Record<string, unknown> {
-  const filtered: Record<string, unknown> = {};
-  for (const key of Object.keys(props)) {
-    if (key[0] !== "$") {
-      filtered[key] = props[key];
-    }
-  }
-  return filtered;
-}
-
-/**
  * Merges class names in the correct order for CSS cascade.
  * Order: styled class(es) first, user className last
  * This allows user classes to override styled classes when needed.
  */
 export function mergeClassNames(styledClass: string, userClass?: string): string {
   return userClass ? `${styledClass} ${userClass}` : styledClass;
+}
+
+/**
+ * Debug logging helper for styled components.
+ * Logs component render info in a grouped console output.
+ * Dead-code eliminated in production builds.
+ *
+ * @param name - Component display name
+ * @param entries - Array of [label, value] pairs to log
+ */
+export function debugLog(name: string, entries: [string, unknown][]): void {
+  if (process.env.NODE_ENV !== "production") {
+    console.group(`[${name}] Render Debug`);
+    for (const [label, value] of entries) {
+      console.log(`${label}:`, value);
+    }
+    console.groupEnd();
+  }
 }

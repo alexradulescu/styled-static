@@ -1,6 +1,6 @@
 /**
  * Features Section - Lazy loaded
- * Contains: as prop, transient props, CSS nesting, theming
+ * Contains: as prop, CSS nesting, theming
  */
 import { Moon, Sun } from "lucide-react";
 import {
@@ -65,32 +65,6 @@ import { Link } from 'react-router-dom';
             <StyledButton as="span">Span</StyledButton>
           </ButtonGroup>
         </DemoArea>
-      </Section>
-
-      {/* Transient Props */}
-      <Section id="transient">
-        <Breadcrumb>Features</Breadcrumb>
-        <SectionTitle>Transient Props</SectionTitle>
-        <Paragraph>
-          Props prefixed with <InlineCode>$</InlineCode> are filtered out before
-          reaching the DOM. Use them to pass data to your component logic
-          without polluting HTML attributes.
-        </Paragraph>
-        <CodeBlock>{`const Button = styled.button\`
-  padding: 0.5rem 1rem;
-\`;
-
-// $variant won't appear in the DOM
-<Button $variant="primary" $size="large">
-  Click me
-</Button>
-
-// Rendered HTML:
-<button class="ss-abc123">Click me</button>`}</CodeBlock>
-        <Callout type="warning" icon={<AlertTriangle size={20} />}>
-          Transient props are for DOM filtering only. For dynamic CSS based on
-          props, use the Variants API instead.
-        </Callout>
       </Section>
 
       {/* CSS Nesting */}
