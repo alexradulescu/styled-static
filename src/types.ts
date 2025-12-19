@@ -158,31 +158,22 @@ export type PropsOf<T> = T extends HTMLTag
     : never;
 
 /**
- * The `as` prop enables polymorphic rendering.
- * Allows a styled component to render as a different HTML element or component.
- *
- * @example
- * const Button = styled.button`...`;
- * <Button as="a" href="/link">Link styled as button</Button>
- * <Button as={Link} to="/path">Router link styled as button</Button>
- */
-export type AsProp = {
-  as?: HTMLTag | ComponentType<{ className?: string }>;
-};
-
-/**
  * A styled React component with full type inference.
  *
  * Styled components created by styled-static support several special features:
  *
  * **Special Props:**
- * - `as` - Polymorphic rendering: render as a different HTML element or component
  * - `className` - Additional CSS classes (merged with styled classes, user classes override)
- * - `__debug` - Dev-only: logs props, variants, and className to console
+ *
+ * **Static Properties:**
+ * - `.className` - The static class name(s) for this component, enabling manual composition
  *
  * **Type Inference:**
- * - For HTML elements: includes element's native props + `as` prop
- * - For wrapped components: includes component's props (no `as` prop)
+ * - For HTML elements: includes element's native props
+ * - For wrapped components: includes component's props
+ *
+ * **Polymorphism:**
+ * Use `withComponent(ToComponent, FromComponent)` to render one component with another's styles.
  *
  * @example
  * ```tsx
@@ -193,29 +184,34 @@ export type AsProp = {
  *   color: white;
  * `;
  *
- * // Render as different element (polymorphic)
- * <Button as="a" href="/link">Link styled as button</Button>
- *
  * // Add custom classes (merged after styled classes)
  * <Button className="mt-4 hover:opacity-80">Click me</Button>
- *
- * // Debug in development
- * <Button __debug>Logs props and className</Button>
  *
  * // Extend existing components
  * const PrimaryButton = styled(Button)`
  *   background: darkblue;
  * `;
+ *
+ * // Access className for manual composition
+ * <a className={Button.className} href="/link">Link with button styles</a>
+ *
+ * // Use withComponent for polymorphism
+ * import { Link } from 'react-router-dom';
+ * const LinkButton = withComponent(Link, Button);
+ * <LinkButton to="/path">Router link styled as button</LinkButton>
  * ```
  *
  * @template T - The HTML tag or component being styled
  */
 export type StyledComponent<T extends HTMLTag | ComponentType<any>> =
-  T extends HTMLTag
-    ? ComponentType<PropsOf<T> & AsProp>
+  (T extends HTMLTag
+    ? ComponentType<PropsOf<T>>
     : T extends ComponentType<infer P>
       ? ComponentType<P>
-      : never;
+      : never) & {
+    /** The static class name(s) for this styled component */
+    className: string;
+  };
 
 // ============================================================================
 // Attrs Types

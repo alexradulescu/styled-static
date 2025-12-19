@@ -1,6 +1,6 @@
 /**
  * Features Section - Lazy loaded
- * Contains: as prop, CSS nesting, theming
+ * Contains: withComponent, CSS nesting, theming
  */
 import { Moon, Sun } from "lucide-react";
 import {
@@ -29,13 +29,14 @@ interface FeaturesSectionProps {
 export function FeaturesSection({ theme, toggleTheme }: FeaturesSectionProps) {
   return (
     <>
-      {/* as prop */}
-      <Section id="as-prop">
+      {/* withComponent & className */}
+      <Section id="polymorphism">
         <Breadcrumb>Features</Breadcrumb>
-        <SectionTitle>Polymorphic as Prop</SectionTitle>
+        <SectionTitle>Polymorphism & Composition</SectionTitle>
         <Paragraph>
-          Change the rendered element using the <InlineCode>as</InlineCode>{" "}
-          prop. Works with HTML elements and React components.
+          Every styled component exposes a static <InlineCode>.className</InlineCode>{" "}
+          property for manual composition. For rendering one component with
+          another's styles, use <InlineCode>withComponent</InlineCode>.
         </Paragraph>
         <CodeBlock>{`const Button = styled.button\`
   padding: 0.5rem 1rem;
@@ -43,26 +44,27 @@ export function FeaturesSection({ theme, toggleTheme }: FeaturesSectionProps) {
   color: white;
 \`;
 
-// Render as HTML element
-<Button as="a" href="/link">
-  I'm a link!
-</Button>
+// Access className for manual composition
+<a className={Button.className} href="/link">
+  Link with button styles
+</a>
 
-// Render as React component (e.g., react-router Link)
+// Use withComponent for polymorphic rendering
 import { Link } from 'react-router-dom';
+import { withComponent } from 'styled-static';
 
-<Button as={Link} to="/path">
-  I'm a router link!
-</Button>`}</CodeBlock>
+const LinkButton = withComponent(Link, Button);
+
+<LinkButton to="/path">
+  Router link styled as button
+</LinkButton>`}</CodeBlock>
         <DemoArea>
           <DemoLabel>Result</DemoLabel>
           <ButtonGroup>
             <StyledButton>Button</StyledButton>
-            {/* @ts-expect-error - polymorphic typing limitation */}
-            <StyledButton as="a" href="#as-prop">
-              Anchor
-            </StyledButton>
-            <StyledButton as="span">Span</StyledButton>
+            <a className={StyledButton.className} href="#polymorphism">
+              Anchor (via className)
+            </a>
           </ButtonGroup>
         </DemoArea>
       </Section>

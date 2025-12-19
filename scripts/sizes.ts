@@ -2,10 +2,7 @@ import { readFile } from "node:fs/promises";
 import { brotliCompressSync, gzipSync } from "node:zlib";
 
 const RUNTIME_FILES = [
-  "dist/runtime/core.js",
-  "dist/runtime/styled.js",
-  "dist/runtime/variants.js",
-  "dist/runtime/global.js",
+  "dist/runtime/index.js",
 ];
 
 function formatBytes(bytes: number): string {

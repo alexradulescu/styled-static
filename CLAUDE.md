@@ -2,7 +2,7 @@
 
 ## What is this?
 
-**styled-static** is a near-zero-runtime CSS-in-JS library for React 19+ with Vite. It provides a styled-components-like API and extracts all CSS at build time. A minimal runtime handles dynamic features (`as` prop, className merging) that require runtime props.
+**styled-static** is a near-zero-runtime CSS-in-JS library for React 19+ with Vite. It provides a styled-components-like API and extracts all CSS at build time. Components are generated inline at build time with a minimal (~45 byte) runtime for className merging.
 
 ## Tech Stack
 
@@ -18,12 +18,9 @@
 ```
 src/
   vite.ts       # Main Vite plugin - AST transformation, CSS extraction
-  runtime/      # Tree-shakable runtime modules
-    core.ts     # Shared utilities (validateAsTag, mergeClassNames)
-    styled.ts   # __styled, __styledExtend
-    variants.ts # __styledVariants, __styledVariantsExtend, __cssVariants
-    global.ts   # __GlobalStyle
-  index.ts      # Public API exports (styled, css, createGlobalStyle)
+  runtime/
+    index.ts    # Minimal runtime (~45 bytes) - just className merging
+  index.ts      # Public API exports (styled, css, createGlobalStyle, withComponent)
   types.ts      # TypeScript types (StyledComponent, StyledFunction, etc.)
   hash.ts       # Murmurhash for class name generation
   vite.test.ts  # Comprehensive test suite
@@ -36,8 +33,12 @@ example/        # Working demo app
 // Style elements
 const Button = styled.button`padding: 1rem;`;
 
-// Extend components
+// Extend components (multi-level works too)
 const Primary = styled(Button)`background: blue;`;
+const BigPrimary = styled(Primary)`font-size: 2rem;`;
+
+// Access className for manual composition
+<a className={Button.className} href="/link">Link with button styles</a>
 
 // Get class string
 const active = css`outline: 2px solid;`;
@@ -45,13 +46,10 @@ const active = css`outline: 2px solid;`;
 // Global styles
 const GlobalStyle = createGlobalStyle`* { box-sizing: border-box; }`;
 
-// Polymorphic as prop
-<Button as="a" href="/">Link</Button>
-
-// Pre-configured as (zero-overhead alternative to withComponent)
-const LinkButton = (props: ComponentProps<typeof Link>) => (
-  <Button as={Link} {...props} />
-);
+// Polymorphism via withComponent (replaces 'as' prop)
+import { Link } from 'react-router-dom';
+const LinkButton = withComponent(Link, Button);
+<LinkButton to="/path">Router link styled as button</LinkButton>
 
 // Default attributes
 const PasswordInput = styled.input.attrs({ type: 'password' })`...`;
@@ -60,12 +58,14 @@ const PasswordInput = styled.input.attrs({ type: 'password' })`...`;
 ## Key Design Decisions
 
 1. **AST over Regex** - Uses Vite's built-in parser for robustness
-2. **No forwardRef** - React 19 handles ref forwarding automatically
-3. **className order** - Base → Extension → User for correct cascade
-4. **Virtual CSS modules** - Each styled block becomes a virtual .css import
-5. **Zero dependencies** - Delegates CSS processing to Vite's pipeline; use Lightning CSS for autoprefixing
-6. **No `css` prop** - Intentionally omitted. Named `css` variables encourage reusable styles and add zero plugin complexity
-7. **No `shouldForwardProp`** - Not needed. No runtime interpolation means no custom styling props to filter. Variants auto-strip their props; use destructuring or data attributes for edge cases
+2. **Inline components** - Components are generated as inline functions at build time
+3. **No forwardRef** - React 19 handles ref forwarding automatically
+4. **className order** - Base → Extension → User for correct cascade
+5. **Virtual CSS modules** - Each styled block becomes a virtual .css import
+6. **Zero dependencies** - Delegates CSS processing to Vite's pipeline; use Lightning CSS for autoprefixing
+7. **No `css` prop** - Intentionally omitted. Named `css` variables encourage reusable styles and add zero plugin complexity
+8. **No `shouldForwardProp`** - Not needed. No runtime interpolation means no custom styling props to filter. Variants auto-strip their props; use destructuring or data attributes for edge cases
+9. **No `as` prop** - Replaced by `withComponent(To, From)` for build-time polymorphism
 
 ## Commands
 
@@ -89,40 +89,69 @@ const Button = styled.button`
 **Output:**
 
 ```tsx
-import { __styled } from "styled-static/runtime/styled";
+import { createElement } from "react";
+import { m } from "styled-static/runtime";
 import "styled-static:abc123-0.css";
 
-const Button = __styled("button", "ss-abc123", "Button");
+const Button = Object.assign(
+  (p) => createElement("button", {...p, className: m("ss-abc123", p.className)}),
+  { className: "ss-abc123" }
+);
 ```
 
-The CSS is extracted to a virtual module, and the styled call is replaced with a thin runtime wrapper.
+The CSS is extracted to a virtual module. The styled component becomes an inline function with a static `.className` property for composition.
 
-## Runtime Structure (Tree-Shakable)
+### Extension Chains
 
-The runtime is split into separate modules for optimal tree-shaking. Bundlers automatically exclude unused modules, reducing bundle size:
+```tsx
+// Input
+const Button = styled.button`padding: 1rem;`;
+const Primary = styled(Button)`background: blue;`;
 
-| Module | Minified | Gzip | Brotli |
-|--------|----------|------|--------|
-| `runtime/core.ts` | 544 B | 390 B | 298 B |
-| `runtime/styled.ts` | 1.1 KB | 590 B | 491 B |
-| `runtime/variants.ts` | 1.7 KB | 894 B | 734 B |
-| `runtime/global.ts` | 43 B | 63 B | 47 B |
-| **Total** | **3.4 KB** | **1.9 KB** | **1.5 KB** |
+// Output
+const Button = Object.assign(
+  (p) => createElement("button", {...p, className: m("ss-btn", p.className)}),
+  { className: "ss-btn" }
+);
+const Primary = Object.assign(
+  (p) => createElement(Button, {...p, className: m("ss-primary", p.className)}),
+  { className: Button.className + " ss-primary" }  // "ss-btn ss-primary"
+);
+```
 
-The Vite plugin automatically imports only what it needs. Apps bundle only the runtime modules they use (e.g., styled-only apps: ~1.6 KB minified).
+## Runtime Size
 
-## Code Patterns
+The runtime is minimal - just a className merge function:
 
-**Runtime functions:**
+| Module | Minified | Brotli |
+|--------|----------|--------|
+| `runtime/index.ts` | **45 B** | **50 B** |
 
-- `__styled(tag, className, displayName?)` - Creates styled component
-- `__styledExtend(Base, className, displayName?)` - Extends existing component
-- `__styledVariants(tag, baseClass, variantKeys, displayName?)` - Creates component with variants
-- `__styledVariantsExtend(Base, baseClass, variantKeys, displayName?)` - Extends component with variants
-- `__cssVariants(baseClass, variantKeys)` - Returns variant class string function
-- `__GlobalStyle` - No-op component (CSS injected via import)
+This is a 98% reduction from the previous 3.4 KB runtime.
 
-**Plugin hooks used:**
+## The Object.assign Pattern
+
+We use `Object.assign` to create inline component functions with static properties. Here's why:
+
+```tsx
+// This creates a valid React component with a .className property
+const Button = Object.assign(
+  (p) => createElement("button", {...p, className: m("ss-btn", p.className)}),
+  { className: "ss-btn" }
+);
+```
+
+**Why this works:**
+1. **Functions are objects** - In JavaScript, functions can have properties
+2. **React components are functions** - A function returning JSX is a valid React component
+3. **Object.assign returns the first argument** - The function itself, now with `.className` attached
+4. **Single expression** - Easy to generate via AST replacement (no multi-statement blocks)
+
+**Caveats:**
+- `React.memo(Button)` won't copy static properties - use `Object.assign(memo(Button), { className: Button.className })`
+- Works perfectly with React Compiler (it only cares that it's a function)
+
+## Plugin Hooks Used
 
 - `configResolved` - Capture dev/prod mode
 - `resolveId` - Handle virtual CSS module IDs
@@ -135,6 +164,7 @@ The Vite plugin automatically imports only what it needs. Apps bundle only the r
 ✅ Fully implemented and working
 ✅ Comprehensive test suite
 ✅ Example app demonstrating all features
+✅ Minimal runtime (~45 bytes)
 
 ## Potential Future Work
 

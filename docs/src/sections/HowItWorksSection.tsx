@@ -37,7 +37,8 @@ export function HowItWorksSection() {
           When you write a styled component, the Vite plugin intercepts your
           source code and performs AST-based transformation. The CSS is
           extracted to a static file, and the component definition is replaced
-          with a lightweight runtime wrapper.
+          with an inline React component. The runtime is just ~45 bytes for
+          className merging.
         </Paragraph>
 
         <Paragraph>Here's what happens to your code:</Paragraph>
@@ -52,14 +53,14 @@ const Button = styled.button\`
 \`;`}</CodeBlock>
 
         <CodeBlock>{`// What gets generated:
-import { __styled } from "styled-static/runtime/styled";
+import { createElement } from "react";
+import { m } from "styled-static/runtime";
 import "styled-static:abc123-0.css";
 
-const Button = __styled({
-  tag: "button",
-  className: "ss-abc123",
-  displayName: "Button"  // dev-only
-});`}</CodeBlock>
+const Button = Object.assign(
+  (p) => createElement("button", {...p, className: m("ss-abc123", p.className)}),
+  { className: "ss-abc123" }
+);`}</CodeBlock>
 
         <Callout type="tip" icon={<Lightbulb size={20} />}>
           The CSS is completely removed from your JavaScript bundle and moved to
@@ -100,67 +101,25 @@ const Button = __styled({
         <Breadcrumb>Internals</Breadcrumb>
         <SubsectionTitle>Minimal Runtime</SubsectionTitle>
         <Paragraph>
-          The runtime wrapper is extremely small because all CSS has been
-          extracted. The runtime only needs to handle dynamic features that
-          require runtime props:
+          The runtime is just ~45 bytes because components are generated inline
+          at build time. The only runtime code is a simple function to merge
+          className strings:
         </Paragraph>
 
-        <ul
-          style={{ marginLeft: "1.5rem", color: "var(--color-text-secondary)" }}
-        >
-          <li>
-            <InlineCode>as</InlineCode> prop - Polymorphic rendering
-          </li>
-          <li>
-            <InlineCode>className</InlineCode> - Merging user classes
-          </li>
-          <li>
-            <InlineCode>__debug</InlineCode> - Dev-only logging (stripped in
-            production)
-          </li>
-        </ul>
+        <CodeBlock>{`// The entire runtime (~45 bytes minified)
+export const m = (b, u) => (u ? \`\${b} \${u}\` : b);
 
-        <CodeBlock>{`// Simplified runtime implementation
-export function __styled(config) {
-  const { tag, className, displayName } = config;
+// Usage: m("ss-abc123", props.className)
+// m("ss-btn", undefined)     → "ss-btn"
+// m("ss-btn", "custom")      → "ss-btn custom"
+// m("ss-btn ss-primary", "") → "ss-btn ss-primary"`}</CodeBlock>
 
-  const Component = (props) => {
-    const { as, className: userClass, __debug, ...rest } = props;
-
-    // Merge classes (styled first, user last)
-    rest.className = mergeClassNames(className, userClass);
-
-    // Render with validated tag
-    return createElement(as || tag, rest);
-  };
-
-  if (process.env.NODE_ENV !== "production" && displayName) {
-    Component.displayName = displayName;
-  }
-
-  return Component;
-}`}</CodeBlock>
-      </Section>
-
-      {/* Object-Based API */}
-      <Section id="object-api">
-        <Breadcrumb>Internals</Breadcrumb>
-        <SubsectionTitle>Self-Documenting Object API</SubsectionTitle>
         <Paragraph>
-          Runtime functions use object-based configuration instead of positional
-          parameters. This makes the generated code self-documenting and easier
-          to debug.
+          For polymorphic rendering, use{" "}
+          <InlineCode>withComponent(To, From)</InlineCode> instead of an{" "}
+          <InlineCode>as</InlineCode> prop. This resolves the component at build
+          time rather than runtime.
         </Paragraph>
-
-        <CodeBlock>{`// Clear object syntax (current)
-__styled({
-  tag: "button",
-  className: "ss-abc123",
-  displayName: "Button"
-});
-
-// vs. positional parameters (harder to read)
-__styled("button", "ss-abc123", "Button");`}</CodeBlock>
       </Section>
 
       {/* Zero-Runtime Features */}
@@ -187,95 +146,6 @@ const GlobalStyles = createGlobalStyle\`
 
 // Generated: no-op component
 const GlobalStyles = () => null;`}</CodeBlock>
-      </Section>
-
-      {/* Bundle Size Comparison */}
-      <Section id="bundle-size">
-        <Breadcrumb>Internals</Breadcrumb>
-        <SubsectionTitle>Bundle Size Comparison</SubsectionTitle>
-        <Paragraph>
-          Here's how styled-static compares to other CSS-in-JS libraries for an
-          app with 500 styled components:
-        </Paragraph>
-
-        <div
-          style={{
-            overflowX: "auto",
-            margin: "1.5rem 0",
-            border: "1px solid var(--color-border)",
-            borderRadius: "var(--radius)",
-          }}
-        >
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: "0.875rem",
-            }}
-          >
-            <thead>
-              <tr
-                style={{
-                  background: "var(--color-bg-sidebar)",
-                  borderBottom: "1px solid var(--color-border)",
-                }}
-              >
-                <th style={{ padding: "0.75rem", textAlign: "left" }}>
-                  Library
-                </th>
-                <th style={{ padding: "0.75rem", textAlign: "left" }}>
-                  Runtime
-                </th>
-                <th style={{ padding: "0.75rem", textAlign: "left" }}>
-                  Per Component
-                </th>
-                <th style={{ padding: "0.75rem", textAlign: "left" }}>
-                  Total (500)
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
-              >
-                <td style={{ padding: "0.75rem" }}>
-                  <strong style={{ color: "var(--color-primary)" }}>
-                    styled-static
-                  </strong>
-                </td>
-                <td style={{ padding: "0.75rem" }}>~1.6 KB</td>
-                <td style={{ padding: "0.75rem" }}>~20 bytes</td>
-                <td style={{ padding: "0.75rem" }}>
-                  <strong style={{ color: "var(--color-primary)" }}>
-                    ~12 KB
-                  </strong>
-                </td>
-              </tr>
-              <tr
-                style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
-              >
-                <td style={{ padding: "0.75rem" }}>Emotion</td>
-                <td style={{ padding: "0.75rem" }}>7.9 KB</td>
-                <td style={{ padding: "0.75rem" }}>~50 bytes</td>
-                <td style={{ padding: "0.75rem" }}>32.9 KB</td>
-              </tr>
-              <tr
-                style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
-              >
-                <td style={{ padding: "0.75rem" }}>styled-components</td>
-                <td style={{ padding: "0.75rem" }}>16 KB</td>
-                <td style={{ padding: "0.75rem" }}>~60 bytes</td>
-                <td style={{ padding: "0.75rem" }}>46 KB</td>
-              </tr>
-              <tr>
-                <td style={{ padding: "0.75rem" }}>Linaria</td>
-                <td style={{ padding: "0.75rem" }}>0 bytes</td>
-                <td style={{ padding: "0.75rem" }}>~40 bytes</td>
-                <td style={{ padding: "0.75rem" }}>20 KB</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
       </Section>
 
       {/* Library Comparison */}
@@ -339,6 +209,16 @@ const GlobalStyles = () => null;`}</CodeBlock>
                   Linaria
                 </th>
                 <th style={{ padding: "0.75rem", textAlign: "left" }}>
+                  <a
+                    href="https://restyle.dev"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "var(--color-text)" }}
+                  >
+                    Restyle
+                  </a>
+                </th>
+                <th style={{ padding: "0.75rem", textAlign: "left" }}>
                   Panda CSS
                 </th>
               </tr>
@@ -351,11 +231,12 @@ const GlobalStyles = () => null;`}</CodeBlock>
                 <td
                   style={{ padding: "0.75rem", color: "var(--color-primary)" }}
                 >
-                  ~1.6 KB
+                  ~50 B
                 </td>
-                <td style={{ padding: "0.75rem" }}>~11KB</td>
-                <td style={{ padding: "0.75rem" }}>0B</td>
-                <td style={{ padding: "0.75rem" }}>0B</td>
+                <td style={{ padding: "0.75rem" }}>~11 KB</td>
+                <td style={{ padding: "0.75rem" }}>~1.5 KB</td>
+                <td style={{ padding: "0.75rem" }}>~2.2 KB</td>
+                <td style={{ padding: "0.75rem" }}>0 B</td>
               </tr>
               <tr
                 style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
@@ -363,7 +244,8 @@ const GlobalStyles = () => null;`}</CodeBlock>
                 <td style={{ padding: "0.75rem" }}>Zero-runtime CSS</td>
                 <td style={{ padding: "0.75rem" }}>◐</td>
                 <td style={{ padding: "0.75rem" }}>✗</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>◐</td>
+                <td style={{ padding: "0.75rem" }}>✗</td>
                 <td style={{ padding: "0.75rem" }}>✓</td>
               </tr>
               <tr
@@ -374,12 +256,14 @@ const GlobalStyles = () => null;`}</CodeBlock>
                 <td style={{ padding: "0.75rem" }}>Setup required</td>
                 <td style={{ padding: "0.75rem" }}>None</td>
                 <td style={{ padding: "0.75rem" }}>None</td>
+                <td style={{ padding: "0.75rem" }}>None</td>
               </tr>
               <tr>
                 <td style={{ padding: "0.75rem" }}>Bundler support</td>
                 <td style={{ padding: "0.75rem" }}>Vite only</td>
                 <td style={{ padding: "0.75rem" }}>Any</td>
                 <td style={{ padding: "0.75rem" }}>Many</td>
+                <td style={{ padding: "0.75rem" }}>Any</td>
                 <td style={{ padding: "0.75rem" }}>Any</td>
               </tr>
             </tbody>
@@ -431,6 +315,9 @@ const GlobalStyles = () => null;`}</CodeBlock>
                   Linaria
                 </th>
                 <th style={{ padding: "0.75rem", textAlign: "left" }}>
+                  Restyle
+                </th>
+                <th style={{ padding: "0.75rem", textAlign: "left" }}>
                   Panda CSS
                 </th>
               </tr>
@@ -445,6 +332,7 @@ const GlobalStyles = () => null;`}</CodeBlock>
                 <td style={{ padding: "0.75rem" }}>✓</td>
                 <td style={{ padding: "0.75rem" }}>✓</td>
                 <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
                 <td style={{ padding: "0.75rem" }}>◐ patterns</td>
               </tr>
               <tr
@@ -453,6 +341,7 @@ const GlobalStyles = () => null;`}</CodeBlock>
                 <td style={{ padding: "0.75rem" }}>
                   <InlineCode>styled(Component)</InlineCode>
                 </td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
                 <td style={{ padding: "0.75rem" }}>✓</td>
                 <td style={{ padding: "0.75rem" }}>✓</td>
                 <td style={{ padding: "0.75rem" }}>✓</td>
@@ -468,6 +357,7 @@ const GlobalStyles = () => null;`}</CodeBlock>
                 <td style={{ padding: "0.75rem" }}>✓</td>
                 <td style={{ padding: "0.75rem" }}>✓</td>
                 <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
               </tr>
               <tr
                 style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
@@ -479,12 +369,14 @@ const GlobalStyles = () => null;`}</CodeBlock>
                 <td style={{ padding: "0.75rem" }}>✓</td>
                 <td style={{ padding: "0.75rem" }}>✗</td>
                 <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
               </tr>
               <tr
                 style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
               >
                 <td style={{ padding: "0.75rem" }}>Variants/Recipes</td>
                 <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>◐ manual</td>
                 <td style={{ padding: "0.75rem" }}>◐ manual</td>
                 <td style={{ padding: "0.75rem" }}>◐ manual</td>
                 <td style={{ padding: "0.75rem" }}>✓</td>
@@ -495,9 +387,10 @@ const GlobalStyles = () => null;`}</CodeBlock>
                 <td style={{ padding: "0.75rem" }}>
                   <InlineCode>as</InlineCode> prop
                 </td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>✗ withComponent</td>
                 <td style={{ padding: "0.75rem" }}>✓</td>
                 <td style={{ padding: "0.75rem" }}>✗</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
                 <td style={{ padding: "0.75rem" }}>◐ manual</td>
               </tr>
               <tr
@@ -510,6 +403,7 @@ const GlobalStyles = () => null;`}</CodeBlock>
                 <td style={{ padding: "0.75rem" }}>✓</td>
                 <td style={{ padding: "0.75rem" }}>✗</td>
                 <td style={{ padding: "0.75rem" }}>—</td>
+                <td style={{ padding: "0.75rem" }}>—</td>
               </tr>
               <tr
                 style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
@@ -518,6 +412,7 @@ const GlobalStyles = () => null;`}</CodeBlock>
                 <td style={{ padding: "0.75rem" }}>✗ by design</td>
                 <td style={{ padding: "0.75rem" }}>✓</td>
                 <td style={{ padding: "0.75rem" }}>✗</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
                 <td style={{ padding: "0.75rem" }}>✗</td>
               </tr>
             </tbody>
@@ -569,6 +464,9 @@ const GlobalStyles = () => null;`}</CodeBlock>
                   Linaria
                 </th>
                 <th style={{ padding: "0.75rem", textAlign: "left" }}>
+                  Restyle
+                </th>
+                <th style={{ padding: "0.75rem", textAlign: "left" }}>
                   Panda CSS
                 </th>
               </tr>
@@ -582,6 +480,7 @@ const GlobalStyles = () => null;`}</CodeBlock>
                 <td style={{ padding: "0.75rem" }}>✓</td>
                 <td style={{ padding: "0.75rem" }}>✓</td>
                 <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
               </tr>
               <tr
                 style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
@@ -590,12 +489,14 @@ const GlobalStyles = () => null;`}</CodeBlock>
                 <td style={{ padding: "0.75rem" }}>— CSS-first</td>
                 <td style={{ padding: "0.75rem" }}>✓</td>
                 <td style={{ padding: "0.75rem" }}>—</td>
+                <td style={{ padding: "0.75rem" }}>— CSS vars</td>
                 <td style={{ padding: "0.75rem" }}>—</td>
               </tr>
               <tr
                 style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
               >
                 <td style={{ padding: "0.75rem" }}>Design tokens</td>
+                <td style={{ padding: "0.75rem" }}>◐ manual</td>
                 <td style={{ padding: "0.75rem" }}>◐ manual</td>
                 <td style={{ padding: "0.75rem" }}>◐ manual</td>
                 <td style={{ padding: "0.75rem" }}>◐ manual</td>
@@ -609,6 +510,7 @@ const GlobalStyles = () => null;`}</CodeBlock>
                 <td style={{ padding: "0.75rem" }}>✓ full</td>
                 <td style={{ padding: "0.75rem" }}>✓ full</td>
                 <td style={{ padding: "0.75rem" }}>✓ full</td>
+                <td style={{ padding: "0.75rem" }}>✓ full</td>
               </tr>
               <tr
                 style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
@@ -617,6 +519,7 @@ const GlobalStyles = () => null;`}</CodeBlock>
                 <td style={{ padding: "0.75rem" }}>19+</td>
                 <td style={{ padding: "0.75rem" }}>16+</td>
                 <td style={{ padding: "0.75rem" }}>16+</td>
+                <td style={{ padding: "0.75rem" }}>19+</td>
                 <td style={{ padding: "0.75rem" }}>16+</td>
               </tr>
               <tr>
@@ -628,6 +531,7 @@ const GlobalStyles = () => null;`}</CodeBlock>
                 </td>
                 <td style={{ padding: "0.75rem" }}>5+</td>
                 <td style={{ padding: "0.75rem" }}>10+</td>
+                <td style={{ padding: "0.75rem" }}>0</td>
                 <td style={{ padding: "0.75rem" }}>5+</td>
               </tr>
             </tbody>
@@ -646,8 +550,22 @@ const GlobalStyles = () => null;`}</CodeBlock>
               wide bundler/React support
             </li>
             <li>
-              <strong>Linaria</strong> — Zero runtime, multi-bundler, don't need{" "}
+              <strong>Linaria</strong> — Near-zero runtime, multi-bundler, don't need{" "}
               <InlineCode>as</InlineCode> prop or variants
+            </li>
+            <li>
+              <strong>
+                <a
+                  href="https://restyle.dev"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "inherit" }}
+                >
+                  Restyle
+                </a>
+              </strong>{" "}
+              — Runtime CSS-in-JS with <InlineCode>css</InlineCode> prop, zero
+              config, React 19+ Server Components
             </li>
             <li>
               <strong>Panda CSS</strong> — Atomic CSS, built-in design tokens,
@@ -672,23 +590,17 @@ const Primary = styled(Button)\`
   background: darkblue;
 \`;
 
-// Generated
-const Primary = __styledExtend({
-  base: Button,
-  className: "ss-xyz789",
-  displayName: "Primary"
-});
+// Generated (inline component with Object.assign)
+import { createElement } from "react";
+import { m } from "styled-static/runtime";
 
-// Runtime behavior
-const Primary = (props) => {
-  const { className: userClass, ...rest } = props;
-  return (
-    <Button
-      {...rest}
-      className={mergeClassNames("ss-xyz789", userClass)}
-    />
-  );
-};`}</CodeBlock>
+const Primary = Object.assign(
+  (p) => createElement(Button, {...p, className: m("ss-xyz789", p.className)}),
+  { className: Button.className + " ss-xyz789" }
+);
+
+// The .className property concatenates: "ss-btn ss-xyz789"
+// This ensures proper CSS cascade: base → extension → user`}</CodeBlock>
 
         <Paragraph>
           The base component handles its own className (including any extensions
@@ -719,16 +631,19 @@ const Button = styledVariants({
   },
 });
 
-// Generated
-const Button = __styledVariants({
-  tag: "button",
-  baseClass: "ss-abc123",
-  variantKeys: ["color"],
-  displayName: "Button"
-});
+// Generated (inline component with explicit variant checks)
+const Button = Object.assign(
+  ({ color, className, ...p }) => {
+    let c = "ss-abc123";
+    if (color === "primary") c += " ss-abc123--color-primary";
+    else if (color === "danger") c += " ss-abc123--color-danger";
+    return createElement("button", {...p, className: m(c, className)});
+  },
+  { className: "ss-abc123" }
+);
 
-// Runtime: builds classes like "ss-abc123 ss-abc123--color-primary"
-<Button color="primary">Click</Button>`}</CodeBlock>
+// Usage: <Button color="primary">Click</Button>
+// Renders with class="ss-abc123 ss-abc123--color-primary"`}</CodeBlock>
       </Section>
 
       {/* Development Features */}
@@ -736,37 +651,24 @@ const Button = __styledVariants({
         <Breadcrumb>Internals</Breadcrumb>
         <SubsectionTitle>Development-Only Features</SubsectionTitle>
         <Paragraph>
-          Several features are automatically stripped in production builds to
-          keep bundle size minimal:
+          The generated code is identical in development and production builds.
+          Debug logging is available via an environment variable:
         </Paragraph>
 
-        <ul
-          style={{ marginLeft: "1.5rem", color: "var(--color-text-secondary)" }}
-        >
-          <li>
-            <InlineCode>displayName</InlineCode> - Only set in development for
-            React DevTools
-          </li>
-          <li>
-            <InlineCode>__debug</InlineCode> prop - Console logging removed in
-            production
-          </li>
-          <li>Dev warnings - Dangerous element validation logs</li>
-        </ul>
+        <CodeBlock>{`# Enable debug logging during development
+DEBUG_STYLED_STATIC=true bun dev
 
-        <CodeBlock>{`// Development build
-const Button = __styled({
-  tag: "button",
-  className: "ss-abc123",
-  displayName: "Button"  // ← included
-});
+# The generated component is the same in dev and prod:
+const Button = Object.assign(
+  (p) => createElement("button", {...p, className: m("ss-abc123", p.className)}),
+  { className: "ss-abc123" }
+);`}</CodeBlock>
 
-// Production build
-const Button = __styled({
-  tag: "button",
-  className: "ss-abc123"
-  // displayName removed by bundler
-});`}</CodeBlock>
+        <Paragraph>
+          Since components are generated inline at build time, there's no
+          runtime <InlineCode>displayName</InlineCode> handling. React DevTools
+          will show the variable name from your source code.
+        </Paragraph>
       </Section>
     </>
   );

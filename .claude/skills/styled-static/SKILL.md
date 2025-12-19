@@ -5,20 +5,17 @@ description: Use when writing styles with styled-static, creating styled compone
 
 # styled-static
 
-Near-zero-runtime CSS-in-JS for React 19+ with Vite. CSS generation happens at build time (zero runtime cost). A minimal runtime handles `as` prop and className merging.
+Near-zero-runtime CSS-in-JS for React 19+ with Vite. CSS generation happens at build time. Components are generated inline with a minimal ~45 byte runtime for className merging.
 
-## Tree-Shakable Runtime
+## Minimal Runtime
 
-The runtime is split into separate modules for optimal tree-shaking:
+The runtime is extremely small because components are generated inline at build time:
 
 | Module | Minified | Brotli |
 |--------|----------|--------|
-| core.js | 544 B | 298 B |
-| styled.js | 1.1 KB | 491 B |
-| variants.js | 1.7 KB | 734 B |
-| global.js | 43 B | 47 B |
+| runtime/index.js | **45 B** | 50 B |
 
-Apps bundle only what they use. Typical styled-only app: ~1.6 KB minified.
+This is a **98% reduction** from traditional CSS-in-JS libraries. The only runtime code is a className merge helper: `(base, user) => user ? base + ' ' + user : base`
 
 ## Key Difference from Emotion/styled-components
 
@@ -48,34 +45,22 @@ const Button = styled.button`
   &:hover { background: blue; }
 `;
 
-// Extend components
+// Extend components (multi-level works too)
 const PrimaryButton = styled(Button)`
   background: blue;
   color: white;
 `;
+const BigPrimary = styled(PrimaryButton)`font-size: 2rem;`;
 ```
 
 **Props:**
-- `as` - Polymorphic rendering with HTML elements or React components:
-  ```tsx
-  <Button as="a" href="/">Link</Button>
-  <Button as={Link} to="/path">Router Link</Button>
-  ```
 - `className` - Merged after styled classes (wins in cascade)
 
-**Pre-configured `as` (alternative to `withComponent`):**
-```tsx
-import type { ComponentProps } from 'react';
-
-// Zero-overhead pattern for always rendering as a specific element/component
-const LinkButton = (props: ComponentProps<typeof Link>) => (
-  <Button as={Link} {...props} />
-);
-
-<LinkButton to="/home">Home</LinkButton>
-```
-
-> We don't provide `.withComponent()` — this pattern is simple, explicit, and adds zero bytes.
+**Static Properties:**
+- `.className` - Access the static class name(s) for manual composition:
+  ```tsx
+  <a className={Button.className} href="/link">Link with button styles</a>
+  ```
 
 **attrs:**
 ```tsx
@@ -88,6 +73,25 @@ const SubmitButton = styled.button.attrs({ type: 'submit' })`
 `;
 ```
 > Note: attrs must be static objects (no functions).
+
+### withComponent
+
+Create polymorphic components at build time:
+```tsx
+import { styled, withComponent } from 'styled-static';
+import { Link } from 'react-router-dom';
+
+const Button = styled.button`padding: 1rem;`;
+
+// Create a Link that looks like Button
+const LinkButton = withComponent(Link, Button);
+
+// Also works with HTML tags
+const AnchorButton = withComponent('a', Button);
+
+<LinkButton to="/path">Router link styled as button</LinkButton>
+<AnchorButton href="/external">External link</AnchorButton>
+```
 
 ### css
 
@@ -344,23 +348,26 @@ const Button = styledVariants({
 Classes merge as: Base → Extension → User className
 ```tsx
 const Button = styled.button`padding: 1rem;`;      // .ss-abc
-const Primary = styled(Button)`background: blue;`; // .ss-def
+const Primary = styled(Button)`background: blue;`; // className = "ss-abc ss-def"
 <Primary className="custom" />
 // Renders: class="ss-abc ss-def custom"
 // "custom" wins if it sets same properties
+
+// Access static className for composition
+console.log(Primary.className); // "ss-abc ss-def"
 ```
 
 ---
 
 ## Security
 
-### Blocked Elements
-The `as` prop blocks dangerous HTML elements: `script`, `iframe`, `style`, `meta`, `link`, `embed`, `object`, `base`, `noscript`, `template`
+### Build-Time Validation
+- Component names in `withComponent` are validated at build time
+- Variant values use explicit equality checks (`=== "value"`) instead of string interpolation
+- Class names are hardcoded literals, never dynamically built from user input
 
-React components passed to `as` are not validated (they come from code, not user input).
-
-### Variant Sanitization
-Variant values are auto-sanitized to alphanumeric + hyphens only, preventing class injection attacks.
+### Variant Safety
+Variant values are validated against a build-time Set of known values, preventing class injection attacks. Each variant generates explicit if/else checks for maximum security.
 
 ---
 

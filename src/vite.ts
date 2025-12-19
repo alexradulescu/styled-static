@@ -101,6 +101,7 @@ interface StyledStaticImports {
   keyframes?: string;
   styledVariants?: string;
   cssVariants?: string;
+  withComponent?: string;
   /** The source path of the import (e.g., "styled-static" or "./index") */
   source?: string;
 }
@@ -117,6 +118,15 @@ type TemplateType =
 /** Types of variant calls we can transform */
 type VariantType = "styledVariants" | "cssVariants";
 
+/** Information about a found withComponent call */
+interface FoundWithComponent {
+  start: number;
+  end: number;
+  toComponent: string; // Component reference or HTML tag string
+  fromComponent: string; // Styled component reference
+  variableName?: string;
+}
+
 /** Information about a found template */
 interface FoundTemplate {
   type: TemplateType;
@@ -132,10 +142,10 @@ interface FoundVariant {
   type: VariantType;
   start: number;
   end: number;
-  component?: string; // 'button' or Component reference
-  baseCss?: string; // Base CSS string
+  component: string | undefined; // 'button' or Component reference
+  baseCss: string | undefined; // Base CSS string
   variants: Map<string, Map<string, string>>; // variantName -> { valueName -> css }
-  variableName?: string; // Variable name for displayName
+  variableName: string; // Variable name for displayName
 }
 
 // ============================================================================
@@ -283,7 +293,8 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
         imports.createGlobalStyle ||
         imports.keyframes;
       const hasVariantImports = imports.styledVariants || imports.cssVariants;
-      if (!hasTemplateImports && !hasVariantImports) {
+      const hasWithComponent = !!imports.withComponent;
+      if (!hasTemplateImports && !hasVariantImports && !hasWithComponent) {
         if (DEBUG) console.log("[styled-static] No imports found, skipping");
         return null;
       }
@@ -305,10 +316,20 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
           variantCalls.length
         );
 
-      if (templates.length === 0 && variantCalls.length === 0) {
+      // Find all withComponent calls
+      const withComponentCalls = hasWithComponent
+        ? findWithComponentCalls(ast, imports)
+        : [];
+      if (DEBUG)
+        console.log(
+          "[styled-static] Found withComponent calls:",
+          withComponentCalls.length
+        );
+
+      if (templates.length === 0 && variantCalls.length === 0 && withComponentCalls.length === 0) {
         if (DEBUG)
           console.log(
-            "[styled-static] No templates or variants found, skipping"
+            "[styled-static] No templates, variants, or withComponent found, skipping"
           );
         return null;
       }
@@ -318,12 +339,8 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
       // (8 chars base36 = ~2.8 × 10^12 possibilities)
       const fileHash = hash(normalizePath(id)).slice(0, 8);
       const cssImports: string[] = [];
-      let needsStyledRuntime = false;
-      let needsExtendRuntime = false;
-      let needsGlobalRuntime = false;
-      let needsStyledVariantsRuntime = false;
-      let needsStyledVariantsExtendRuntime = false;
-      let needsCssVariantsRuntime = false;
+      // Track if we need React's createElement and our merge helper
+      let needsCreateElement = false;
 
       let cssIndex = 0;
 
@@ -352,9 +369,11 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
         const replacement = generateReplacement(t, className, isDev);
         s.overwrite(t.node.start, t.node.end, replacement);
 
-        if (t.type === "styled") needsStyledRuntime = true;
-        if (t.type === "styledExtend") needsExtendRuntime = true;
-        if (t.type === "createGlobalStyle") needsGlobalRuntime = true;
+        // styled, styledExtend, styledAttrs need createElement and m
+        if (t.type === "styled" || t.type === "styledExtend" || t.type === "styledAttrs") {
+          needsCreateElement = true;
+        }
+        // css, keyframes, createGlobalStyle don't need runtime
       }
 
       // Process variant calls
@@ -393,63 +412,59 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
         );
         s.overwrite(v.start, v.end, replacement);
 
-        // Track runtime needs
+        // styledVariants needs createElement and m
         if (v.type === "styledVariants") {
-          // Check if component is a string (HTML tag) or reference (component)
-          if (v.component && /^[a-z]/.test(v.component)) {
-            needsStyledVariantsRuntime = true;
-          } else {
-            needsStyledVariantsExtendRuntime = true;
-          }
+          needsCreateElement = true;
         }
-        if (v.type === "cssVariants") needsCssVariantsRuntime = true;
+        // cssVariants doesn't need runtime (inline function)
       }
 
-      // Build runtime imports from specific modules for tree-shaking
-      // Determine the runtime base path based on original import source
+      // Process withComponent calls
+      for (const wc of withComponentCalls) {
+        // SECURITY: Validate component references
+        if (!isValidIdentifier(wc.fromComponent)) {
+          throw new Error(
+            `[styled-static] Invalid fromComponent name: ${wc.fromComponent}`
+          );
+        }
+
+        // Generate replacement code
+        // withComponent(To, From) → Object.assign((p) => createElement(To, {...p, className: m(From.className, p.className)}), { className: From.className })
+        const isHtmlTag = /^[a-z]/.test(wc.toComponent);
+        let replacement: string;
+
+        if (isHtmlTag) {
+          // HTML tag: withComponent('a', Button)
+          replacement = `Object.assign((p) => createElement(${safeStringLiteral(wc.toComponent)}, {...p, className: m(${wc.fromComponent}.className, p.className)}), { className: ${wc.fromComponent}.className })`;
+        } else {
+          // Component reference: withComponent(Link, Button)
+          if (!isValidIdentifier(wc.toComponent)) {
+            throw new Error(
+              `[styled-static] Invalid toComponent name: ${wc.toComponent}`
+            );
+          }
+          replacement = `Object.assign((p) => createElement(${wc.toComponent}, {...p, className: m(${wc.fromComponent}.className, p.className)}), { className: ${wc.fromComponent}.className })`;
+        }
+
+        s.overwrite(wc.start, wc.end, replacement);
+        needsCreateElement = true;
+      }
+
+      // Build imports for the new minimal runtime
+      // Only need createElement from React and m from our runtime
       const runtimeBasePath =
         imports.source === "./index" || imports.source === "../index"
           ? imports.source.replace("/index", "/runtime")
           : "styled-static/runtime";
 
-      const runtimeImports: string[] = [];
-
-      // styled.ts imports
-      const styledImports: string[] = [];
-      if (needsStyledRuntime) styledImports.push("__styled");
-      if (needsExtendRuntime) styledImports.push("__styledExtend");
-      if (styledImports.length > 0) {
-        runtimeImports.push(
-          `import { ${styledImports.join(", ")} } from "${runtimeBasePath}/styled";`
-        );
-      }
-
-      // variants.ts imports
-      const variantImports: string[] = [];
-      if (needsStyledVariantsRuntime) variantImports.push("__styledVariants");
-      if (needsStyledVariantsExtendRuntime)
-        variantImports.push("__styledVariantsExtend");
-      if (needsCssVariantsRuntime) variantImports.push("__cssVariants");
-      if (variantImports.length > 0) {
-        runtimeImports.push(
-          `import { ${variantImports.join(", ")} } from "${runtimeBasePath}/variants";`
-        );
-      }
-
-      // global.ts imports
-      if (needsGlobalRuntime) {
-        runtimeImports.push(
-          `import { __GlobalStyle } from "${runtimeBasePath}/global";`
-        );
-      }
-
-      // Prepend imports (CSS first, then runtime, with blank line separator)
+      // Prepend imports: CSS first, then runtime
       let prepend = "";
       if (cssImports.length > 0) {
         prepend += cssImports.join("\n") + "\n";
       }
-      if (runtimeImports.length > 0) {
-        prepend += runtimeImports.join("\n") + "\n";
+      if (needsCreateElement) {
+        prepend += `import { createElement } from "react";\n`;
+        prepend += `import { m } from "${runtimeBasePath}";\n`;
       }
       if (prepend) {
         // Add extra newline after imports for better readability
@@ -500,6 +515,7 @@ function findStyledStaticImports(ast: ESTree.Program): StyledStaticImports {
             if (imported === "keyframes") imports.keyframes = local;
             if (imported === "styledVariants") imports.styledVariants = local;
             if (imported === "cssVariants") imports.cssVariants = local;
+            if (imported === "withComponent") imports.withComponent = local;
           }
         }
       }
@@ -682,51 +698,42 @@ function extractTemplateContent(
 /**
  * Generate the replacement code for a styled template.
  *
- * SECURITY: Uses safeStringLiteral() for displayName to prevent code injection
- * via malicious variable names or edge cases with Unicode/escape sequences.
+ * This generates inline React components using Object.assign pattern:
+ * Object.assign((p) => createElement(tag, {...p, className: m(cls, p.className)}), { className: cls })
+ *
+ * SECURITY: Uses safeStringLiteral() for className to prevent code injection.
  */
 function generateReplacement(
   template: FoundTemplate,
   className: string,
-  isDev: boolean
+  _isDev: boolean
 ): string {
-  // SECURITY: Validate and safely escape displayName to prevent code injection
-  const displayNameProp =
-    isDev && template.variableName && isValidIdentifier(template.variableName)
-      ? `,\n  displayName: ${safeStringLiteral(template.variableName)}`
-      : "";
+  const cls = safeStringLiteral(className);
 
   switch (template.type) {
     case "styled":
-      return `__styled({
-  tag: ${safeStringLiteral(template.tag)},
-  className: ${safeStringLiteral(className)}${displayNameProp}
-})`;
+      // Inline component: Object.assign((p) => createElement("tag", {...p, className: m("cls", p.className)}), { className: "cls" })
+      return `Object.assign((p) => createElement(${safeStringLiteral(template.tag)}, {...p, className: m(${cls}, p.className)}), { className: ${cls} })`;
 
     case "styledExtend":
-      // baseComponent is a reference to an existing variable, not a string literal
-      return `__styledExtend({
-  base: ${template.baseComponent},
-  className: ${safeStringLiteral(className)}${displayNameProp}
-})`;
+      // Extension: renders base component with merged className
+      // className is concatenated at runtime: Base.className + " " + newClass
+      return `Object.assign((p) => createElement(${template.baseComponent}, {...p, className: m(${cls}, p.className)}), { className: ${template.baseComponent}.className + " " + ${cls} })`;
 
     case "styledAttrs":
-      // attrs object is serialized, tag comes from template
-      return `__styledWithAttrs(${safeStringLiteral(
-        template.tag
-      )}, ${safeStringLiteral(className)}, ${
-        template.attrsArg ?? "{}"
-      }${displayNameProp ? `, ${safeStringLiteral(template.variableName!)}` : ""})`;
+      // Attrs: spread default attrs, then props, with className merge
+      return `Object.assign((p) => createElement(${safeStringLiteral(template.tag)}, {...(${template.attrsArg ?? "{}"}), ...p, className: m(${cls}, p.className)}), { className: ${cls} })`;
 
     case "css":
-      return safeStringLiteral(className);
+      return cls;
 
     case "keyframes":
       // Keyframes are replaced with just the scoped animation name
-      return safeStringLiteral(className);
+      return cls;
 
     case "createGlobalStyle":
-      return `__GlobalStyle`;
+      // GlobalStyle is a no-op component (CSS is imported via side-effect)
+      return `() => null`;
   }
 }
 
@@ -938,37 +945,65 @@ function classifyVariantCall(
 /**
  * Generate replacement code for a variant call.
  *
- * SECURITY: Validates component names and uses safe string escaping
- * to prevent code injection attacks.
+ * This generates inline components with explicit variant checks.
+ * No string interpolation with user values - each variant value generates
+ * a static if/else check for maximum security.
+ *
+ * SECURITY: Validates component names and generates explicit equality checks.
  */
 function generateVariantReplacement(
   variant: FoundVariant,
   baseClass: string,
   variantKeys: string[],
-  isDev: boolean
+  _isDev: boolean
 ): string {
-  // SECURITY: Validate and safely escape displayName
-  const displayNameProp =
-    isDev && variant.variableName && isValidIdentifier(variant.variableName)
-      ? `,\n  displayName: ${safeStringLiteral(variant.variableName)}`
-      : "";
-  const keysJson = JSON.stringify(variantKeys);
+  const cls = safeStringLiteral(baseClass);
+
+  // Generate variant class building logic
+  // Each variant key gets explicit if/else checks for each value
+  // For cssVariants, use "variants.key" in condition; for styledVariants, use destructured "key"
+  const isCssVariants = variant.type === "cssVariants";
+
+  const variantChecks: string[] = [];
+  for (const key of variantKeys) {
+    const values = variant.variants.get(key);
+    if (values) {
+      // Use variants.key for cssVariants, plain key for styledVariants
+      const keyRef = isCssVariants ? `variants.${key}` : key;
+      const valueChecks = Array.from(values.keys())
+        .map(
+          (value, i) =>
+            `${i === 0 ? "if" : "else if"} (${keyRef} === ${safeStringLiteral(value)}) c += ${safeStringLiteral(` ${baseClass}--${key}-${value}`)}`
+        )
+        .join("; ");
+      if (valueChecks) {
+        variantChecks.push(valueChecks);
+      }
+    }
+  }
+
+  // Join variant checks with semicolons and newlines for readability
+  const variantLogic = variantChecks.length > 0 ? variantChecks.join("; ") + "; " : "";
+
+  // Destructure variant props from the component props
+  const propsDestructure =
+    variantKeys.length > 0
+      ? `{ ${variantKeys.join(", ")}, className, ...p }`
+      : `{ className, ...p }`;
 
   if (variant.type === "styledVariants") {
     // Check if component is an HTML tag (lowercase) or component reference
     const isHtmlTag = variant.component && /^[a-z]/.test(variant.component);
+
     if (isHtmlTag) {
-      // SECURITY: Validate HTML tag name before interpolation
+      // SECURITY: Validate HTML tag name
       if (!variant.component || !/^[a-z][a-z0-9]*$/.test(variant.component)) {
         throw new Error(
           `[styled-static] Invalid HTML tag name: ${variant.component}`
         );
       }
-      return `__styledVariants({
-  tag: ${safeStringLiteral(variant.component)},
-  baseClass: ${safeStringLiteral(baseClass)},
-  variantKeys: ${keysJson}${displayNameProp}
-})`;
+      const tag = safeStringLiteral(variant.component);
+      return `Object.assign((${propsDestructure}) => { let c = ${cls}; ${variantLogic}return createElement(${tag}, {...p, className: m(c, className)}); }, { className: ${cls} })`;
     } else {
       // SECURITY: Validate component reference is a valid identifier
       if (!variant.component || !isValidIdentifier(variant.component)) {
@@ -976,19 +1011,95 @@ function generateVariantReplacement(
           `[styled-static] Invalid component name: ${variant.component}`
         );
       }
-      return `__styledVariantsExtend({
-  base: ${variant.component},
-  baseClass: ${safeStringLiteral(baseClass)},
-  variantKeys: ${keysJson}${displayNameProp}
-})`;
+      // Extension: className includes base component's className
+      return `Object.assign((${propsDestructure}) => { let c = ${cls}; ${variantLogic}return createElement(${variant.component}, {...p, className: m(c, className)}); }, { className: ${variant.component}.className + " " + ${cls} })`;
     }
   }
 
-  // cssVariants
-  return `__cssVariants({
-  baseClass: ${safeStringLiteral(baseClass)},
-  variantKeys: ${keysJson}
-})`;
+  // cssVariants: returns a function that generates class string
+  // variantLogic already uses "variants.key" for condition checks (set above via isCssVariants)
+  return `(variants) => { let c = ${cls}; ${variantLogic}return c; }`;
+}
+
+// ============================================================================
+// withComponent Detection
+// ============================================================================
+
+/**
+ * Find all withComponent(To, From) calls in the AST.
+ */
+function findWithComponentCalls(
+  ast: ESTree.Program,
+  imports: StyledStaticImports
+): FoundWithComponent[] {
+  const results: FoundWithComponent[] = [];
+
+  function processVariableDeclaration(node: ESTree.VariableDeclaration) {
+    for (const decl of node.declarations) {
+      if (
+        decl.init?.type === "CallExpression" &&
+        decl.id.type === "Identifier"
+      ) {
+        const call = decl.init as ESTree.CallExpression & {
+          start: number;
+          end: number;
+        };
+        const varName = decl.id.name;
+
+        // Check if this is a withComponent call
+        if (
+          call.callee.type === "Identifier" &&
+          call.callee.name === imports.withComponent &&
+          call.arguments.length === 2
+        ) {
+          const toArg = call.arguments[0];
+          const fromArg = call.arguments[1];
+
+          let toComponent: string | undefined;
+          let fromComponent: string | undefined;
+
+          // toComponent can be a string literal (HTML tag) or identifier (component)
+          if (toArg?.type === "Literal" && typeof toArg.value === "string") {
+            toComponent = toArg.value;
+          } else if (toArg?.type === "Identifier") {
+            toComponent = toArg.name;
+          }
+
+          // fromComponent must be an identifier (styled component reference)
+          if (fromArg?.type === "Identifier") {
+            fromComponent = fromArg.name;
+          }
+
+          if (toComponent && fromComponent) {
+            results.push({
+              start: call.start,
+              end: call.end,
+              toComponent,
+              fromComponent,
+              variableName: varName,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  for (const node of ast.body) {
+    // Regular variable declaration: const X = withComponent(Link, Button)
+    if (node.type === "VariableDeclaration") {
+      processVariableDeclaration(node);
+    }
+
+    // Exported variable: export const X = withComponent(Link, Button)
+    if (
+      node.type === "ExportNamedDeclaration" &&
+      node.declaration?.type === "VariableDeclaration"
+    ) {
+      processVariableDeclaration(node.declaration);
+    }
+  }
+
+  return results;
 }
 
 // Default export for convenience

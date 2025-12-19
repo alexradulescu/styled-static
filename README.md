@@ -16,16 +16,16 @@ For implementation details, see CLAUDE.md or the source files in src/
 
 Near-zero-runtime CSS-in-JS for React 19+ with Vite. Write styled-components syntax, get static CSS extracted at build time.
 
-**What's "zero"?** CSS generation happens at build time (the expensive part). A minimal runtime handles `as` prop polymorphism and className merging - features that require runtime props.
+**What's "zero"?** CSS generation happens at build time (the expensive part). A minimal runtime (~45 bytes) handles className merging. Components are generated inline at build time.
 
 ## Features
 
 - ⚡ **Static CSS** - All CSS extracted at build time, no runtime stylesheet generation
 - 🎯 **Type-Safe** - Full TypeScript support with proper prop inference
 - 🎨 **Familiar API** - styled-components syntax you already know
-- 📦 **Tiny** - Minimal runtime for `as` prop and className merging
+- 📦 **Tiny** - Minimal ~45 byte runtime for className merging only
 - 🔧 **Zero Dependencies** - Uses native CSS features and Vite's built-in tools
-- 🌳 **Tree-Shakable** - Runtime split into modules; only ship what you use
+- 🌳 **Inline Components** - Components generated at build time, no runtime factories
 - 🌓 **Theme Helpers** - Simple utilities for dark mode and custom themes
 
 ---
@@ -503,13 +503,13 @@ const badgeCss = cssVariants({
 
 ## Features
 
-### Polymorphic `as` Prop
+### Polymorphism with withComponent
 
-Render a styled component as a different HTML element or React component:
+Render one component with another's styles using `withComponent`:
 
 ```tsx
-// Render as a React component (e.g., react-router Link)
 import { Link } from "react-router-dom";
+import { styled, withComponent } from "styled-static";
 
 const Button = styled.button`
   padding: 0.5rem 1rem;
@@ -517,54 +517,44 @@ const Button = styled.button`
   color: white;
 `;
 
-// Render as an anchor tag
-<Button as="a" href="/link">
-  I'm a link styled as a button
-</Button>;
+// Create a Link that looks like Button
+const LinkButton = withComponent(Link, Button);
 
-<Button as={Link} to="/path">
-  I'm a router link styled as a button
-</Button>;
+// Also works with HTML tags
+const AnchorButton = withComponent('a', Button);
+
+// Usage
+<LinkButton to="/path">Router link styled as button</LinkButton>
+<AnchorButton href="/external">External link</AnchorButton>
 ```
 
-The `as` prop accepts:
+`withComponent` accepts:
 
-- **HTML elements**: `"a"`, `"div"`, `"span"`, etc.
-- **React components**: Any component that accepts a `className` prop
+- **First argument**: The component to render (React component or HTML tag string)
+- **Second argument**: The styled component whose styles to use
 
-### Pre-configured Polymorphic Components
+### Manual Composition with .className
 
-To create a component that always renders as a specific element or component (similar to styled-components' `withComponent`), use a simple wrapper:
+Every styled component exposes a static `.className` property for manual composition:
 
 ```tsx
-import { Link } from 'react-router-dom';
-import type { ComponentProps } from 'react';
-
 const Button = styled.button`
   padding: 0.5rem 1rem;
   background: blue;
 `;
 
-// Always render as Link
-const LinkButton = (props: ComponentProps<typeof Link>) => (
-  <Button as={Link} {...props} />
-);
+// Use className directly on any element
+<a className={Button.className} href="/link">
+  Link with button styles
+</a>
 
-// Always render as anchor
-const AnchorButton = (props: ComponentProps<'a'>) => (
-  <Button as="a" {...props} />
-);
-
-// Usage
-<LinkButton to="/home">Home</LinkButton>
-<AnchorButton href="/external">External</AnchorButton>
+// Combine with cx utility
+<div className={cx(Button.className, Card.className, "custom")}>
+  Combined styles
+</div>
 ```
 
-This pattern has zero bundle overhead and works with both `styled` and `styledVariants` components.
-
-> **Why no `.withComponent()` method?**
->
-> Unlike styled-components, we don't provide a built-in `withComponent` method. This is intentional: the pattern above is simple, explicit, and adds zero bytes to your bundle. Since pre-configured polymorphic components are typically needed in only 1-2% of cases, we chose not to add runtime overhead for a feature that's trivial to implement manually.
+This is useful when you need button styles on a non-component element or want to combine multiple styled component classes.
 
 ### CSS Nesting
 
@@ -879,17 +869,17 @@ const Button = styled.button`
 `;
 
 // 2. What gets generated:
-import { __styled } from "styled-static/runtime/styled";
+import { createElement } from "react";
+import { m } from "styled-static/runtime";
 import "styled-static:abc123-0.css";
 
-const Button = __styled({
-  tag: "button",
-  className: "ss-abc123",
-  displayName: "Button"  // dev-only
-});
+const Button = Object.assign(
+  (p) => createElement("button", {...p, className: m("ss-abc123", p.className)}),
+  { className: "ss-abc123" }
+);
 ```
 
-The CSS is completely removed from your JavaScript bundle and extracted to a virtual CSS module that Vite can optimize and cache.
+The CSS is completely removed from your JavaScript bundle and extracted to a virtual CSS module. The component becomes an inline function with a static `.className` property for composition.
 
 ### Virtual CSS Modules
 
@@ -911,65 +901,38 @@ Each styled component gets its own virtual CSS module with a unique ID like `sty
 
 ### Minimal Runtime
 
-The runtime is tree-shakable and extremely small because all CSS has been extracted at build time:
+The runtime is extremely small because components are generated inline at build time. The only runtime code is a className merge helper:
 
-| Module      | Minified   | Brotli     |
-| ----------- | ---------- | ---------- |
-| core.js     | 544 B      | 298 B      |
-| styled.js   | 1.1 KB     | 491 B      |
-| variants.js | 1.7 KB     | 734 B      |
-| global.js   | 43 B       | 47 B       |
-| **Total**   | **3.4 KB** | **1.5 KB** |
+| Module           | Minified | Brotli |
+| ---------------- | -------- | ------ |
+| runtime/index.js | **45 B** | 50 B   |
 
-Apps only bundle the modules they use. A typical styled-only app: ~1.6 KB minified.
+This is a **98% reduction** from traditional CSS-in-JS libraries.
 
 ```tsx
-// Simplified runtime implementation
-export function __styled(config) {
-  const { tag, className, displayName } = config;
-
-  const Component = (props) => {
-    const { as, className: userClass, __debug, ...rest } = props;
-
-    // Merge classes (styled first, user last)
-    rest.className = mergeClassNames(className, userClass);
-
-    // Render with validated tag
-    return createElement(as || tag, rest);
-  };
-
-  return Component;
-}
+// The ENTIRE runtime - just className merging
+export const m = (base, user) => user ? `${base} ${user}` : base;
 ```
 
-### Bundle Size Comparison
-
-For an app with 500 styled components:
-
-| Library           | Runtime | Per Component | Total (500)   |
-| ----------------- | ------- | ------------- | ------------- |
-| **styled-static** | ~1.6 KB | ~20 bytes     | **~12 KB** ⭐ |
-| Emotion           | 7.9 KB  | ~50 bytes     | 32.9 KB       |
-| styled-components | 16 KB   | ~60 bytes     | 46 KB         |
-| Linaria           | 0 bytes | ~40 bytes     | 20 KB         |
+Everything else is generated at build time as inline components.
 
 ### Zero-Runtime Features
 
 Some features have literally zero runtime cost because they're completely replaced at build time:
 
 ```tsx
-// css helper - zero runtime
-const activeClass = css`
-  outline: 2px solid blue;
-`;
+// css helper - zero runtime (just a string)
+const activeClass = css`outline: 2px solid blue;`;
 // Generated: const activeClass = "ss-xyz789";
 
 // Global styles - zero runtime (just CSS import)
 const GlobalStyles = createGlobalStyle`* { box-sizing: border-box; }`;
 // Generated: const GlobalStyles = () => null;
-```
 
-For a detailed explanation of the transformation process, virtual CSS modules, and runtime internals, see the ["How It Works" section in the documentation](https://styled-static.dev#how-it-works).
+// withComponent - zero runtime (build-time transformation)
+const LinkButton = withComponent(Link, Button);
+// Generated: Object.assign((p) => createElement(Link, {...p, className: m(Button.className, p.className)}), { className: Button.className })
+```
 
 ---
 
@@ -994,8 +957,12 @@ const Button = styled.button`...`;
 // ✅ Type-safe: button props are available
 <Button type="submit" disabled>Submit</Button>
 
-// ✅ Type-safe: as prop changes available props
-<Button as="a" href="/link">Link</Button>
+// ✅ Type-safe: withComponent infers props from target component
+const LinkButton = withComponent(Link, Button);
+<LinkButton to="/path">Link</LinkButton>
+
+// ✅ Type-safe: .className is always string
+const classes = Button.className; // string
 ```
 
 ---
@@ -1044,44 +1011,46 @@ An honest comparison with other CSS-in-JS libraries. Each library excels in diff
 
 ### Runtime & Build
 
-| Feature          | styled-static | Emotion        | Linaria | Panda CSS |
-| ---------------- | ------------- | -------------- | ------- | --------- |
-| Runtime size     | ~1.6 KB       | ~11KB          | 0B      | 0B        |
-| Zero-runtime CSS | ◐             | ✗              | ✓       | ✓         |
-| SSR complexity   | None          | Setup required | None    | None      |
-| Bundler support  | Vite only     | Any            | Many    | Any       |
+| Feature          | styled-static | Emotion        | Linaria  | Restyle  | Panda CSS |
+| ---------------- | ------------- | -------------- | -------- | -------- | --------- |
+| Runtime size     | **~50 B**     | ~11 KB         | ~1.5 KB  | ~2.2 KB  | 0 B       |
+| Zero-runtime CSS | ◐             | ✗              | ◐        | ✗        | ✓         |
+| SSR complexity   | None          | Setup required | None     | None     | None      |
+| Bundler support  | Vite only     | Any            | Many     | Any      | Any       |
 
 ### API & Features
 
-| Feature               | styled-static | Emotion  | Linaria  | Panda CSS  |
-| --------------------- | ------------- | -------- | -------- | ---------- |
-| `styled.element`      | ✓             | ✓        | ✓        | ◐ patterns |
-| `styled(Component)`   | ✓             | ✓        | ✓        | ◐          |
-| `css` helper          | ✓             | ✓        | ✓        | ✓          |
-| `css` prop            | ✗ by design   | ✓        | ✗        | ✓          |
-| Variants/Recipes      | ✓             | ◐ manual | ◐ manual | ✓          |
-| `as` prop             | ✓             | ✓        | ✗        | ◐ manual   |
-| `attrs`               | ✓             | ✓        | ✗        | —          |
-| keyframes             | ✓             | ✓        | ✓        | ✓          |
-| Global styles         | ✓             | ✓        | ✓        | ✓          |
-| Runtime interpolation | ✗ by design   | ✓        | ✗        | ✗          |
+| Feature               | styled-static   | Emotion  | Linaria  | Restyle    | Panda CSS  |
+| --------------------- | --------------- | -------- | -------- | ---------- | ---------- |
+| `styled.element`      | ✓               | ✓        | ✓        | ✓          | ◐ patterns |
+| `styled(Component)`   | ✓               | ✓        | ✓        | ✓          | ◐          |
+| `css` helper          | ✓               | ✓        | ✓        | ✓          | ✓          |
+| `css` prop            | ✗ by design     | ✓        | ✗        | ✓          | ✓          |
+| Variants/Recipes      | ✓               | ◐ manual | ◐ manual | ◐ manual   | ✓          |
+| `withComponent`       | ✓ build-time    | ✓        | ✗        | ✓          | ◐ manual   |
+| `.className` access   | ✓               | ✗        | ✗        | ✗          | ✗          |
+| `attrs`               | ✓               | ✓        | ✗        | —          | —          |
+| keyframes             | ✓               | ✓        | ✓        | ✓          | ✓          |
+| Global styles         | ✓               | ✓        | ✓        | ✓          | ✓          |
+| Runtime interpolation | ✗ by design     | ✓        | ✗        | ✓          | ✗          |
 
 ### Theming & DX
 
-| Feature       | styled-static | Emotion  | Linaria  | Panda CSS  |
-| ------------- | ------------- | -------- | -------- | ---------- |
-| CSS variables | ✓             | ✓        | ✓        | ✓          |
-| ThemeProvider | — CSS-first   | ✓        | —        | —          |
-| Design tokens | ◐ manual      | ◐ manual | ◐ manual | ✓ built-in |
-| TypeScript    | ✓ full        | ✓ full   | ✓ full   | ✓ full     |
-| React version | 19+           | 16+      | 16+      | 16+        |
-| Dependencies  | 0             | 5+       | 10+      | 5+         |
+| Feature       | styled-static | Emotion  | Linaria  | Restyle    | Panda CSS  |
+| ------------- | ------------- | -------- | -------- | ---------- | ---------- |
+| CSS variables | ✓             | ✓        | ✓        | ✓          | ✓          |
+| ThemeProvider | — CSS-first   | ✓        | —        | — CSS vars | —          |
+| Design tokens | ◐ manual      | ◐ manual | ◐ manual | ◐ manual   | ✓ built-in |
+| TypeScript    | ✓ full        | ✓ full   | ✓ full   | ✓ full     | ✓ full     |
+| React version | 19+           | 16+      | 16+      | 19+        | 16+        |
+| Dependencies  | 0             | 5+       | 10+      | 0          | 5+         |
 
 ### When to Choose Each
 
 - **styled-static**: You want familiar styled-components DX with zero dependencies, minimal runtime, and are on React 19+ with Vite
 - **Emotion**: You need runtime interpolation (`${props => props.color}`), ThemeProvider, or wide bundler/React version support
-- **Linaria**: You want zero runtime with multi-bundler support and don't need `as` prop or variants
+- **Linaria**: You want near-zero runtime with multi-bundler support and don't need `as` prop or variants
+- **[Restyle](https://restyle.dev)**: You want runtime CSS-in-JS with `css` prop, zero config, and React 19+ Server Components support
 - **Panda CSS**: You want atomic CSS, built-in design tokens, and framework-agnostic support
 
 ---
