@@ -1422,6 +1422,112 @@ const calloutStyles = cssVariants({
     expect(result?.code).toMatch(/--type-tip/);
     expect(result?.code).not.toContain("--variants.type");
   });
+
+  it("should use if/else for <= 4 total variant values", async () => {
+    // 2 variants × 2 values = 4 total (at threshold, should use if/else)
+    const code = `import { styledVariants, css } from 'styled-static';
+const Button = styledVariants({
+  component: 'button',
+  css: css\`padding: 1rem;\`,
+  variants: {
+    color: {
+      primary: css\`background: blue;\`,
+      danger: css\`background: red;\`,
+    },
+    size: {
+      sm: css\`font-size: 0.875rem;\`,
+      lg: css\`font-size: 1.125rem;\`,
+    },
+  },
+});`;
+    const result = await transform(plugin, code, "/test-threshold-4.tsx");
+
+    // Should use if/else chain (original approach)
+    expect(result?.code).toContain('if (color === "primary")');
+    expect(result?.code).toContain('else if (color === "danger")');
+    expect(result?.code).toContain('if (size === "sm")');
+    // Should NOT have hoisted map
+    expect(result?.code).not.toMatch(/const _vm\d+/);
+  });
+
+  it("should use hoisted map for > 4 total variant values", async () => {
+    // 1 variant × 5 values = 5 total (above threshold, should use hoisted map)
+    const code = `import { styledVariants, css } from 'styled-static';
+const Button = styledVariants({
+  component: 'button',
+  css: css\`padding: 1rem;\`,
+  variants: {
+    color: {
+      primary: css\`background: blue;\`,
+      secondary: css\`background: gray;\`,
+      success: css\`background: green;\`,
+      danger: css\`background: red;\`,
+      warning: css\`background: orange;\`,
+    },
+  },
+});`;
+    const result = await transform(plugin, code, "/test-threshold-5.tsx");
+
+    // Should have hoisted map declaration
+    expect(result?.code).toMatch(/const _vm\d+=\{color:\{/);
+    // Should use map lookup instead of if/else
+    expect(result?.code).toMatch(/_vm\d+\.color\[color\]\|\|""/);
+    // Should NOT have if/else chain for this variant
+    expect(result?.code).not.toContain('if (color === "primary")');
+  });
+
+  it("should use hoisted map for complex multi-variant components", async () => {
+    // 3 variants × 2 values each = 6 total (above threshold)
+    const code = `import { styledVariants, css } from 'styled-static';
+const Button = styledVariants({
+  component: 'button',
+  css: css\`padding: 1rem;\`,
+  variants: {
+    color: {
+      primary: css\`background: blue;\`,
+      danger: css\`background: red;\`,
+    },
+    size: {
+      sm: css\`font-size: 0.875rem;\`,
+      lg: css\`font-size: 1.125rem;\`,
+    },
+    variant: {
+      solid: css\`border: none;\`,
+      outline: css\`border: 1px solid;\`,
+    },
+  },
+});`;
+    const result = await transform(plugin, code, "/test-threshold-6.tsx");
+
+    // Should have hoisted map with all three variant dimensions
+    expect(result?.code).toMatch(/const _vm\d+=\{color:\{.*\},size:\{.*\},variant:\{.*\}\}/);
+    // Should use map lookups
+    expect(result?.code).toMatch(/_vm\d+\.color\[color\]\|\|""/);
+    expect(result?.code).toMatch(/_vm\d+\.size\[size\]\|\|""/);
+    expect(result?.code).toMatch(/_vm\d+\.variant\[variant\]\|\|""/);
+  });
+
+  it("should use hoisted map for cssVariants with > 4 values", async () => {
+    const code = `import { cssVariants, css } from 'styled-static';
+const calloutStyles = cssVariants({
+  css: css\`padding: 1rem;\`,
+  variants: {
+    type: {
+      note: css\`background: blue;\`,
+      tip: css\`background: green;\`,
+      warning: css\`background: orange;\`,
+      danger: css\`background: red;\`,
+      info: css\`background: cyan;\`,
+    },
+  },
+});`;
+    const result = await transform(plugin, code, "/test-cssVariants-hoisted.tsx");
+
+    // Should have hoisted map
+    expect(result?.code).toMatch(/const _vm\d+=\{type:\{/);
+    // cssVariants uses variants.type in lookup
+    expect(result?.code).toMatch(/_vm\d+\.type\[variants\.type\]\|\|""/);
+  });
 });
 
 describe("security: prototype pollution prevention", () => {

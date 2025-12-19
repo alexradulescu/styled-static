@@ -377,6 +377,7 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
       }
 
       // Process variant calls
+      const hoistedDeclarations: string[] = [];
       for (const v of variantCalls) {
         const baseHash = hash(v.baseCss || "").slice(0, 6);
         const baseClass = `${classPrefix}-${baseHash}`;
@@ -404,13 +405,18 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
 
         // Generate replacement code
         const variantKeys = Array.from(v.variants.keys());
-        const replacement = generateVariantReplacement(
+        const result = generateVariantReplacement(
           v,
           baseClass,
           variantKeys,
           isDev
         );
-        s.overwrite(v.start, v.end, replacement);
+        s.overwrite(v.start, v.end, result.code);
+
+        // Collect hoisted declarations for complex variants
+        if (result.hoisted) {
+          hoistedDeclarations.push(result.hoisted);
+        }
 
         // styledVariants needs createElement and m
         if (v.type === "styledVariants") {
@@ -457,7 +463,7 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
           ? imports.source.replace("/index", "/runtime")
           : "styled-static/runtime";
 
-      // Prepend imports: CSS first, then runtime
+      // Prepend imports: CSS first, then runtime, then hoisted declarations
       let prepend = "";
       if (cssImports.length > 0) {
         prepend += cssImports.join("\n") + "\n";
@@ -465,6 +471,10 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
       if (needsCreateElement) {
         prepend += `import { createElement } from "react";\n`;
         prepend += `import { m } from "${runtimeBasePath}";\n`;
+      }
+      // Add hoisted variant maps for complex variants (> 4 values)
+      if (hoistedDeclarations.length > 0) {
+        prepend += hoistedDeclarations.join("\n") + "\n";
       }
       if (prepend) {
         // Add extra newline after imports for better readability
@@ -942,12 +952,24 @@ function classifyVariantCall(
   };
 }
 
+/** Threshold for switching from if/else to hoisted map */
+const VARIANT_MAP_THRESHOLD = 4;
+
+/** Counter for unique variant map names */
+let variantMapId = 0;
+
+/** Result from variant replacement generation */
+interface VariantReplacementResult {
+  code: string;
+  hoisted: string | undefined;
+}
+
 /**
  * Generate replacement code for a variant call.
  *
- * This generates inline components with explicit variant checks.
- * No string interpolation with user values - each variant value generates
- * a static if/else check for maximum security.
+ * Uses a hybrid approach:
+ * - For ≤ 4 total variant values: if/else chains (zero allocation, simple)
+ * - For > 4 total variant values: hoisted static map (O(1) lookup, compact)
  *
  * SECURITY: Validates component names and generates explicit equality checks.
  */
@@ -956,40 +978,71 @@ function generateVariantReplacement(
   baseClass: string,
   variantKeys: string[],
   _isDev: boolean
-): string {
+): VariantReplacementResult {
   const cls = safeStringLiteral(baseClass);
-
-  // Generate variant class building logic
-  // Each variant key gets explicit if/else checks for each value
-  // For cssVariants, use "variants.key" in condition; for styledVariants, use destructured "key"
   const isCssVariants = variant.type === "cssVariants";
 
-  const variantChecks: string[] = [];
-  for (const key of variantKeys) {
-    const values = variant.variants.get(key);
-    if (values) {
-      // Use variants.key for cssVariants, plain key for styledVariants
-      const keyRef = isCssVariants ? `variants.${key}` : key;
-      const valueChecks = Array.from(values.keys())
-        .map(
-          (value, i) =>
-            `${i === 0 ? "if" : "else if"} (${keyRef} === ${safeStringLiteral(value)}) c += ${safeStringLiteral(` ${baseClass}--${key}-${value}`)}`
-        )
-        .join("; ");
-      if (valueChecks) {
-        variantChecks.push(valueChecks);
-      }
-    }
-  }
-
-  // Join variant checks with semicolons and newlines for readability
-  const variantLogic = variantChecks.length > 0 ? variantChecks.join("; ") + "; " : "";
+  // Calculate total variant values to determine strategy
+  const totalVariantValues = variantKeys.reduce(
+    (sum, key) => sum + (variant.variants.get(key)?.size ?? 0),
+    0
+  );
+  const useHoistedMap = totalVariantValues > VARIANT_MAP_THRESHOLD;
 
   // Destructure variant props from the component props
   const propsDestructure =
     variantKeys.length > 0
       ? `{ ${variantKeys.join(", ")}, className, ...p }`
       : `{ className, ...p }`;
+
+  let variantLogic: string;
+  let hoisted: string | undefined;
+
+  if (useHoistedMap && variantKeys.length > 0) {
+    // Generate hoisted static map for > 4 values
+    const mapName = `_vm${variantMapId++}`;
+
+    // Build the map object: { color: {"primary": " ss-abc--color-primary", ...}, ... }
+    const mapEntries = variantKeys.map((key) => {
+      const values = variant.variants.get(key);
+      if (!values) return "";
+      const valueEntries = Array.from(values.keys())
+        .map(
+          (v) =>
+            `${safeStringLiteral(v)}:${safeStringLiteral(` ${baseClass}--${key}-${v}`)}`
+        )
+        .join(",");
+      return `${key}:{${valueEntries}}`;
+    });
+    hoisted = `const ${mapName}={${mapEntries.join(",")}};`;
+
+    // Generate lookup logic: c += _vm0.color[color] || "";
+    const lookups = variantKeys.map((key) => {
+      const keyRef = isCssVariants ? `variants.${key}` : key;
+      return `c+=${mapName}.${key}[${keyRef}]||""`;
+    });
+    variantLogic = lookups.join(";") + ";";
+  } else {
+    // Generate if/else checks for ≤ 4 values (original approach)
+    const variantChecks: string[] = [];
+    for (const key of variantKeys) {
+      const values = variant.variants.get(key);
+      if (values) {
+        const keyRef = isCssVariants ? `variants.${key}` : key;
+        const valueChecks = Array.from(values.keys())
+          .map(
+            (value, i) =>
+              `${i === 0 ? "if" : "else if"} (${keyRef} === ${safeStringLiteral(value)}) c += ${safeStringLiteral(` ${baseClass}--${key}-${value}`)}`
+          )
+          .join("; ");
+        if (valueChecks) {
+          variantChecks.push(valueChecks);
+        }
+      }
+    }
+    variantLogic =
+      variantChecks.length > 0 ? variantChecks.join("; ") + "; " : "";
+  }
 
   if (variant.type === "styledVariants") {
     // Check if component is an HTML tag (lowercase) or component reference
@@ -1003,7 +1056,10 @@ function generateVariantReplacement(
         );
       }
       const tag = safeStringLiteral(variant.component);
-      return `Object.assign((${propsDestructure}) => { let c = ${cls}; ${variantLogic}return createElement(${tag}, {...p, className: m(c, className)}); }, { className: ${cls} })`;
+      return {
+        code: `Object.assign((${propsDestructure}) => { let c = ${cls}; ${variantLogic}return createElement(${tag}, {...p, className: m(c, className)}); }, { className: ${cls} })`,
+        hoisted,
+      };
     } else {
       // SECURITY: Validate component reference is a valid identifier
       if (!variant.component || !isValidIdentifier(variant.component)) {
@@ -1012,13 +1068,18 @@ function generateVariantReplacement(
         );
       }
       // Extension: className includes base component's className
-      return `Object.assign((${propsDestructure}) => { let c = ${cls}; ${variantLogic}return createElement(${variant.component}, {...p, className: m(c, className)}); }, { className: ${variant.component}.className + " " + ${cls} })`;
+      return {
+        code: `Object.assign((${propsDestructure}) => { let c = ${cls}; ${variantLogic}return createElement(${variant.component}, {...p, className: m(c, className)}); }, { className: ${variant.component}.className + " " + ${cls} })`,
+        hoisted,
+      };
     }
   }
 
   // cssVariants: returns a function that generates class string
-  // variantLogic already uses "variants.key" for condition checks (set above via isCssVariants)
-  return `(variants) => { let c = ${cls}; ${variantLogic}return c; }`;
+  return {
+    code: `(variants) => { let c = ${cls}; ${variantLogic}return c; }`,
+    hoisted,
+  };
 }
 
 // ============================================================================
