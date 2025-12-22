@@ -68,11 +68,14 @@ const PasswordInput = styled.input.attrs({ type: 'password' })`
   padding: 0.5rem;
 `;
 
-const SubmitButton = styled.button.attrs({ type: 'submit' })`
+const SubmitButton = styled.button.attrs({
+  type: 'submit',
+  'aria-label': 'Submit form',
+})`
   background: blue;
 `;
 ```
-> Note: attrs must be static objects (no functions).
+> Note: attrs must be static objects (no functions). For dynamic attributes, use regular props.
 
 ### withComponent
 
@@ -180,10 +183,15 @@ const buttonClass = cssVariants({
 
 ### cx
 
-Conditionally join class names:
+Conditionally join class names. Intentionally flat (no nested arrays/objects) for minimal bundle size:
 ```tsx
 import { cx, css } from 'styled-static';
 
+cx('base', 'active')                    // → "base active"
+cx('btn', isActive && activeClass)      // → "btn ss-abc123" or "btn"
+cx('a', null, undefined, false, 'b')    // → "a b"
+
+// With styled components
 const active = css`outline: 2px solid;`;
 const disabled = css`opacity: 0.5;`;
 
@@ -241,6 +249,12 @@ const Box = styled.div`
 ---
 
 ## Dynamic Styling (Without Runtime Interpolation)
+
+No runtime interpolation—use these patterns instead:
+- **Variants API** — Type-safe component variants (recommended, see `styledVariants`/`cssVariants`)
+- **cx utility** — Conditional class toggling (see `cx` above)
+- **CSS variables** — Pass via `style` prop for truly dynamic values
+- **Data attributes** — Style with `&[data-variant="x"]` selectors
 
 ### CSS Variables
 ```tsx
