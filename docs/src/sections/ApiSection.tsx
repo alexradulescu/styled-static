@@ -3,7 +3,7 @@
  * Contains: styled, extension, css, cx, keyframes, attrs, variants, global
  */
 import { useState } from "react";
-import { cx } from "styled-static";
+import { styled, cx } from "styled-static";
 import {
   AlertTriangle,
   Breadcrumb,
@@ -25,11 +25,20 @@ import {
   SubsectionTitle,
 } from "./shared";
 
+// Section-specific styled component (tests CSS code splitting)
+const ApiWrapper = styled.div`
+  opacity: 1;
+  transition: opacity 0.3s ease-out;
+
+  /* Unique to ApiSection */
+  --api-section-loaded: 1;
+`;
+
 export function ApiSection() {
   const [isHighlighted, setIsHighlighted] = useState(false);
 
   return (
-    <>
+    <ApiWrapper>
       {/* styled */}
       <Section id="styled">
         <Breadcrumb>API</Breadcrumb>
@@ -368,6 +377,6 @@ const GlobalStyle = createGlobalStyle\`
           injected via imports.
         </Callout>
       </Section>
-    </>
+    </ApiWrapper>
   );
 }

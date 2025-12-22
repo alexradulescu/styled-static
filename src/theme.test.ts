@@ -1,10 +1,10 @@
 /**
- * Theme Helper Tests
+ * Theme Helper Tests (SSR / Node.js environment)
  *
- * These tests verify the theme helper functions.
- * Since we're running in Node.js (no DOM), we test:
- * 1. SSR fallback behavior (when document is undefined)
- * 2. Export verification
+ * These tests verify the theme helper functions in Node.js where
+ * document/localStorage/matchMedia are undefined.
+ *
+ * Browser tests are in theme.browser.test.ts
  */
 import { describe, expect, it } from "vitest";
 import {

@@ -1,6 +1,6 @@
 {
   "name": "@alex.radulescu/styled-static",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Near-zero-runtime styled components for React 19+ with Vite. CSS extracted at build time, minimal runtime.",
   "type": "module",
   "private": false,
@@ -19,21 +19,9 @@
       "types": "./dist/vite.d.ts",
       "import": "./dist/vite.js"
     },
-    "./runtime/core": {
-      "types": "./dist/runtime/core.d.ts",
-      "import": "./dist/runtime/core.js"
-    },
-    "./runtime/styled": {
-      "types": "./dist/runtime/styled.d.ts",
-      "import": "./dist/runtime/styled.js"
-    },
-    "./runtime/variants": {
-      "types": "./dist/runtime/variants.d.ts",
-      "import": "./dist/runtime/variants.js"
-    },
-    "./runtime/global": {
-      "types": "./dist/runtime/global.d.ts",
-      "import": "./dist/runtime/global.js"
+    "./runtime": {
+      "types": "./dist/runtime/index.d.ts",
+      "import": "./dist/runtime/index.js"
     }
   },
   "files": [
@@ -61,7 +49,10 @@
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.2",
     "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/browser": "^4.0.16",
+    "@vitest/coverage-v8": "2.1.8",
     "acorn": "^8.15.0",
+    "jsdom": "^27.3.0",
     "prettier": "^3.7.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

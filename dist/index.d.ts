@@ -35,18 +35,27 @@
  *   body { margin: 0; }
  * `;
  *
+ * // Polymorphism with withComponent
+ * import { Link } from 'react-router-dom';
+ * const LinkButton = withComponent(Link, Button);
+ *
  * // Usage
  * <GlobalStyle />
  * <Button>Click me</Button>
- * <Button as="a" href="/link">Link button</Button>
+ * <LinkButton to="/home">Link button</LinkButton>
  * <PrimaryButton className={activeClass}>Active</PrimaryButton>
+ *
+ * // Access className for manual composition
+ * <a className={Button.className} href="/link">Manual link</a>
  * ```
  */
 export type { StyledComponent, StyledFunction, HTMLTag, PropsOf, VariantsConfig, VariantsDefinition, StyledVariantsDefinition, VariantProps, StyledVariantComponent, CssVariantsFunction, Keyframes, } from "./types";
 export { getTheme, setTheme, initTheme, onSystemThemeChange, type InitThemeOptions, } from "./theme";
 /**
- * Create styled React components with zero runtime overhead.
+ * Create styled React components with near-zero runtime overhead.
  * CSS is extracted to static files at build time.
+ *
+ * Every styled component exposes a `.className` property for composition.
  *
  * @example
  * // Style HTML elements
@@ -60,16 +69,11 @@ export { getTheme, setTheme, initTheme, onSystemThemeChange, type InitThemeOptio
  *   font-weight: bold;
  * `;
  *
- * // Use with `as` prop for polymorphism
- * <Button as="a" href="/link">Click</Button>
+ * // Access className for manual composition
+ * <a className={Button.className} href="/link">Link with button styles</a>
  *
- * // Pre-configure as prop (zero overhead alternative to withComponent)
- * const LinkButton = (props: ComponentProps<typeof Link>) => (
- *   <Button as={Link} {...props} />
- * );
- *
- * // Use transient props (won't reach DOM)
- * <Button $primary={true}>Click</Button>
+ * // Use withComponent for polymorphism
+ * const LinkButton = withComponent(Link, Button);
  */
 export declare const styled: import("./types").StyledFunction;
 /**
@@ -227,4 +231,40 @@ export declare function styledVariants<T extends import("./types").HTMLTag | imp
  * <div className={cx(buttonCss({ color: 'primary' }), isActive && activeClass)}>
  */
 export declare function cssVariants<V extends import("./types").VariantsConfig>(_config: import("./types").VariantsDefinition<V>): import("./types").CssVariantsFunction<V>;
+/**
+ * Create a component that renders one element with another's styles.
+ * This is a build-time alternative to the runtime `as` prop.
+ *
+ * @param toComponent - The component or HTML tag to render
+ * @param fromComponent - The styled component whose styles to use
+ *
+ * @example
+ * import { Link } from 'react-router-dom';
+ *
+ * const Button = styled.button`
+ *   padding: 1rem;
+ *   background: blue;
+ * `;
+ *
+ * // Create a Link that looks like a Button
+ * const LinkButton = withComponent(Link, Button);
+ *
+ * // Usage
+ * <LinkButton to="/home">Go Home</LinkButton>
+ *
+ * // Can extend further
+ * const PrimaryLinkButton = styled(LinkButton)`
+ *   font-weight: bold;
+ * `;
+ *
+ * @example
+ * // Also works with HTML tags
+ * const ButtonAsAnchor = withComponent('a', Button);
+ * <ButtonAsAnchor href="/link">Click</ButtonAsAnchor>
+ */
+export declare function withComponent<T extends import("./types").HTMLTag | import("react").ComponentType<any>, F extends {
+    className: string;
+}>(_toComponent: T, _fromComponent: F): import("./types").StyledComponent<T> & {
+    className: string;
+};
 //# sourceMappingURL=index.d.ts.map
