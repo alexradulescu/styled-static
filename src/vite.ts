@@ -180,6 +180,15 @@ function safeStringLiteral(str: string): string {
   return JSON.stringify(str);
 }
 
+/**
+ * Extract a clean, CSS-safe filename from a file path.
+ * Used in dev mode to generate readable class names.
+ */
+function getFileBaseName(filePath: string): string {
+  const base = filePath.split("/").pop() || "unknown";
+  return base.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9]/g, "");
+}
+
 export function styledStatic(options: StyledStaticOptions = {}): Plugin {
   const { classPrefix = "ss", debug: debugOption } = options;
 
@@ -187,8 +196,8 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
   // Only enable via explicit option or environment variable.
   const DEBUG = debugOption ?? process.env.DEBUG_STYLED_STATIC === "true";
 
-  // Virtual CSS modules: filename -> CSS content
-  const cssModules = new Map<string, string>();
+  // Virtual CSS modules: filename -> CSS content + source file
+  const cssModules = new Map<string, { css: string; sourceFile: string }>();
 
   let config: ResolvedConfig;
   let isDev = false;
@@ -204,22 +213,56 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
 
     // Resolve virtual CSS module IDs
     resolveId(id) {
-      // Handle the virtual module prefix
-      if (id.startsWith("\0styled-static:")) {
-        return id;
-      }
-      // Handle imports without the \0 prefix (from our generated code)
-      if (id.startsWith("styled-static:")) {
+      // Handle virtual:styled-static/path/to/file.tsx/0.css (build) or .js (dev)
+      if (id.startsWith("virtual:styled-static/")) {
         return "\0" + id;
+      }
+      if (id.startsWith("\0virtual:styled-static/")) {
+        return id;
       }
       return null;
     },
 
     // Load virtual CSS module content
     load(id) {
-      if (id.startsWith("\0styled-static:")) {
-        const filename = id.slice("\0styled-static:".length);
-        return cssModules.get(filename) ?? "";
+      if (id.startsWith("\0virtual:styled-static/")) {
+        // Extract the base path (without extension) for Map lookup
+        const fullPath = id.slice("\0".length); // "virtual:styled-static/.../0.css" or ".js"
+        // Remove extension (.css or .js) to get base path for lookup
+        const basePath = fullPath.replace(/\.(css|js)$/, ".css");
+        const data = cssModules.get(basePath);
+        const css = data?.css ?? "";
+
+        if (isDev) {
+          // Add sourceURL comment for DevTools source mapping
+          const sourceFile = data?.sourceFile ?? "";
+          const cssWithSource = sourceFile
+            ? `${css}\n/*# sourceURL=${sourceFile} */`
+            : css;
+
+          // Dev mode: return JS that injects CSS into DOM with HMR support
+          return `
+const id = ${JSON.stringify(basePath)};
+const css = ${JSON.stringify(cssWithSource)};
+
+// Remove existing style for this module (HMR cleanup)
+const existing = document.querySelector(\`style[data-ss-id="\${id}"]\`);
+if (existing) existing.remove();
+
+const style = document.createElement('style');
+style.setAttribute('data-ss-id', id);
+style.textContent = css;
+document.head.appendChild(style);
+
+if (import.meta.hot) {
+  import.meta.hot.accept();
+}
+
+export default css;
+`;
+        }
+        // Build mode: return raw CSS for extraction
+        return css;
       }
       return null;
     },
@@ -230,14 +273,12 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
       // and update cssModules. We just need to invalidate any
       // cached virtual modules.
       if (/\.[tj]sx?$/.test(file)) {
-        // Invalidate all virtual CSS modules from this file
-        // SECURITY: Use consistent 8-char hash to match transform()
-        const fileHash = hash(normalizePath(file)).slice(0, 8);
-        for (const [name] of cssModules) {
-          if (name.startsWith(fileHash)) {
-            const mod = server.moduleGraph.getModuleById(
-              `\0styled-static:${name}`
-            );
+        const normalizedPath = normalizePath(file);
+        // Invalidate all virtual CSS modules from this source file
+        for (const [moduleId] of cssModules) {
+          // New format: virtual:styled-static/path/to/file.tsx/0.css
+          if (moduleId.includes(normalizedPath)) {
+            const mod = server.moduleGraph.getModuleById(`\0${moduleId}`);
             if (mod) {
               server.moduleGraph.invalidateModule(mod);
             }
@@ -335,9 +376,6 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
       }
 
       const s = new MagicString(code);
-      // Use 8-char file hash to match Vite's CSS Modules standard
-      // (8 chars base36 = ~2.8 × 10^12 possibilities)
-      const fileHash = hash(normalizePath(id)).slice(0, 8);
       const cssImports: string[] = [];
       // Track if we need React's createElement and our merge helper
       let needsCreateElement = false;
@@ -348,10 +386,17 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
         const t = templates[i];
         if (!t) continue; // Guard against undefined (noUncheckedIndexedAccess)
         const cssContent = extractTemplateContent(code, t.node.quasi);
-        // SECURITY: Use longer hash in production for lower collision probability
-        const hashLength = isDev ? 6 : 8;
-        const cssHash = hash(cssContent).slice(0, hashLength);
-        const className = `${classPrefix}-${cssHash}`;
+        // In dev mode, use readable class names; in prod, use hash for minimal size
+        let className: string;
+        if (isDev && t.variableName) {
+          const fileBase = getFileBaseName(id);
+          className = `${classPrefix}-${t.variableName}-${fileBase}`;
+        } else {
+          // SECURITY: Use longer hash in production for lower collision probability
+          const hashLength = isDev ? 6 : 8;
+          const cssHash = hash(cssContent).slice(0, hashLength);
+          className = `${classPrefix}-${cssHash}`;
+        }
 
         // Wrap CSS in class selector (unless global)
         // Lightning CSS (via Vite's CSS pipeline) handles nesting, prefixes, etc.
@@ -360,10 +405,14 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
             ? cssContent
             : `.${className} { ${cssContent} }`;
 
-        // Create virtual CSS module
-        const cssFilename = `${fileHash}-${cssIndex++}.css`;
-        cssModules.set(cssFilename, processedCss);
-        cssImports.push(`import "styled-static:${cssFilename}";`);
+        // Create virtual CSS module with source file path for proper chunk association
+        // Use .js extension in dev mode (to avoid Vite's CSS plugin processing)
+        // Use .css extension in build mode (for proper CSS extraction)
+        const cssModuleBase = `virtual:styled-static/${normalizePath(id)}/${cssIndex++}`;
+        const cssModuleId = `${cssModuleBase}.css`; // Always store with .css
+        const importId = isDev ? `${cssModuleBase}.js` : cssModuleId;
+        cssModules.set(cssModuleId, { css: processedCss, sourceFile: id });
+        cssImports.push(`import "${importId}";`);
 
         // Generate replacement code and track runtime needs
         const replacement = generateReplacement(t, className, isDev);
@@ -379,8 +428,15 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
       // Process variant calls
       const hoistedDeclarations: string[] = [];
       for (const v of variantCalls) {
-        const baseHash = hash(v.baseCss || "").slice(0, 6);
-        const baseClass = `${classPrefix}-${baseHash}`;
+        // In dev mode, use readable class names; in prod, use hash for minimal size
+        let baseClass: string;
+        if (isDev && v.variableName) {
+          const fileBase = getFileBaseName(id);
+          baseClass = `${classPrefix}-${v.variableName}-${fileBase}`;
+        } else {
+          const baseHash = hash(v.baseCss || "").slice(0, 6);
+          baseClass = `${classPrefix}-${baseHash}`;
+        }
 
         // Generate CSS for base and all variants
         let allCss = "";
@@ -398,10 +454,13 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
           }
         }
 
-        // Create virtual CSS module
-        const cssFilename = `${fileHash}-${cssIndex++}.css`;
-        cssModules.set(cssFilename, allCss);
-        cssImports.push(`import "styled-static:${cssFilename}";`);
+        // Create virtual CSS module with source file path for proper chunk association
+        // Use .js extension in dev mode, .css in build mode
+        const cssModuleBase = `virtual:styled-static/${normalizePath(id)}/${cssIndex++}`;
+        const cssModuleId = `${cssModuleBase}.css`;
+        const importId = isDev ? `${cssModuleBase}.js` : cssModuleId;
+        cssModules.set(cssModuleId, { css: allCss, sourceFile: id });
+        cssImports.push(`import "${importId}";`);
 
         // Generate replacement code
         const variantKeys = Array.from(v.variants.keys());
@@ -749,9 +808,10 @@ function generateReplacement(
 
 /**
  * Normalize file paths for consistent hashing across platforms.
+ * Strips leading slashes to avoid double-slash in virtual module IDs.
  */
 function normalizePath(p: string): string {
-  return p.replace(/\\/g, "/").toLowerCase();
+  return p.replace(/\\/g, "/").replace(/^\/+/, "").toLowerCase();
 }
 
 // ============================================================================

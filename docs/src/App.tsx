@@ -1173,6 +1173,29 @@ export default defineConfig({
                   plugin in the plugins array.
                 </CalloutContent>
               </div>
+
+              <Paragraph style={{ marginTop: "1.5rem" }}>
+                <strong>Optional: Lightning CSS</strong> for autoprefixing and
+                faster CSS processing:
+              </Paragraph>
+              <CodeBlock filename="terminal">{`npm install lightningcss`}</CodeBlock>
+              <CodeBlock filename="vite.config.ts">{`import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { styledStatic } from 'styled-static/vite';
+
+export default defineConfig({
+  css: { transformer: 'lightningcss' },
+  plugins: [styledStatic(), react()],
+});`}</CodeBlock>
+              <div className={calloutStyles({ type: "tip" })}>
+                <CalloutIcon>
+                  <Zap size={20} />
+                </CalloutIcon>
+                <CalloutContent>
+                  Lightning CSS provides automatic vendor prefixes, better
+                  minification, and faster builds than PostCSS.
+                </CalloutContent>
+              </div>
             </Section>
 
             {/* ========================================== */}

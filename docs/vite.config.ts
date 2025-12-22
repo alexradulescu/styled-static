@@ -5,6 +5,9 @@ import { styledStatic } from "../src/vite";
 
 export default defineConfig({
   base: "/styled-static/",
+  css: {
+    transformer: "lightningcss",
+  },
   plugins: [styledStatic() as PluginOption, react()],
   resolve: {
     alias: {

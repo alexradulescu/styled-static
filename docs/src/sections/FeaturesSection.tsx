@@ -2,6 +2,7 @@
  * Features Section - Lazy loaded
  * Contains: withComponent, CSS nesting, theming
  */
+import { styled } from "styled-static";
 import { Moon, Sun } from "lucide-react";
 import {
   AlertTriangle,
@@ -21,6 +22,15 @@ import {
   SubsectionTitle,
 } from "./shared";
 
+// Section-specific styled component (tests CSS code splitting)
+const FeaturesWrapper = styled.div`
+  opacity: 1;
+  transition: opacity 0.25s ease-out;
+
+  /* Unique to FeaturesSection */
+  --features-section-loaded: 1;
+`;
+
 interface FeaturesSectionProps {
   theme: string;
   toggleTheme: () => void;
@@ -28,7 +38,7 @@ interface FeaturesSectionProps {
 
 export function FeaturesSection({ theme, toggleTheme }: FeaturesSectionProps) {
   return (
-    <>
+    <FeaturesWrapper>
       {/* withComponent & className */}
       <Section id="polymorphism">
         <Breadcrumb>Features</Breadcrumb>
@@ -237,6 +247,6 @@ onSystemThemeChange(callback: (isDark: boolean) => void): () => void`}</CodeBloc
           APIs. They return sensible defaults when running on the server.
         </Callout>
       </Section>
-    </>
+    </FeaturesWrapper>
   );
 }

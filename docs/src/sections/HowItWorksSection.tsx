@@ -2,6 +2,7 @@
  * How It Works Section - Explains the build-time transformation
  * Contains: compilation process, virtual CSS modules, runtime wrappers, bundle size
  */
+import { styled } from "styled-static";
 import { Info, Lightbulb } from "lucide-react";
 import {
   Breadcrumb,
@@ -14,9 +15,18 @@ import {
   SubsectionTitle,
 } from "./shared";
 
+// Section-specific styled component (tests CSS code splitting)
+const HowItWorksWrapper = styled.div`
+  opacity: 1;
+  transition: opacity 0.35s ease-out;
+
+  /* Unique to HowItWorksSection */
+  --how-it-works-section-loaded: 1;
+`;
+
 export function HowItWorksSection() {
   return (
-    <>
+    <HowItWorksWrapper>
       {/* Overview */}
       <Section id="how-it-works">
         <Breadcrumb>Internals</Breadcrumb>
@@ -670,6 +680,6 @@ const Button = Object.assign(
           will show the variable name from your source code.
         </Paragraph>
       </Section>
-    </>
+    </HowItWorksWrapper>
   );
 }

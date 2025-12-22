@@ -1001,6 +1001,32 @@ export default defineConfig({
 });
 ```
 
+**With browser targets** for precise autoprefixing:
+
+```bash
+npm install lightningcss browserslist
+```
+
+```ts
+import browserslist from "browserslist";
+import { browserslistToTargets } from "lightningcss";
+
+export default defineConfig({
+  css: {
+    transformer: "lightningcss",
+    lightningcss: {
+      targets: browserslistToTargets(browserslist(">= 0.25%")),
+    },
+  },
+  plugins: [styledStatic(), react()],
+});
+```
+
+Lightning CSS provides:
+- Automatic vendor prefixes based on browser targets
+- CSS minification (smaller than default)
+- Faster builds than PostCSS
+
 ---
 
 ## Comparison
