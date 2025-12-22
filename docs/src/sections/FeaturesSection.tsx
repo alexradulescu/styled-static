@@ -5,7 +5,6 @@
 import { styled } from "styled-static";
 import { Moon, Sun } from "lucide-react";
 import {
-  AlertTriangle,
   Breadcrumb,
   Button,
   ButtonGroup,
@@ -125,91 +124,39 @@ const LinkButton = withComponent(Link, Button);
         <Breadcrumb>Features</Breadcrumb>
         <SectionTitle>Theming</SectionTitle>
         <Paragraph>
-          styled-static provides a CSS-first approach to theming using CSS
-          variables and <InlineCode>data-theme</InlineCode> attributes. Themes
-          are pure CSS—no runtime theme injection.
+          CSS-first theming with CSS variables and{" "}
+          <InlineCode>data-theme</InlineCode> attributes:
         </Paragraph>
 
-        <SubsectionTitle>Defining Themes</SubsectionTitle>
-        <Paragraph>
-          Use <InlineCode>createGlobalStyle</InlineCode> to define your theme
-          tokens as CSS variables:
-        </Paragraph>
         <CodeBlock>{`const GlobalStyle = createGlobalStyle\`
-  :root, [data-theme="light"] {
-    --color-bg: #ffffff;
-    --color-text: #1a1a1a;
-    --color-primary: #10b981;
-  }
-  
-  [data-theme="dark"] {
-    --color-bg: #0f0f0f;
-    --color-text: #e5e7eb;
-    --color-primary: #10b981;
-  }
-  
-  /* Custom themes */
-  [data-theme="pokemon"] {
-    --color-bg: #ffcb05;
-    --color-text: #2a75bb;
-    --color-primary: #cc0000;
-  }
+  :root, [data-theme="light"] { --bg: #fff; --text: #1a1a1a; }
+  [data-theme="dark"] { --bg: #0a0a0a; --text: #f1f5f9; }
+  [data-theme="pokemon"] { --bg: #ffcb05; --text: #2a75bb; }
 \`;
 
-const Button = styled.button\`
-  background: var(--color-primary);
-  color: var(--color-bg);
+const Card = styled.div\`
+  background: var(--bg);
+  color: var(--text);
 \`;`}</CodeBlock>
 
-        <SubsectionTitle>Theme Helper Functions</SubsectionTitle>
-        <Paragraph>
-          styled-static exports helper functions for theme switching:
-        </Paragraph>
+        <SubsectionTitle>Theme Helpers</SubsectionTitle>
         <CodeBlock>{`import { initTheme, setTheme, getTheme, onSystemThemeChange } from 'styled-static';
 
-// Initialize on app load (reads from localStorage, then system preference)
-initTheme({
-  defaultTheme: 'light',
-  useSystemPreference: true  // Optional: detect OS dark mode
-});
+// Initialize (reads localStorage → system preference → default)
+initTheme({ defaultTheme: 'light', useSystemPreference: true });
 
-// Get current theme
-const current = getTheme(); // 'light' | 'dark' | etc.
+// Switch themes
+setTheme('dark');              // persists to localStorage
+setTheme('pokemon', false);    // no persist (preview)
 
-// Change theme (persists to localStorage by default)
-setTheme('dark');
+// Read current
+const current = getTheme();    // 'light' | 'dark' | etc.
 
-// Change without persisting (useful for previews)
-setTheme('pokemon', false);
-
-// Listen for OS theme changes
-const unsubscribe = onSystemThemeChange((prefersDark) => {
-  if (!localStorage.getItem('theme')) {
-    setTheme(prefersDark ? 'dark' : 'light', false);
-  }
+// React to OS changes
+const unsub = onSystemThemeChange((prefersDark) => {
+  if (!localStorage.getItem('theme')) setTheme(prefersDark ? 'dark' : 'light', false);
 });`}</CodeBlock>
 
-        <SubsectionTitle>Theme Toggle Example</SubsectionTitle>
-        <Paragraph>
-          Here's how this documentation page implements its theme toggle:
-        </Paragraph>
-        <CodeBlock>{`function ThemeToggle() {
-  const [theme, setThemeState] = useState(() => {
-    return initTheme({ useSystemPreference: true });
-  });
-  
-  const toggleTheme = () => {
-    const next = getTheme() === 'dark' ? 'light' : 'dark';
-    setTheme(next);
-    setThemeState(next);
-  };
-  
-  return (
-    <button onClick={toggleTheme}>
-      {theme === 'light' ? '🌙 Dark' : '☀️ Light'}
-    </button>
-  );
-}`}</CodeBlock>
         <DemoArea>
           <DemoLabel>Try it</DemoLabel>
           <ButtonGroup>
@@ -226,26 +173,6 @@ const unsubscribe = onSystemThemeChange((prefersDark) => {
             </Button>
           </ButtonGroup>
         </DemoArea>
-
-        <SubsectionTitle>API Reference</SubsectionTitle>
-        <CodeBlock>{`// initTheme options
-initTheme({
-  defaultTheme: 'light',        // Default theme if no stored preference
-  storageKey: 'theme',          // localStorage key (default: 'theme')
-  useSystemPreference: false,   // Detect OS dark/light preference
-  attribute: 'data-theme',      // Attribute to set on documentElement
-});
-
-// Function signatures
-getTheme(attribute?: string): string
-setTheme(theme: string, persist?: boolean, options?: object): void
-initTheme(options?: InitThemeOptions): string
-onSystemThemeChange(callback: (isDark: boolean) => void): () => void`}</CodeBlock>
-
-        <Callout type="tip" icon={<Lightbulb size={20} />}>
-          The theme helpers are SSR-safe and gracefully handle missing browser
-          APIs. They return sensible defaults when running on the server.
-        </Callout>
       </Section>
     </FeaturesWrapper>
   );

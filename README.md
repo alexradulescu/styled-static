@@ -32,7 +32,7 @@ Near-zero-runtime CSS-in-JS for React 19+ with Vite. Write styled-components syn
 
 ## Quick Overview
 
-All the APIs you need at a glance. styled-static provides 6 core functions that cover most CSS-in-JS use cases:
+All the APIs you need at a glance. styled-static provides 10 core functions that cover most CSS-in-JS use cases:
 
 ### styled.element
 
@@ -104,41 +104,52 @@ const badgeCss = cssVariants({
 });
 
 <span className={badgeCss({ color: "blue" })}>Info</span>;
+
+// Combine classes conditionally
+<div className={cx("base", isActive && activeClass)} />;
+
+// Default attributes
+const PasswordInput = styled.input.attrs({ type: "password" })`
+  padding: 0.5rem 1rem;
+`;
+
+// Polymorphism - render Link with Button's styles
+import { Link } from "react-router-dom";
+const LinkButton = withComponent(Link, Button);
+<LinkButton to="/path">Router link styled as button</LinkButton>;
 ```
+
+---
+
+## Table of Contents
+
+- [Quick Overview](#quick-overview) · [Why](#why-styled-static) · [What We Don't Do](#what-we-dont-do) · [Installation](#installation)
+- **API:** [styled](#styled) · [Extension](#component-extension) · [css](#css-helper) · [keyframes](#keyframes) · [attrs](#attrs) · [cx](#cx-utility) · [Global Styles](#global-styles) · [Variants](#variants-api)
+- **Features:** [Polymorphism](#polymorphism-with-withcomponent) · [.className](#manual-composition-with-classname) · [CSS Nesting](#css-nesting) · [Dynamic Styling](#dynamic-styling) · [Theming](#theming)
+- **Internals:** [How It Works](#how-it-works) · [Config](#configuration) · [TypeScript](#typescript) · [Zero Deps](#zero-dependencies) · [Comparison](#comparison)
 
 ---
 
 ## Why styled-static?
 
-- 🌐 **CSS & browsers have evolved.** Native CSS nesting, CSS variables, container queries, and fewer vendor prefixes mean the gap between CSS and CSS-in-JS has never been smaller.
-
-- 😵 **CSS-in-JS fatigue is real.** Most libraries are now obsolete, overly complex, or have large runtime overhead. The ecosystem needs simpler solutions.
-
-- ✨ **Syntactic sugar over CSS modules.** Most projects don't need runtime interpolation. They need a better DX for writing and organizing CSS.
-
-- 🔒 **Supply chain security matters.** Zero dependencies means a minimal attack surface. No transitive dependencies to audit or worry about.
-
-- 🎯 **Intentionally simple.** 95% native browser foundation + 5% sprinkles on top. We leverage what browsers and vite already do great.
-
-- 🎉 **Built for fun.** Sometimes the best projects come from curiosity and the joy of building something useful.
+- 🌐 **CSS evolved.** Native nesting, CSS variables, container queries—the gap between CSS and CSS-in-JS is smaller than ever.
+- 😵 **CSS-in-JS fatigue.** Most libraries are obsolete, complex, or have large runtime overhead.
+- ✨ **Syntactic sugar over CSS modules.** Better DX for writing CSS, without runtime interpolation.
+- 🔒 **Zero dependencies.** Minimal attack surface. Nothing to audit.
+- 🎯 **Intentionally simple.** 95% native browser + 5% sprinkles.
+- 🎉 **Built for fun.** Curiosity-driven, useful code.
 
 ---
 
 ## What We Don't Do
 
-styled-static is intentionally limited. Here's what we don't support—and why:
+- 🚫 **No runtime interpolation** — Can't write `${props => props.color}`. Use variants, CSS variables, or data attributes.
+- ⚛️ **React 19+ only** — Uses automatic ref forwarding (no `forwardRef`).
+- ⚡ **Vite only** — Uses Vite's AST parser and virtual modules. No Webpack/Rollup.
+- 🚫 **No `css` prop** — Use named `css` variables with `className`.
+- 🚫 **No `shouldForwardProp`** — Not needed. Variants auto-strip props.
 
-- 🚫 **No runtime interpolation.** You can't write `${props => props.color}`. CSS is extracted at build time, so values must be static. Use Variants API, CSS variables or data attributes for dynamic styles.
-
-- ⚛️ **React 19+ only.** We rely on automatic ref forwarding instead of `forwardRef`. This keeps the runtime tiny but requires React 19.
-
-- ⚡ **Vite only.** The plugin uses Vite's built-in AST parser and virtual module system. No Webpack, Rollup, or other bundler support.
-
-- 🚫 **No `css` prop.** We don't support `<Button css={...}>`. Use named `css` variables with `className` instead. This keeps the plugin simple (~100 fewer lines) and nudges you toward reusable, named styles.
-
-- 🚫 **No `shouldForwardProp`.** Not needed—without runtime interpolation, you don't pass custom styling props. Variants auto-strip their props; for edge cases, use destructuring or data attributes.
-
-- 💡 **Why these constraints?** Each limitation removes complexity. No runtime interpolation means no runtime CSS parsing. React 19 means no forwardRef wrapper. Vite-only means one excellent integration instead of many mediocre ones.
+Each constraint removes complexity—no CSS parsing, no forwardRef, one great integration.
 
 ---
 
@@ -171,7 +182,7 @@ export default defineConfig({
 
 ### styled
 
-Create styled React components with zero runtime overhead. CSS is extracted to static files at build time.
+Create styled React components:
 
 ```tsx
 import { styled } from "styled-static";
@@ -289,42 +300,13 @@ const PulsingDot = styled.div`
 `;
 ```
 
-**How it works:**
-
-- At build time, keyframes CSS is extracted to a static file
-- The animation name is hashed (e.g., `ss-abc123`)
-- References in styled components are replaced with the hashed name
-
-```css
-/* Generated CSS */
-@keyframes ss-abc123 {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-.ss-xyz789 {
-  animation: ss-abc123 1s linear infinite;
-}
-```
+Animation names are hashed at build time to avoid conflicts.
 
 ### attrs
 
-Set default HTML attributes on styled components using the `.attrs()` method:
+Set default HTML attributes using `.attrs()`:
 
 ```tsx
-import { styled } from 'styled-static';
-
-// Set default type for input
-const PasswordInput = styled.input.attrs({ type: 'password' })`
-  padding: 0.5rem 1rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 4px;
-`;
-
-// Set multiple default attributes
 const SubmitButton = styled.button.attrs({
   type: 'submit',
   'aria-label': 'Submit form',
@@ -334,39 +316,24 @@ const SubmitButton = styled.button.attrs({
   color: white;
 `;
 
-// Usage - default attrs are applied, can be overridden
-<PasswordInput placeholder="Enter password" />
-// Renders: <input type="password" placeholder="Enter password" class="ss-abc123" />
-
 <SubmitButton>Send</SubmitButton>
-// Renders: <button type="submit" aria-label="Submit form" class="ss-xyz789">Send</button>
+// Renders: <button type="submit" aria-label="Submit form" class="ss-xyz789">
 ```
 
-> **Note:** Unlike styled-components, attrs in styled-static must be static objects (no functions). For dynamic attributes, use regular props on your component.
+> **Note:** attrs must be static objects (no functions). For dynamic attributes, use regular props.
 
 ### cx Utility
 
-Combine class names conditionally with the minimal `cx` utility:
+Combine class names conditionally. Intentionally flat (no nested arrays/objects) for minimal bundle size:
 
 ```tsx
 import { css, cx } from 'styled-static';
 
-const activeClass = css`
-  color: blue;
-`;
+const activeClass = css`color: blue;`;
 
-// Multiple class names
-<div className={cx('base', 'active')} />
-// → class="base active"
-
-// Conditional classes
-<Button className={cx('btn', isActive && activeClass)} />
-// → class="btn ss-abc123" (when active)
-// → class="btn" (when not active)
-
-// Falsy values are filtered out
-<div className={cx('a', null, undefined, false, 'b')} />
-// → class="a b"
+cx('base', 'active')                    // → "base active"
+cx('btn', isActive && activeClass)      // → "btn ss-abc123" or "btn"
+cx('a', null, undefined, false, 'b')    // → "a b"
 ```
 
 ### Global Styles
@@ -399,7 +366,6 @@ createRoot(document.getElementById("root")!).render(
 );
 ```
 
-> **Note:** The component renders nothing at runtime. All CSS is extracted and injected via imports.
 
 ### Variants API
 
@@ -412,59 +378,28 @@ For type-safe variant handling, use `styledVariants` to create components with v
 ```tsx
 import { css, styledVariants } from "styled-static";
 
-// With css`` for syntax highlighting (recommended)
 const Button = styledVariants({
   component: "button",
   css: css`
     padding: 0.5rem 1rem;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
+    background: gray;
+    color: white;
+    font-size: 1rem;
   `,
   variants: {
     color: {
-      primary: css`
-        background: blue;
-        color: white;
-      `,
-      danger: css`
-        background: red;
-        color: white;
-      `,
-      success: css`
-        background: green;
-        color: white;
-      `,
+      primary: css`background: blue;`,
+      danger: css`background: red;`,
+      success: css`background: green;`,
     },
     size: {
-      sm: css`
-        font-size: 0.875rem;
-        padding: 0.25rem 0.5rem;
-      `,
-      md: css`
-        font-size: 1rem;
-      `,
-      lg: css`
-        font-size: 1.125rem;
-        padding: 0.75rem 1.5rem;
-      `,
+      sm: css`font-size: 0.875rem; padding: 0.25rem 0.5rem;`,
+      lg: css`font-size: 1.125rem; padding: 0.75rem 1.5rem;`,
     },
   },
 });
 
-// Plain strings also work (no highlighting)
-const SimpleButton = styledVariants({
-  component: "button",
-  css: `padding: 0.5rem;`,
-  variants: {
-    size: { sm: `font-size: 0.875rem;` },
-  },
-});
-
-// Usage - variant props are type-safe
-<Button color="primary" size="lg">
-  Click me
-</Button>;
+<Button color="primary" size="lg">Click me</Button>
 // Renders: <button class="ss-abc ss-abc--color-primary ss-abc--size-lg">
 ```
 
@@ -595,258 +530,58 @@ const Card = styled.div`
 
 ## Dynamic Styling
 
-Since CSS is extracted at build time, you cannot use runtime interpolations like `${props => props.color}`. Instead, use these patterns:
-
-### 1. Variants API (Recommended)
-
-For type-safe variant handling, use `styledVariants` or `cssVariants`:
-
-```tsx
-import { styledVariants, css } from "styled-static";
-
-const Button = styledVariants({
-  component: "button",
-  css: css`
-    padding: 0.5rem 1rem;
-    border: none;
-    border-radius: 4px;
-  `,
-  variants: {
-    color: {
-      primary: css`background: blue; color: white;`,
-      danger: css`background: red; color: white;`,
-      success: css`background: green; color: white;`,
-    },
-  },
-});
-
-// Usage - variant props are type-safe
-<Button color="primary">Click</Button>
-<Button color="danger">Delete</Button>
-```
-
-See the [Variants API](#variants-api) section for full documentation.
-
-### 2. Class Toggling with cx
-
-```tsx
-import { css, cx, styled } from "styled-static";
-
-const primaryClass = css`
-  background: blue;
-`;
-const dangerClass = css`
-  background: red;
-`;
-
-const Button = styled.button`
-  padding: 0.5rem 1rem;
-  color: white;
-`;
-
-// Toggle between classes based on props/state
-<Button className={cx(isPrimary ? primaryClass : dangerClass)}>Click</Button>;
-```
-
-### 3. Data Attributes
-
-```tsx
-const Button = styled.button`
-  padding: 0.5rem 1rem;
-  color: white;
-
-  &[data-variant="primary"] {
-    background: blue;
-  }
-  &[data-variant="danger"] {
-    background: red;
-  }
-  &[data-variant="success"] {
-    background: green;
-  }
-`;
-
-<Button data-variant={variant}>Click</Button>;
-```
-
-### 4. CSS Variables
-
-```tsx
-const Button = styled.button`
-  padding: 0.5rem 1rem;
-  background: var(--btn-bg, gray);
-  color: var(--btn-color, white);
-`;
-
-<Button style={{ "--btn-bg": color, "--btn-color": textColor }}>Click</Button>;
-```
+No runtime interpolation—use these patterns instead:
+- **[Variants API](#variants-api)** — Type-safe component variants (recommended)
+- **[cx utility](#cx-utility)** — Conditional class toggling
+- **CSS variables** — Pass via `style` prop for truly dynamic values
+- **Data attributes** — Style with `&[data-variant="x"]` selectors
 
 ---
 
 ## Theming
 
-styled-static provides a simple, CSS-first approach to theming using CSS variables and `data-theme` attributes. No runtime overhead—just pure CSS.
-
-### Defining Themes
-
-Use `createGlobalStyle` to define your theme tokens:
-
-```tsx
-import { createGlobalStyle, styled } from "styled-static";
-
-const GlobalStyle = createGlobalStyle`
-  :root, [data-theme="light"] {
-    --color-bg: #ffffff;
-    --color-text: #1a1a1a;
-    --color-primary: #3b82f6;
-    --color-accent: #8b5cf6;
-  }
-  
-  [data-theme="dark"] {
-    --color-bg: #0f172a;
-    --color-text: #f1f5f9;
-    --color-primary: #60a5fa;
-    --color-accent: #a78bfa;
-  }
-  
-  /* Custom themes */
-  [data-theme="pokemon"] {
-    --color-bg: #ffcb05;
-    --color-text: #2a75bb;
-    --color-primary: #cc0000;
-    --color-accent: #3d7dca;
-  }
-  
-  [data-theme="star-trek"] {
-    --color-bg: #000000;
-    --color-text: #ff9900;
-    --color-primary: #3366cc;
-    --color-accent: #cc0000;
-  }
-`;
-
-// Use CSS variables in your components
-const Button = styled.button`
-  background: var(--color-primary);
-  color: var(--color-bg);
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 4px;
-
-  &:hover {
-    background: var(--color-accent);
-  }
-`;
-```
-
-### Theme Helper Functions
-
-styled-static provides helper functions for theme switching:
-
-```tsx
-import {
-  getTheme,
-  initTheme,
-  onSystemThemeChange,
-  setTheme,
-} from "styled-static";
-
-// Initialize on app load (reads from localStorage, falls back to default)
-initTheme({
-  defaultTheme: "light",
-  useSystemPreference: true, // Optional: detect OS dark mode
-});
-
-// Get current theme
-const current = getTheme(); // 'light' | 'dark' | 'pokemon' | etc.
-
-// Change theme (persists to localStorage by default)
-setTheme("dark");
-
-// Change without persisting (useful for previews)
-setTheme("pokemon", false);
-
-// Listen for OS theme changes
-const unsubscribe = onSystemThemeChange((prefersDark) => {
-  if (!localStorage.getItem("theme")) {
-    setTheme(prefersDark ? "dark" : "light", false);
-  }
-});
-```
-
-### Theme Toggle Example
-
-```tsx
-import { getTheme, setTheme } from "styled-static";
-
-function ThemeToggle() {
-  const toggleTheme = () => {
-    const current = getTheme();
-    setTheme(current === "dark" ? "light" : "dark");
-  };
-
-  return <button onClick={toggleTheme}>Toggle Theme</button>;
-}
-
-function ThemeSelector() {
-  return (
-    <select onChange={(e) => setTheme(e.target.value)}>
-      <option value="light">Light</option>
-      <option value="dark">Dark</option>
-      <option value="pokemon">Pokemon</option>
-      <option value="star-trek">Star Trek</option>
-    </select>
-  );
-}
-```
-
-### System Preference Detection
-
-Combine `useSystemPreference` with CSS for automatic system theme detection:
+CSS-first theming with CSS variables and `data-theme` attributes:
 
 ```tsx
 const GlobalStyle = createGlobalStyle`
-  :root {
-    --color-bg: #ffffff;
-    --color-text: #1a1a1a;
-  }
-  
-  /* Automatic system preference (when no explicit theme set) */
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme]) {
-      --color-bg: #0f172a;
-      --color-text: #f1f5f9;
-    }
-  }
-  
-  /* Explicit theme overrides */
-  [data-theme="light"] { --color-bg: #ffffff; --color-text: #1a1a1a; }
-  [data-theme="dark"] { --color-bg: #0f172a; --color-text: #f1f5f9; }
+  :root, [data-theme="light"] { --bg: #fff; --text: #1a1a1a; }
+  [data-theme="dark"] { --bg: #0a0a0a; --text: #f1f5f9; }
+  [data-theme="pokemon"] { --bg: #ffcb05; --text: #2a75bb; }
 `;
 
-// Initialize with system preference detection
-initTheme({ useSystemPreference: true });
+const Card = styled.div`
+  background: var(--bg);
+  color: var(--text);
+`;
 ```
 
-### API Reference
+### Theme Helpers
 
-| Function                              | Description                                                                          |
-| ------------------------------------- | ------------------------------------------------------------------------------------ |
-| `getTheme(attribute?)`                | Get current theme from `data-theme` attribute. Returns `'light'` as default.         |
-| `setTheme(theme, persist?, options?)` | Set theme on document. Persists to localStorage by default.                          |
-| `initTheme(options?)`                 | Initialize theme on page load. Priority: localStorage → system preference → default. |
-| `onSystemThemeChange(callback)`       | Subscribe to OS theme changes. Returns unsubscribe function.                         |
+```tsx
+import { initTheme, setTheme, getTheme, onSystemThemeChange } from "styled-static";
 
-#### initTheme Options
+// Initialize (reads localStorage → system preference → default)
+initTheme({ defaultTheme: "light", useSystemPreference: true });
 
-```ts
-initTheme({
-  defaultTheme: "light", // Default theme if no stored preference
-  storageKey: "theme", // localStorage key (default: 'theme')
-  useSystemPreference: false, // Detect OS dark/light preference
-  attribute: "data-theme", // Attribute to set on documentElement
+// Switch themes
+setTheme("dark");              // persists to localStorage
+setTheme("pokemon", false);    // no persist (preview)
+
+// Read current
+const current = getTheme();    // 'light' | 'dark' | etc.
+
+// React to OS changes
+const unsub = onSystemThemeChange((prefersDark) => {
+  if (!localStorage.getItem("theme")) setTheme(prefersDark ? "dark" : "light", false);
 });
 ```
+
+| Function | Description |
+| -------- | ----------- |
+| `initTheme(options?)` | Init on load. Priority: localStorage → system → default |
+| `setTheme(theme, persist?)` | Set theme. Persists to localStorage by default |
+| `getTheme()` | Get current theme from `data-theme` |
+| `onSystemThemeChange(cb)` | Subscribe to OS theme changes |
 
 ---
 
@@ -967,123 +702,43 @@ const classes = Button.className; // string
 
 ---
 
-## Limitations
-
-- **No runtime interpolation** - CSS values must be static (use CSS variables for dynamic values)
-- **React 19+ only** - Uses automatic ref forwarding
-- **Vite only** - Built specifically for Vite's plugin system
-
----
-
 ## Zero Dependencies
 
-The plugin has **ZERO** direct dependencies! 🎉
-
-It relies on:
-
-- **Native CSS nesting** - Supported in all browsers that support React 19 (Chrome 112+, Safari 16.5+, Firefox 117+, Edge 112+)
-- **Vite's CSS pipeline** - Handles the virtual CSS modules
-
-### Optional: Lightning CSS
-
-For faster CSS processing and automatic vendor prefixes, install Lightning CSS:
-
-```bash
-npm install lightningcss
-```
-
-Then enable in your vite.config.ts:
-
-```ts
-export default defineConfig({
-  css: { transformer: "lightningcss" },
-  plugins: [styledStatic(), react()],
-});
-```
-
-**With browser targets** for precise autoprefixing:
-
-```bash
-npm install lightningcss browserslist
-```
-
-```ts
-import browserslist from "browserslist";
-import { browserslistToTargets } from "lightningcss";
-
-export default defineConfig({
-  css: {
-    transformer: "lightningcss",
-    lightningcss: {
-      targets: browserslistToTargets(browserslist(">= 0.25%")),
-    },
-  },
-  plugins: [styledStatic(), react()],
-});
-```
-
-Lightning CSS provides:
-- Automatic vendor prefixes based on browser targets
-- CSS minification (smaller than default)
-- Faster builds than PostCSS
+Zero runtime dependencies. Uses native CSS nesting (Chrome 112+, Safari 16.5+, Firefox 117+) and Vite's CSS pipeline. See [Installation](#installation) for optional Lightning CSS integration.
 
 ---
 
 ## Comparison
 
-An honest comparison with other CSS-in-JS libraries. Each library excels in different areas—choose based on your needs.
+**Legend:** ✓ Yes | ◐ Partial | ✗ No
 
-**Legend:** ✓ Supported | ◐ Partial | ✗ Not supported | — Not applicable
+| | styled-static | Emotion | Linaria | [Restyle](https://restyle.dev) | Panda CSS |
+|-|---------------|---------|---------|--------|-----------|
+| Runtime | **~50 B** | ~11 KB | ~1.5 KB | ~2.2 KB | 0 B |
+| Dependencies | 0 | 5+ | 10+ | 0 | 5+ |
+| React | 19+ | 16+ | 16+ | 19+ | 16+ |
+| Bundler | Vite | Any | Many | Any | Any |
+| `styled.el` | ✓ | ✓ | ✓ | ✓ | ◐ |
+| `styled(Comp)` | ✓ | ✓ | ✓ | ✓ | ◐ |
+| Variants | ✓ | ◐ | ◐ | ◐ | ✓ |
+| `css` helper | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `css` inline prop | ✗ | ✓ | ✗ | ✓ | ✓ |
+| Runtime interpolation | ✗ | ✓ | ✗ | ✓ | ✗ |
+| `.className` access | ✓ | ✗ | ✗ | ✗ | ✗ |
 
-### Runtime & Build
-
-| Feature          | styled-static | Emotion        | Linaria  | Restyle  | Panda CSS |
-| ---------------- | ------------- | -------------- | -------- | -------- | --------- |
-| Runtime size     | **~50 B**     | ~11 KB         | ~1.5 KB  | ~2.2 KB  | 0 B       |
-| Zero-runtime CSS | ◐             | ✗              | ◐        | ✗        | ✓         |
-| SSR complexity   | None          | Setup required | None     | None     | None      |
-| Bundler support  | Vite only     | Any            | Many     | Any      | Any       |
-
-### API & Features
-
-| Feature               | styled-static   | Emotion  | Linaria  | Restyle    | Panda CSS  |
-| --------------------- | --------------- | -------- | -------- | ---------- | ---------- |
-| `styled.element`      | ✓               | ✓        | ✓        | ✓          | ◐ patterns |
-| `styled(Component)`   | ✓               | ✓        | ✓        | ✓          | ◐          |
-| `css` helper          | ✓               | ✓        | ✓        | ✓          | ✓          |
-| `css` prop            | ✗ by design     | ✓        | ✗        | ✓          | ✓          |
-| Variants/Recipes      | ✓               | ◐ manual | ◐ manual | ◐ manual   | ✓          |
-| `withComponent`       | ✓ build-time    | ✓        | ✗        | ✓          | ◐ manual   |
-| `.className` access   | ✓               | ✗        | ✗        | ✗          | ✗          |
-| `attrs`               | ✓               | ✓        | ✗        | —          | —          |
-| keyframes             | ✓               | ✓        | ✓        | ✓          | ✓          |
-| Global styles         | ✓               | ✓        | ✓        | ✓          | ✓          |
-| Runtime interpolation | ✗ by design     | ✓        | ✗        | ✓          | ✗          |
-
-### Theming & DX
-
-| Feature       | styled-static | Emotion  | Linaria  | Restyle    | Panda CSS  |
-| ------------- | ------------- | -------- | -------- | ---------- | ---------- |
-| CSS variables | ✓             | ✓        | ✓        | ✓          | ✓          |
-| ThemeProvider | — CSS-first   | ✓        | —        | — CSS vars | —          |
-| Design tokens | ◐ manual      | ◐ manual | ◐ manual | ◐ manual   | ✓ built-in |
-| TypeScript    | ✓ full        | ✓ full   | ✓ full   | ✓ full     | ✓ full     |
-| React version | 19+           | 16+      | 16+      | 19+        | 16+        |
-| Dependencies  | 0             | 5+       | 10+      | 0          | 5+         |
-
-### When to Choose Each
-
-- **styled-static**: You want familiar styled-components DX with zero dependencies, minimal runtime, and are on React 19+ with Vite
-- **Emotion**: You need runtime interpolation (`${props => props.color}`), ThemeProvider, or wide bundler/React version support
-- **Linaria**: You want near-zero runtime with multi-bundler support and don't need `as` prop or variants
-- **[Restyle](https://restyle.dev)**: You want runtime CSS-in-JS with `css` prop, zero config, and React 19+ Server Components support
-- **Panda CSS**: You want atomic CSS, built-in design tokens, and framework-agnostic support
+**When to choose:** styled-static for familiar DX + zero deps + React 19/Vite. Emotion for runtime interpolation + ThemeProvider. Linaria for multi-bundler zero-runtime. [Restyle](https://restyle.dev) for `css` prop + Server Components. Panda for atomic CSS + design tokens.
 
 ---
 
 ## VS Code Support
 
 For syntax highlighting in template literals, install the [vscode-styled-components](https://marketplace.visualstudio.com/items?itemName=styled-components.vscode-styled-components) extension.
+
+---
+
+## Inspiration
+
+We take inspiration from the greats before us: [Emotion](https://emotion.sh), [styled-components](https://styled-components.com), [Linaria](https://linaria.dev), [Panda CSS](https://panda-css.com), [Pigment CSS](https://github.com/mui/pigment-css), [Stitches](https://stitches.dev), [Ecsstatic](https://github.com/danielroe/ecsstatic), [Restyle](https://restyle.dev), [goober](https://goober.rocks). Thanks to each and every one for ideas and inspiration.
 
 ---
 

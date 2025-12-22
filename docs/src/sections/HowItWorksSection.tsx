@@ -3,7 +3,7 @@
  * Contains: compilation process, virtual CSS modules, runtime wrappers, bundle size
  */
 import { styled } from "styled-static";
-import { Info, Lightbulb } from "lucide-react";
+import { Lightbulb } from "lucide-react";
 import {
   Breadcrumb,
   Callout,
@@ -162,32 +162,16 @@ const GlobalStyles = () => null;`}</CodeBlock>
       <Section id="comparison">
         <Breadcrumb>Internals</Breadcrumb>
         <SubsectionTitle>Library Comparison</SubsectionTitle>
-        <Paragraph>
-          An honest comparison with other CSS-in-JS libraries. Each library
-          excels in different areas—choose based on your needs.
-        </Paragraph>
-
         <Paragraph
           style={{ fontSize: "0.875rem", color: "var(--color-text-secondary)" }}
         >
-          <strong>Legend:</strong> ✓ Supported | ◐ Partial | ✗ Not supported | —
-          Not applicable
+          <strong>Legend:</strong> ✓ Yes | ◐ Partial | ✗ No
         </Paragraph>
 
-        {/* Runtime & Build Table */}
-        <div
-          style={{
-            marginTop: "1.5rem",
-            marginBottom: "0.5rem",
-            fontWeight: 600,
-          }}
-        >
-          Runtime &amp; Build
-        </div>
         <div
           style={{
             overflowX: "auto",
-            margin: "0.5rem 0 1.5rem",
+            margin: "1rem 0 1.5rem",
             border: "1px solid var(--color-border)",
             borderRadius: "var(--radius)",
           }}
@@ -206,383 +190,116 @@ const GlobalStyles = () => null;`}</CodeBlock>
                   borderBottom: "1px solid var(--color-border)",
                 }}
               >
+                <th style={{ padding: "0.75rem", textAlign: "left" }}></th>
+                <th style={{ padding: "0.75rem", textAlign: "left" }}>styled-static</th>
+                <th style={{ padding: "0.75rem", textAlign: "left" }}>Emotion</th>
+                <th style={{ padding: "0.75rem", textAlign: "left" }}>Linaria</th>
                 <th style={{ padding: "0.75rem", textAlign: "left" }}>
-                  Feature
+                  <a href="https://restyle.dev" target="_blank" rel="noopener noreferrer" style={{ color: "var(--color-text)" }}>Restyle</a>
                 </th>
-                <th style={{ padding: "0.75rem", textAlign: "left" }}>
-                  styled-static
-                </th>
-                <th style={{ padding: "0.75rem", textAlign: "left" }}>
-                  Emotion
-                </th>
-                <th style={{ padding: "0.75rem", textAlign: "left" }}>
-                  Linaria
-                </th>
-                <th style={{ padding: "0.75rem", textAlign: "left" }}>
-                  <a
-                    href="https://restyle.dev"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ color: "var(--color-text)" }}
-                  >
-                    Restyle
-                  </a>
-                </th>
-                <th style={{ padding: "0.75rem", textAlign: "left" }}>
-                  Panda CSS
-                </th>
+                <th style={{ padding: "0.75rem", textAlign: "left" }}>Panda CSS</th>
               </tr>
             </thead>
             <tbody>
-              <tr
-                style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
-              >
-                <td style={{ padding: "0.75rem" }}>Runtime size</td>
-                <td
-                  style={{ padding: "0.75rem", color: "var(--color-primary)" }}
-                >
-                  ~50 B
-                </td>
+              <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
+                <td style={{ padding: "0.75rem" }}>Runtime</td>
+                <td style={{ padding: "0.75rem", color: "var(--color-primary)" }}><strong>~50 B</strong></td>
                 <td style={{ padding: "0.75rem" }}>~11 KB</td>
                 <td style={{ padding: "0.75rem" }}>~1.5 KB</td>
                 <td style={{ padding: "0.75rem" }}>~2.2 KB</td>
                 <td style={{ padding: "0.75rem" }}>0 B</td>
               </tr>
-              <tr
-                style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
-              >
-                <td style={{ padding: "0.75rem" }}>Zero-runtime CSS</td>
-                <td style={{ padding: "0.75rem" }}>◐</td>
-                <td style={{ padding: "0.75rem" }}>✗</td>
-                <td style={{ padding: "0.75rem" }}>◐</td>
-                <td style={{ padding: "0.75rem" }}>✗</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-              </tr>
-              <tr
-                style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
-              >
-                <td style={{ padding: "0.75rem" }}>SSR complexity</td>
-                <td style={{ padding: "0.75rem" }}>None</td>
-                <td style={{ padding: "0.75rem" }}>Setup required</td>
-                <td style={{ padding: "0.75rem" }}>None</td>
-                <td style={{ padding: "0.75rem" }}>None</td>
-                <td style={{ padding: "0.75rem" }}>None</td>
-              </tr>
-              <tr>
-                <td style={{ padding: "0.75rem" }}>Bundler support</td>
-                <td style={{ padding: "0.75rem" }}>Vite only</td>
-                <td style={{ padding: "0.75rem" }}>Any</td>
-                <td style={{ padding: "0.75rem" }}>Many</td>
-                <td style={{ padding: "0.75rem" }}>Any</td>
-                <td style={{ padding: "0.75rem" }}>Any</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        {/* API & Features Table */}
-        <div
-          style={{
-            marginTop: "1.5rem",
-            marginBottom: "0.5rem",
-            fontWeight: 600,
-          }}
-        >
-          API &amp; Features
-        </div>
-        <div
-          style={{
-            overflowX: "auto",
-            margin: "0.5rem 0 1.5rem",
-            border: "1px solid var(--color-border)",
-            borderRadius: "var(--radius)",
-          }}
-        >
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: "0.875rem",
-            }}
-          >
-            <thead>
-              <tr
-                style={{
-                  background: "var(--color-bg-sidebar)",
-                  borderBottom: "1px solid var(--color-border)",
-                }}
-              >
-                <th style={{ padding: "0.75rem", textAlign: "left" }}>
-                  Feature
-                </th>
-                <th style={{ padding: "0.75rem", textAlign: "left" }}>
-                  styled-static
-                </th>
-                <th style={{ padding: "0.75rem", textAlign: "left" }}>
-                  Emotion
-                </th>
-                <th style={{ padding: "0.75rem", textAlign: "left" }}>
-                  Linaria
-                </th>
-                <th style={{ padding: "0.75rem", textAlign: "left" }}>
-                  Restyle
-                </th>
-                <th style={{ padding: "0.75rem", textAlign: "left" }}>
-                  Panda CSS
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
-              >
-                <td style={{ padding: "0.75rem" }}>
-                  <InlineCode>styled.element</InlineCode>
-                </td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-                <td style={{ padding: "0.75rem" }}>◐ patterns</td>
-              </tr>
-              <tr
-                style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
-              >
-                <td style={{ padding: "0.75rem" }}>
-                  <InlineCode>styled(Component)</InlineCode>
-                </td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-                <td style={{ padding: "0.75rem" }}>◐</td>
-              </tr>
-              <tr
-                style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
-              >
-                <td style={{ padding: "0.75rem" }}>
-                  <InlineCode>css</InlineCode> helper
-                </td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-              </tr>
-              <tr
-                style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
-              >
-                <td style={{ padding: "0.75rem" }}>
-                  <InlineCode>css</InlineCode> prop
-                </td>
-                <td style={{ padding: "0.75rem" }}>✗ by design</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-                <td style={{ padding: "0.75rem" }}>✗</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-              </tr>
-              <tr
-                style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
-              >
-                <td style={{ padding: "0.75rem" }}>Variants/Recipes</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-                <td style={{ padding: "0.75rem" }}>◐ manual</td>
-                <td style={{ padding: "0.75rem" }}>◐ manual</td>
-                <td style={{ padding: "0.75rem" }}>◐ manual</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-              </tr>
-              <tr
-                style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
-              >
-                <td style={{ padding: "0.75rem" }}>
-                  <InlineCode>as</InlineCode> prop
-                </td>
-                <td style={{ padding: "0.75rem" }}>✗ withComponent</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-                <td style={{ padding: "0.75rem" }}>✗</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-                <td style={{ padding: "0.75rem" }}>◐ manual</td>
-              </tr>
-              <tr
-                style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
-              >
-                <td style={{ padding: "0.75rem" }}>
-                  <InlineCode>attrs</InlineCode>
-                </td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-                <td style={{ padding: "0.75rem" }}>✗</td>
-                <td style={{ padding: "0.75rem" }}>—</td>
-                <td style={{ padding: "0.75rem" }}>—</td>
-              </tr>
-              <tr
-                style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
-              >
-                <td style={{ padding: "0.75rem" }}>Runtime interpolation</td>
-                <td style={{ padding: "0.75rem" }}>✗ by design</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-                <td style={{ padding: "0.75rem" }}>✗</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-                <td style={{ padding: "0.75rem" }}>✗</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        {/* Theming & DX Table */}
-        <div
-          style={{
-            marginTop: "1.5rem",
-            marginBottom: "0.5rem",
-            fontWeight: 600,
-          }}
-        >
-          Theming &amp; DX
-        </div>
-        <div
-          style={{
-            overflowX: "auto",
-            margin: "0.5rem 0 1.5rem",
-            border: "1px solid var(--color-border)",
-            borderRadius: "var(--radius)",
-          }}
-        >
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: "0.875rem",
-            }}
-          >
-            <thead>
-              <tr
-                style={{
-                  background: "var(--color-bg-sidebar)",
-                  borderBottom: "1px solid var(--color-border)",
-                }}
-              >
-                <th style={{ padding: "0.75rem", textAlign: "left" }}>
-                  Feature
-                </th>
-                <th style={{ padding: "0.75rem", textAlign: "left" }}>
-                  styled-static
-                </th>
-                <th style={{ padding: "0.75rem", textAlign: "left" }}>
-                  Emotion
-                </th>
-                <th style={{ padding: "0.75rem", textAlign: "left" }}>
-                  Linaria
-                </th>
-                <th style={{ padding: "0.75rem", textAlign: "left" }}>
-                  Restyle
-                </th>
-                <th style={{ padding: "0.75rem", textAlign: "left" }}>
-                  Panda CSS
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
-              >
-                <td style={{ padding: "0.75rem" }}>CSS variables</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-              </tr>
-              <tr
-                style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
-              >
-                <td style={{ padding: "0.75rem" }}>ThemeProvider</td>
-                <td style={{ padding: "0.75rem" }}>— CSS-first</td>
-                <td style={{ padding: "0.75rem" }}>✓</td>
-                <td style={{ padding: "0.75rem" }}>—</td>
-                <td style={{ padding: "0.75rem" }}>— CSS vars</td>
-                <td style={{ padding: "0.75rem" }}>—</td>
-              </tr>
-              <tr
-                style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
-              >
-                <td style={{ padding: "0.75rem" }}>Design tokens</td>
-                <td style={{ padding: "0.75rem" }}>◐ manual</td>
-                <td style={{ padding: "0.75rem" }}>◐ manual</td>
-                <td style={{ padding: "0.75rem" }}>◐ manual</td>
-                <td style={{ padding: "0.75rem" }}>◐ manual</td>
-                <td style={{ padding: "0.75rem" }}>✓ built-in</td>
-              </tr>
-              <tr
-                style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
-              >
-                <td style={{ padding: "0.75rem" }}>TypeScript</td>
-                <td style={{ padding: "0.75rem" }}>✓ full</td>
-                <td style={{ padding: "0.75rem" }}>✓ full</td>
-                <td style={{ padding: "0.75rem" }}>✓ full</td>
-                <td style={{ padding: "0.75rem" }}>✓ full</td>
-                <td style={{ padding: "0.75rem" }}>✓ full</td>
-              </tr>
-              <tr
-                style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
-              >
-                <td style={{ padding: "0.75rem" }}>React version</td>
-                <td style={{ padding: "0.75rem" }}>19+</td>
-                <td style={{ padding: "0.75rem" }}>16+</td>
-                <td style={{ padding: "0.75rem" }}>16+</td>
-                <td style={{ padding: "0.75rem" }}>19+</td>
-                <td style={{ padding: "0.75rem" }}>16+</td>
-              </tr>
-              <tr>
+              <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
                 <td style={{ padding: "0.75rem" }}>Dependencies</td>
-                <td
-                  style={{ padding: "0.75rem", color: "var(--color-primary)" }}
-                >
-                  0
-                </td>
+                <td style={{ padding: "0.75rem", color: "var(--color-primary)" }}>0</td>
                 <td style={{ padding: "0.75rem" }}>5+</td>
                 <td style={{ padding: "0.75rem" }}>10+</td>
                 <td style={{ padding: "0.75rem" }}>0</td>
                 <td style={{ padding: "0.75rem" }}>5+</td>
               </tr>
+              <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
+                <td style={{ padding: "0.75rem" }}>React</td>
+                <td style={{ padding: "0.75rem" }}>19+</td>
+                <td style={{ padding: "0.75rem" }}>16+</td>
+                <td style={{ padding: "0.75rem" }}>16+</td>
+                <td style={{ padding: "0.75rem" }}>19+</td>
+                <td style={{ padding: "0.75rem" }}>16+</td>
+              </tr>
+              <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
+                <td style={{ padding: "0.75rem" }}>Bundler</td>
+                <td style={{ padding: "0.75rem" }}>Vite</td>
+                <td style={{ padding: "0.75rem" }}>Any</td>
+                <td style={{ padding: "0.75rem" }}>Many</td>
+                <td style={{ padding: "0.75rem" }}>Any</td>
+                <td style={{ padding: "0.75rem" }}>Any</td>
+              </tr>
+              <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
+                <td style={{ padding: "0.75rem" }}><InlineCode>styled.el</InlineCode></td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>◐</td>
+              </tr>
+              <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
+                <td style={{ padding: "0.75rem" }}><InlineCode>styled(Comp)</InlineCode></td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>◐</td>
+              </tr>
+              <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
+                <td style={{ padding: "0.75rem" }}>Variants</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>◐</td>
+                <td style={{ padding: "0.75rem" }}>◐</td>
+                <td style={{ padding: "0.75rem" }}>◐</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
+              </tr>
+              <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
+                <td style={{ padding: "0.75rem" }}><InlineCode>css</InlineCode> helper</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
+              </tr>
+              <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
+                <td style={{ padding: "0.75rem" }}><InlineCode>css</InlineCode> inline prop</td>
+                <td style={{ padding: "0.75rem" }}>✗</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>✗</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
+              </tr>
+              <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
+                <td style={{ padding: "0.75rem" }}>Runtime interpolation</td>
+                <td style={{ padding: "0.75rem" }}>✗</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>✗</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>✗</td>
+              </tr>
+              <tr>
+                <td style={{ padding: "0.75rem" }}><InlineCode>.className</InlineCode> access</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>✗</td>
+                <td style={{ padding: "0.75rem" }}>✗</td>
+                <td style={{ padding: "0.75rem" }}>✗</td>
+                <td style={{ padding: "0.75rem" }}>✗</td>
+              </tr>
             </tbody>
           </table>
         </div>
 
-        <Callout type="note" icon={<Info size={20} />}>
-          <strong>When to choose each:</strong>
-          <ul style={{ margin: "0.5rem 0 0", paddingLeft: "1.25rem" }}>
-            <li>
-              <strong>styled-static</strong> — Familiar styled-components DX,
-              zero deps, minimal runtime, React 19+ with Vite
-            </li>
-            <li>
-              <strong>Emotion</strong> — Runtime interpolation, ThemeProvider,
-              wide bundler/React support
-            </li>
-            <li>
-              <strong>Linaria</strong> — Near-zero runtime, multi-bundler, don't need{" "}
-              <InlineCode>as</InlineCode> prop or variants
-            </li>
-            <li>
-              <strong>
-                <a
-                  href="https://restyle.dev"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: "inherit" }}
-                >
-                  Restyle
-                </a>
-              </strong>{" "}
-              — Runtime CSS-in-JS with <InlineCode>css</InlineCode> prop, zero
-              config, React 19+ Server Components
-            </li>
-            <li>
-              <strong>Panda CSS</strong> — Atomic CSS, built-in design tokens,
-              framework-agnostic
-            </li>
-          </ul>
-        </Callout>
+        <Paragraph style={{ color: "var(--color-text-secondary)" }}>
+          <strong>When to choose:</strong> styled-static for familiar DX + zero deps + React 19/Vite.
+          Emotion for runtime interpolation + ThemeProvider.
+          Linaria for multi-bundler zero-runtime.{" "}
+          <a href="https://restyle.dev" target="_blank" rel="noopener noreferrer">Restyle</a> for <InlineCode>css</InlineCode> prop + Server Components.
+          Panda for atomic CSS + design tokens.
+        </Paragraph>
       </Section>
 
       {/* Component Extensions */}

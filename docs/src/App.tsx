@@ -7,7 +7,6 @@ import {
   Globe,
   HeartCrack,
   Info,
-  Lightbulb,
   Moon,
   Palette,
   PartyPopper,
@@ -708,10 +707,10 @@ const sections: SectionInfo[] = [
     keywords: ["global", "createGlobalStyle", "reset", "root"],
   },
   {
-    id: "as-prop",
-    title: "Polymorphic as Prop",
+    id: "polymorphism",
+    title: "Polymorphism",
     group: "Features",
-    keywords: ["as", "polymorphic", "element", "render"],
+    keywords: ["as", "polymorphic", "element", "render", "withComponent", "className"],
   },
   {
     id: "nesting",
@@ -750,16 +749,10 @@ const sections: SectionInfo[] = [
     keywords: ["runtime", "wrapper", "component", "size"],
   },
   {
-    id: "bundle-size",
-    title: "Bundle Size Comparison",
-    group: "Internals",
-    keywords: ["bundle", "size", "comparison", "emotion", "styled-components"],
-  },
-  {
     id: "comparison",
     title: "Library Comparison",
     group: "Internals",
-    keywords: ["comparison", "emotion", "linaria", "panda", "css-in-js", "alternatives"],
+    keywords: ["comparison", "bundle", "size", "emotion", "linaria", "panda", "css-in-js", "alternatives"],
   },
 ];
 
@@ -979,8 +972,8 @@ export function App() {
               <Breadcrumb>Getting Started</Breadcrumb>
               <SectionTitle>Quick Overview</SectionTitle>
               <Paragraph>
-                All the APIs you need at a glance. styled-static provides 6 core
-                functions that cover most CSS-in-JS use cases:
+                All the APIs you need at a glance. styled-static provides 10
+                core functions that cover most CSS-in-JS use cases:
               </Paragraph>
               <CodeBlock>{`// Style elements
 const Button = styled.button\`padding: 0.5rem 1rem;\`;
@@ -997,12 +990,28 @@ const GlobalStyle = createGlobalStyle\`* { box-sizing: border-box; }\`;
 // Scoped keyframes
 const spin = keyframes\`from { transform: rotate(0deg); } to { transform: rotate(360deg); }\`;
 
-// Type-safe variants
+// Type-safe component variants
 const Btn = styledVariants({
   component: 'button',
   css: css\`padding: 0.5rem;\`,
-  variants: { size: { sm: css\`font-size: 0.875rem;\`, lg: css\`font-size: 1.125rem;\` } }
-});`}</CodeBlock>
+  variants: { size: { sm: css\`font-size: 0.875rem;\` } }
+});
+
+// Type-safe class variants
+const badge = cssVariants({
+  css: css\`padding: 0.25rem;\`,
+  variants: { color: { blue: css\`background: #e0f2fe;\` } }
+});
+<span className={badge({ color: 'blue' })}>Info</span>
+
+// Combine classes conditionally
+<div className={cx('base', isActive && activeClass)} />
+
+// Default attributes
+const Input = styled.input.attrs({ type: 'password' })\`padding: 0.5rem;\`;
+
+// Polymorphism
+const LinkButton = withComponent(Link, Button);`}</CodeBlock>
             </Section>
 
             {/* Why styled-static? */}
@@ -1015,10 +1024,9 @@ const Btn = styledVariants({
                   <Globe size={20} />
                 </CalloutIcon>
                 <CalloutContent>
-                  <strong>CSS & browsers have evolved.</strong> Native CSS
-                  nesting, CSS variables, container queries, and fewer vendor
-                  prefixes mean the gap between CSS and CSS-in-JS has never been
-                  smaller.
+                  <strong>CSS evolved.</strong> Native nesting, CSS variables,
+                  container queries—the gap between CSS and CSS-in-JS is smaller
+                  than ever.
                 </CalloutContent>
               </div>
 
@@ -1027,9 +1035,8 @@ const Btn = styledVariants({
                   <HeartCrack size={20} />
                 </CalloutIcon>
                 <CalloutContent>
-                  <strong>CSS-in-JS fatigue is real.</strong> Most libraries are
-                  now obsolete, overly complex, or have large runtime overhead.
-                  The ecosystem needs simpler solutions.
+                  <strong>CSS-in-JS fatigue.</strong> Most libraries are
+                  obsolete, complex, or have large runtime overhead.
                 </CalloutContent>
               </div>
 
@@ -1038,21 +1045,8 @@ const Btn = styledVariants({
                   <Sparkles size={20} />
                 </CalloutIcon>
                 <CalloutContent>
-                  <strong>Static CSS, minimal runtime.</strong> CSS generation happens
-                  at build time (zero runtime cost). A minimal runtime handles
-                  dynamic features like <InlineCode>as</InlineCode> prop polymorphism
-                  and className merging.
-                </CalloutContent>
-              </div>
-
-              <div className={calloutStyles({ type: "tip" })}>
-                <CalloutIcon>
-                  <Sparkles size={20} />
-                </CalloutIcon>
-                <CalloutContent>
-                  <strong>Syntactic sugar over CSS modules.</strong> Most
-                  projects don't need runtime interpolation. They need a better
-                  DX for writing and organizing CSS.
+                  <strong>Syntactic sugar over CSS modules.</strong> Better DX
+                  for writing CSS, without runtime interpolation.
                 </CalloutContent>
               </div>
 
@@ -1061,9 +1055,8 @@ const Btn = styledVariants({
                   <Shield size={20} />
                 </CalloutIcon>
                 <CalloutContent>
-                  <strong>Supply chain security matters.</strong> Zero
-                  dependencies means a minimal attack surface. No transitive
-                  dependencies to audit or worry about.
+                  <strong>Zero dependencies.</strong> Minimal attack surface.
+                  Nothing to audit.
                 </CalloutContent>
               </div>
 
@@ -1072,9 +1065,8 @@ const Btn = styledVariants({
                   <Target size={20} />
                 </CalloutIcon>
                 <CalloutContent>
-                  <strong>Intentionally simple.</strong> 95% native browser
-                  foundation + 5% sprinkles on top. We leverage what browsers
-                  already do well.
+                  <strong>Intentionally simple.</strong> 95% native browser + 5%
+                  sprinkles.
                 </CalloutContent>
               </div>
 
@@ -1083,8 +1075,7 @@ const Btn = styledVariants({
                   <PartyPopper size={20} />
                 </CalloutIcon>
                 <CalloutContent>
-                  <strong>Built for fun.</strong> Sometimes the best projects
-                  come from curiosity and the joy of building something useful.
+                  <strong>Built for fun.</strong> Curiosity-driven, useful code.
                 </CalloutContent>
               </div>
             </Section>
@@ -1093,21 +1084,15 @@ const Btn = styledVariants({
             <Section id="what-we-dont-do">
               <Breadcrumb>Getting Started</Breadcrumb>
               <SectionTitle>What We Don't Do</SectionTitle>
-              <Paragraph>
-                styled-static is intentionally limited. Here's what we don't
-                support—and why:
-              </Paragraph>
 
               <div className={calloutStyles({ type: "warning" })}>
                 <CalloutIcon>
                   <Ban size={20} />
                 </CalloutIcon>
                 <CalloutContent>
-                  <strong>No runtime interpolation.</strong> You can't write{" "}
-                  <InlineCode>{`\${props => props.color}`}</InlineCode>. CSS is
-                  extracted at build time, so values must be static. Use CSS
-                  variables, data attributes, or the Variants API for dynamic
-                  styles.
+                  <strong>No runtime interpolation</strong> — Can't write{" "}
+                  <InlineCode>{`\${props => props.color}`}</InlineCode>. Use
+                  variants, CSS variables, or data attributes.
                 </CalloutContent>
               </div>
 
@@ -1116,9 +1101,8 @@ const Btn = styledVariants({
                   <Atom size={20} />
                 </CalloutIcon>
                 <CalloutContent>
-                  <strong>React 19+ only.</strong> We rely on automatic ref
-                  forwarding instead of <InlineCode>forwardRef</InlineCode>.
-                  This keeps the runtime tiny but requires React 19.
+                  <strong>React 19+ only</strong> — Uses automatic ref
+                  forwarding (no <InlineCode>forwardRef</InlineCode>).
                 </CalloutContent>
               </div>
 
@@ -1127,23 +1111,15 @@ const Btn = styledVariants({
                   <Zap size={20} />
                 </CalloutIcon>
                 <CalloutContent>
-                  <strong>Vite only.</strong> The plugin uses Vite's built-in
-                  AST parser and virtual module system. No Webpack, Rollup, or
-                  other bundler support.
+                  <strong>Vite only</strong> — Uses Vite's AST parser and
+                  virtual modules. No Webpack/Rollup.
                 </CalloutContent>
               </div>
 
-              <div className={calloutStyles({ type: "tip" })}>
-                <CalloutIcon>
-                  <Lightbulb size={20} />
-                </CalloutIcon>
-                <CalloutContent>
-                  <strong>Why these constraints?</strong> Each limitation
-                  removes complexity. No runtime interpolation means no runtime
-                  CSS parsing. React 19 means no forwardRef wrapper. Vite-only
-                  means one excellent integration instead of many mediocre ones.
-                </CalloutContent>
-              </div>
+              <Paragraph style={{ marginTop: "1rem", color: "var(--color-text-secondary)" }}>
+                Each constraint removes complexity—no CSS parsing, no
+                forwardRef, one great integration.
+              </Paragraph>
             </Section>
 
             {/* Installation */}
