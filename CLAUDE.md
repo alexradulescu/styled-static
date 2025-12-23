@@ -90,8 +90,8 @@ const Button = styled.button`
 
 ```tsx
 import { createElement } from "react";
-import { m } from "styled-static/runtime";
-import "styled-static:abc123-0.css";
+import { m } from "@alex.radulescu/styled-static/runtime";
+import "@alex.radulescu/styled-static:abc123-0.css";
 
 const Button = Object.assign(
   (p) => createElement("button", {...p, className: m("ss-abc123", p.className)}),

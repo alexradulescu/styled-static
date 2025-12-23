@@ -37,7 +37,7 @@ All CSS must be static. Use alternatives below for dynamic styling.
 
 Create styled components:
 ```tsx
-import { styled } from 'styled-static';
+import { styled } from '@alex.radulescu/styled-static';
 
 // HTML elements
 const Button = styled.button`
@@ -81,7 +81,7 @@ const SubmitButton = styled.button.attrs({
 
 Create polymorphic components at build time:
 ```tsx
-import { styled, withComponent } from 'styled-static';
+import { styled, withComponent } from '@alex.radulescu/styled-static';
 import { Link } from 'react-router-dom';
 
 const Button = styled.button`padding: 1rem;`;
@@ -100,7 +100,7 @@ const AnchorButton = withComponent('a', Button);
 
 Get a scoped class string:
 ```tsx
-import { css } from 'styled-static';
+import { css } from '@alex.radulescu/styled-static';
 
 const activeClass = css`
   outline: 2px solid blue;
@@ -113,7 +113,7 @@ const activeClass = css`
 
 Inject global CSS (renders null, CSS via import):
 ```tsx
-import { createGlobalStyle } from 'styled-static';
+import { createGlobalStyle } from '@alex.radulescu/styled-static';
 
 const GlobalStyle = createGlobalStyle`
   * { box-sizing: border-box; }
@@ -128,7 +128,7 @@ const GlobalStyle = createGlobalStyle`
 
 Create scoped animation names:
 ```tsx
-import { styled, keyframes } from 'styled-static';
+import { styled, keyframes } from '@alex.radulescu/styled-static';
 
 const spin = keyframes`
   from { transform: rotate(0deg); }
@@ -144,7 +144,7 @@ const Spinner = styled.div`
 
 Component with variant props:
 ```tsx
-import { styledVariants, css } from 'styled-static';
+import { styledVariants, css } from '@alex.radulescu/styled-static';
 
 const Button = styledVariants({
   component: 'button',
@@ -169,7 +169,7 @@ const Button = styledVariants({
 
 Function that returns class strings (not a component):
 ```tsx
-import { cssVariants, css } from 'styled-static';
+import { cssVariants, css } from '@alex.radulescu/styled-static';
 
 const buttonClass = cssVariants({
   css: css`padding: 0.5rem 1rem;`,
@@ -185,7 +185,7 @@ const buttonClass = cssVariants({
 
 Conditionally join class names. Intentionally flat (no nested arrays/objects) for minimal bundle size:
 ```tsx
-import { cx, css } from 'styled-static';
+import { cx, css } from '@alex.radulescu/styled-static';
 
 cx('base', 'active')                    // → "base active"
 cx('btn', isActive && activeClass)      // → "btn ss-abc123" or "btn"
@@ -207,7 +207,7 @@ const disabled = css`opacity: 0.5;`;
 ### Theme Helpers
 
 ```tsx
-import { initTheme, getTheme, setTheme, onSystemThemeChange } from 'styled-static';
+import { initTheme, getTheme, setTheme, onSystemThemeChange } from '@alex.radulescu/styled-static';
 
 // On app init - checks localStorage, then system pref, then default
 initTheme({ useSystemPreference: true });
@@ -310,7 +310,7 @@ Not compatible with Webpack, Rollup, Parcel, or other bundlers.
 ### 4. Plugin Order Matters
 ```ts
 // vite.config.ts
-import { styledStatic } from 'styled-static/vite';
+import { styledStatic } from '@alex.radulescu/styled-static/vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({

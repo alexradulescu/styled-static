@@ -126,7 +126,7 @@ const LinkButton = withComponent(Link, Button);
 - [Quick Overview](#quick-overview) · [Why](#why-styled-static) · [What We Don't Do](#what-we-dont-do) · [Installation](#installation)
 - **API:** [styled](#styled) · [Extension](#component-extension) · [css](#css-helper) · [keyframes](#keyframes) · [attrs](#attrs) · [cx](#cx-utility) · [Global Styles](#global-styles) · [Variants](#variants-api)
 - **Features:** [Polymorphism](#polymorphism-with-withcomponent) · [.className](#manual-composition-with-classname) · [CSS Nesting](#css-nesting) · [Dynamic Styling](#dynamic-styling) · [Theming](#theming)
-- **Internals:** [How It Works](#how-it-works) · [Config](#configuration) · [TypeScript](#typescript) · [Zero Deps](#zero-dependencies) · [Comparison](#comparison)
+- **Internals:** [Troubleshooting](#troubleshooting) · [How It Works](#how-it-works) · [Config](#configuration) · [TypeScript](#typescript) · [Zero Deps](#zero-dependencies) · [Comparison](#comparison)
 
 ---
 
@@ -156,9 +156,9 @@ Each constraint removes complexity—no CSS parsing, no forwardRef, one great in
 ## Installation
 
 ```bash
-npm install styled-static
+npm install @alex.radulescu/styled-static
 # or
-bun add styled-static
+bun add @alex.radulescu/styled-static
 ```
 
 Configure the Vite plugin:
@@ -166,7 +166,7 @@ Configure the Vite plugin:
 ```ts
 // vite.config.ts
 import react from "@vitejs/plugin-react";
-import { styledStatic } from "styled-static/vite";
+import { styledStatic } from "@alex.radulescu/styled-static/vite";
 import { defineConfig } from "vite";
 
 export default defineConfig({
@@ -185,7 +185,7 @@ export default defineConfig({
 Create styled React components:
 
 ```tsx
-import { styled } from "styled-static";
+import { styled } from "@alex.radulescu/styled-static";
 
 const Button = styled.button`
   padding: 0.5rem 1rem;
@@ -244,7 +244,7 @@ When components are extended, classes are ordered correctly:
 Get a scoped class name for mixing with other classes:
 
 ```tsx
-import { css } from 'styled-static';
+import { css } from '@alex.radulescu/styled-static';
 
 const activeClass = css`
   outline: 2px solid blue;
@@ -270,7 +270,7 @@ const highlightClass = css`
 Create scoped keyframe animations. The animation name is hashed to avoid conflicts between components:
 
 ```tsx
-import { keyframes, styled } from "styled-static";
+import { keyframes, styled } from "@alex.radulescu/styled-static";
 
 const spin = keyframes`
   from { transform: rotate(0deg); }
@@ -327,7 +327,7 @@ const SubmitButton = styled.button.attrs({
 Combine class names conditionally. Intentionally flat (no nested arrays/objects) for minimal bundle size:
 
 ```tsx
-import { css, cx } from 'styled-static';
+import { css, cx } from '@alex.radulescu/styled-static';
 
 const activeClass = css`color: blue;`;
 
@@ -339,7 +339,7 @@ cx('a', null, undefined, false, 'b')    // → "a b"
 ### Global Styles
 
 ```tsx
-import { createGlobalStyle } from "styled-static";
+import { createGlobalStyle } from "@alex.radulescu/styled-static";
 
 const GlobalStyle = createGlobalStyle`
   * {
@@ -376,7 +376,7 @@ For type-safe variant handling, use `styledVariants` to create components with v
 #### styledVariants
 
 ```tsx
-import { css, styledVariants } from "styled-static";
+import { css, styledVariants } from "@alex.radulescu/styled-static";
 
 const Button = styledVariants({
   component: "button",
@@ -406,7 +406,7 @@ const Button = styledVariants({
 #### cssVariants
 
 ```tsx
-import { cssVariants, css, cx } from 'styled-static';
+import { cssVariants, css, cx } from '@alex.radulescu/styled-static';
 
 // With css`` for syntax highlighting (recommended)
 const badgeCss = cssVariants({
@@ -444,7 +444,7 @@ Render one component with another's styles using `withComponent`:
 
 ```tsx
 import { Link } from "react-router-dom";
-import { styled, withComponent } from "styled-static";
+import { styled, withComponent } from "@alex.radulescu/styled-static";
 
 const Button = styled.button`
   padding: 0.5rem 1rem;
@@ -558,7 +558,7 @@ const Card = styled.div`
 ### Theme Helpers
 
 ```tsx
-import { initTheme, setTheme, getTheme, onSystemThemeChange } from "styled-static";
+import { initTheme, setTheme, getTheme, onSystemThemeChange } from "@alex.radulescu/styled-static";
 
 // Initialize (reads localStorage → system preference → default)
 initTheme({ defaultTheme: "light", useSystemPreference: true });
@@ -585,6 +585,38 @@ const unsub = onSystemThemeChange((prefersDark) => {
 
 ---
 
+## Troubleshooting
+
+### Storybook: "This package is ESM only"
+
+If you see this error when using styled-static with Storybook:
+
+```
+Failed to resolve "@alex.radulescu/styled-static/vite".
+This package is ESM only but it was tried to load by `require`.
+```
+
+Add the package to Vite's `optimizeDeps.include` in your Storybook config:
+
+```ts
+// .storybook/main.ts
+export default {
+  // ... other config
+  viteFinal: async (config) => {
+    config.optimizeDeps = config.optimizeDeps || {};
+    config.optimizeDeps.include = [
+      ...(config.optimizeDeps.include || []),
+      '@alex.radulescu/styled-static',
+    ];
+    return config;
+  },
+};
+```
+
+This is a known limitation with ESM-only packages in Storybook's esbuild-based config loading.
+
+---
+
 ## How It Works
 
 styled-static uses a Vite plugin to transform your styled components at build time. Here's what happens under the hood:
@@ -595,7 +627,7 @@ When you write a styled component, the Vite plugin intercepts your code and perf
 
 ```tsx
 // 1. What you write:
-import { styled } from "styled-static";
+import { styled } from "@alex.radulescu/styled-static";
 
 const Button = styled.button`
   padding: 1rem;
@@ -605,8 +637,8 @@ const Button = styled.button`
 
 // 2. What gets generated:
 import { createElement } from "react";
-import { m } from "styled-static/runtime";
-import "styled-static:abc123-0.css";
+import { m } from "@alex.radulescu/styled-static/runtime";
+import "@alex.radulescu/styled-static:abc123-0.css";
 
 const Button = Object.assign(
   (p) => createElement("button", {...p, className: m("ss-abc123", p.className)}),

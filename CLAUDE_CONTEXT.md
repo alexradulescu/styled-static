@@ -108,7 +108,7 @@ styled-static/
 **Input:**
 
 ```tsx
-import { createGlobalStyle, css, styled } from "styled-static";
+import { createGlobalStyle, css, styled } from "@alex.radulescu/styled-static";
 
 const Button = styled.button`
   padding: 1rem;
@@ -135,11 +135,11 @@ const GlobalStyle = createGlobalStyle`
 **Output:**
 
 ```tsx
-import { __GlobalStyle, __styled, __styledExtend } from "styled-static/runtime";
-import "styled-static:abc123-0.css";
-import "styled-static:abc123-1.css";
-import "styled-static:abc123-2.css";
-import "styled-static:abc123-3.css";
+import { __GlobalStyle, __styled, __styledExtend } from "@alex.radulescu/styled-static/runtime";
+import "@alex.radulescu/styled-static:abc123-0.css";
+import "@alex.radulescu/styled-static:abc123-1.css";
+import "@alex.radulescu/styled-static:abc123-2.css";
+import "@alex.radulescu/styled-static:abc123-3.css";
 
 const Button = __styled("button", "ss-abc123", "Button");
 const Primary = __styledExtend(Button, "ss-def456", "Primary");
@@ -233,7 +233,7 @@ const GlobalStyle = createGlobalStyle`
 ```ts
 // vite.config.ts
 import react from "@vitejs/plugin-react";
-import { styledStatic } from "styled-static/vite";
+import { styledStatic } from "@alex.radulescu/styled-static/vite";
 import { defineConfig } from "vite";
 
 export default defineConfig({

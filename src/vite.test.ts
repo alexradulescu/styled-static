@@ -101,7 +101,7 @@ describe("file filtering", () => {
   });
 
   it("should skip node_modules", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Button = styled.button\`padding: 1rem;\`;`;
     const result = await transform(
       plugin,
@@ -119,28 +119,28 @@ const Component = () => <div>Hello</div>;`;
   });
 
   it("should process .tsx files with styled-static import", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Button = styled.button\`padding: 1rem;\`;`;
     const result = await transform(plugin, code, "/src/Button.tsx");
     expect(result).not.toBeNull();
   });
 
   it("should process .jsx files", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Button = styled.button\`padding: 1rem;\`;`;
     const result = await transform(plugin, code, "/src/Button.jsx");
     expect(result).not.toBeNull();
   });
 
   it("should process .ts files", async () => {
-    const code = `import { css } from 'styled-static';
+    const code = `import { css } from '@alex.radulescu/styled-static';
 const buttonClass = css\`padding: 1rem;\`;`;
     const result = await transform(plugin, code, "/src/styles.ts");
     expect(result).not.toBeNull();
   });
 
   it("should process .js files", async () => {
-    const code = `import { css } from 'styled-static';
+    const code = `import { css } from '@alex.radulescu/styled-static';
 const buttonClass = css\`padding: 1rem;\`;`;
     const result = await transform(plugin, code, "/src/styles.js");
     expect(result).not.toBeNull();
@@ -160,7 +160,7 @@ describe("styled.element transformation", () => {
   });
 
   it("should transform styled.button", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Button = styled.button\`
   padding: 1rem;
   color: red;
@@ -169,13 +169,13 @@ const Button = styled.button\`
 
     expect(result).not.toBeNull();
     expect(result?.code).toContain('import { createElement } from "react"');
-    expect(result?.code).toContain('import { m } from "styled-static/runtime"');
+    expect(result?.code).toContain('import { m } from "@alex.radulescu/styled-static/runtime"');
     expect(result?.code).toContain('createElement("button"');
     expect(result?.code).toContain('import "virtual:styled-static/');
   });
 
   it("should transform styled.div", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Container = styled.div\`max-width: 1280px;\`;`;
     const result = await transform(plugin, code, "/test.tsx");
 
@@ -183,7 +183,7 @@ const Container = styled.div\`max-width: 1280px;\`;`;
   });
 
   it("should transform styled.a", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Link = styled.a\`color: blue;\`;`;
     const result = await transform(plugin, code, "/test.tsx");
 
@@ -191,7 +191,7 @@ const Link = styled.a\`color: blue;\`;`;
   });
 
   it("should transform styled.input", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Input = styled.input\`padding: 0.5rem;\`;`;
     const result = await transform(plugin, code, "/test.tsx");
 
@@ -199,7 +199,7 @@ const Input = styled.input\`padding: 0.5rem;\`;`;
   });
 
   it("should transform styled.span", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Text = styled.span\`font-weight: bold;\`;`;
     const result = await transform(plugin, code, "/test.tsx");
 
@@ -207,7 +207,7 @@ const Text = styled.span\`font-weight: bold;\`;`;
   });
 
   it("should transform multiple styled elements in one file", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Button = styled.button\`padding: 1rem;\`;
 const Container = styled.div\`margin: 0;\`;
 const Link = styled.a\`color: blue;\`;`;
@@ -226,7 +226,7 @@ const Link = styled.a\`color: blue;\`;`;
   });
 
   it("should generate inline component with Object.assign pattern", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const MyButton = styled.button\`padding: 1rem;\`;`;
     const result = await transform(plugin, code, "/test.tsx");
 
@@ -239,7 +239,7 @@ const MyButton = styled.button\`padding: 1rem;\`;`;
     const prodPlugin = styledStatic();
     (prodPlugin.configResolved as Function)?.({ command: "build" });
 
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const MyButton = styled.button\`padding: 1rem;\`;`;
     const result = await transform(prodPlugin, code, "/test.tsx");
 
@@ -262,7 +262,7 @@ describe("styled.element.attrs() transformation", () => {
   });
 
   it("should transform styled.input.attrs with type", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const PasswordInput = styled.input.attrs({ type: 'password' })\`
   padding: 0.5rem;
 \`;`;
@@ -276,7 +276,7 @@ const PasswordInput = styled.input.attrs({ type: 'password' })\`
   });
 
   it("should transform styled.button.attrs with type submit", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const SubmitButton = styled.button.attrs({ type: 'submit' })\`
   background: blue;
 \`;`;
@@ -288,7 +288,7 @@ const SubmitButton = styled.button.attrs({ type: 'submit' })\`
   });
 
   it("should transform styled.a.attrs with target blank", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const ExternalLink = styled.a.attrs({ target: '_blank', rel: 'noopener noreferrer' })\`
   color: blue;
 \`;`;
@@ -301,7 +301,7 @@ const ExternalLink = styled.a.attrs({ target: '_blank', rel: 'noopener noreferre
   });
 
   it("should spread attrs before props for correct override behavior", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Input = styled.input.attrs({ type: 'text', placeholder: 'Enter...' })\`
   padding: 0.5rem;
 \`;`;
@@ -314,7 +314,7 @@ const Input = styled.input.attrs({ type: 'text', placeholder: 'Enter...' })\`
   });
 
   it("should handle exported attrs components", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 export const PasswordInput = styled.input.attrs({ type: 'password' })\`
   padding: 0.5rem;
 \`;`;
@@ -337,7 +337,7 @@ describe("styled(Component) extension", () => {
   });
 
   it("should transform component extension", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Button = styled.button\`padding: 1rem;\`;
 const PrimaryButton = styled(Button)\`background: blue;\`;`;
     const result = await transform(plugin, code, "/test.tsx");
@@ -349,7 +349,7 @@ const PrimaryButton = styled(Button)\`background: blue;\`;`;
   });
 
   it("should handle nested component extension (3 levels)", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Button = styled.button\`padding: 1rem;\`;
 const PrimaryButton = styled(Button)\`background: blue;\`;
 const LargePrimaryButton = styled(PrimaryButton)\`font-size: 1.5rem;\`;`;
@@ -362,7 +362,7 @@ const LargePrimaryButton = styled(PrimaryButton)\`font-size: 1.5rem;\`;`;
   });
 
   it("should maintain declaration order for CSS cascade", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Button = styled.button\`padding: 1rem;\`;
 const Primary = styled(Button)\`background: blue;\`;`;
     const result = await transform(plugin, code, "/test.tsx");
@@ -391,7 +391,7 @@ describe("withComponent transformation", () => {
   });
 
   it("should transform withComponent with component reference", async () => {
-    const code = `import { styled, withComponent } from 'styled-static';
+    const code = `import { styled, withComponent } from '@alex.radulescu/styled-static';
 import { Link } from 'react-router-dom';
 
 const Button = styled.button\`padding: 1rem;\`;
@@ -406,7 +406,7 @@ const LinkButton = withComponent(Link, Button);`;
   });
 
   it("should transform withComponent with HTML tag string", async () => {
-    const code = `import { styled, withComponent } from 'styled-static';
+    const code = `import { styled, withComponent } from '@alex.radulescu/styled-static';
 
 const Button = styled.button\`padding: 1rem;\`;
 const AnchorButton = withComponent('a', Button);`;
@@ -418,7 +418,7 @@ const AnchorButton = withComponent('a', Button);`;
   });
 
   it("should handle exported withComponent", async () => {
-    const code = `import { styled, withComponent } from 'styled-static';
+    const code = `import { styled, withComponent } from '@alex.radulescu/styled-static';
 import { Link } from 'react-router-dom';
 
 const Button = styled.button\`padding: 1rem;\`;
@@ -429,7 +429,7 @@ export const LinkButton = withComponent(Link, Button);`;
   });
 
   it("should work with extended components", async () => {
-    const code = `import { styled, withComponent } from 'styled-static';
+    const code = `import { styled, withComponent } from '@alex.radulescu/styled-static';
 import { Link } from 'react-router-dom';
 
 const Button = styled.button\`padding: 1rem;\`;
@@ -455,7 +455,7 @@ describe("css`` transformation", () => {
   });
 
   it("should transform css`` to class string", async () => {
-    const code = `import { css } from 'styled-static';
+    const code = `import { css } from '@alex.radulescu/styled-static';
 const activeClass = css\`background: blue;\`;`;
     const result = await transform(plugin, code, "/test.tsx");
 
@@ -467,7 +467,7 @@ const activeClass = css\`background: blue;\`;`;
   });
 
   it("should handle multiple css`` calls", async () => {
-    const code = `import { css } from 'styled-static';
+    const code = `import { css } from '@alex.radulescu/styled-static';
 const activeClass = css\`background: blue;\`;
 const hoverClass = css\`transform: scale(1.1);\`;
 const disabledClass = css\`opacity: 0.5;\`;`;
@@ -481,7 +481,7 @@ const disabledClass = css\`opacity: 0.5;\`;`;
   });
 
   it("should work alongside styled components", async () => {
-    const code = `import { styled, css } from 'styled-static';
+    const code = `import { styled, css } from '@alex.radulescu/styled-static';
 const Button = styled.button\`padding: 1rem;\`;
 const activeClass = css\`outline: 2px solid blue;\`;`;
     const result = await transform(plugin, code, "/test.tsx");
@@ -504,7 +504,7 @@ describe("createGlobalStyle transformation", () => {
   });
 
   it("should transform createGlobalStyle", async () => {
-    const code = `import { createGlobalStyle } from 'styled-static';
+    const code = `import { createGlobalStyle } from '@alex.radulescu/styled-static';
 const GlobalStyle = createGlobalStyle\`
   * { box-sizing: border-box; }
   body { margin: 0; }
@@ -521,7 +521,7 @@ const GlobalStyle = createGlobalStyle\`
   it("should not wrap global styles in class selector", async () => {
     // Global styles should be unscoped - this test verifies the code transforms
     // The actual CSS content check would require inspecting the virtual module
-    const code = `import { createGlobalStyle } from 'styled-static';
+    const code = `import { createGlobalStyle } from '@alex.radulescu/styled-static';
 const GlobalStyle = createGlobalStyle\`
   :root { --color-primary: blue; }
   body { margin: 0; }
@@ -533,14 +533,14 @@ const GlobalStyle = createGlobalStyle\`
   });
 
   it("should work alongside styled and css", async () => {
-    const code = `import { styled, css, createGlobalStyle } from 'styled-static';
+    const code = `import { styled, css, createGlobalStyle } from '@alex.radulescu/styled-static';
 const GlobalStyle = createGlobalStyle\`body { margin: 0; }\`;
 const Button = styled.button\`padding: 1rem;\`;
 const activeClass = css\`background: blue;\`;`;
     const result = await transform(plugin, code, "/test.tsx");
 
     expect(result?.code).toContain('import { createElement } from "react"');
-    expect(result?.code).toContain('import { m } from "styled-static/runtime"');
+    expect(result?.code).toContain('import { m } from "@alex.radulescu/styled-static/runtime"');
     expect(result?.code).toContain("const GlobalStyle = () => null");
     expect(result?.code).toContain('createElement("button"');
     expect(result?.code).toContain('const activeClass = "ss-activeClass-test"');
@@ -560,7 +560,7 @@ describe("keyframes transformation", () => {
   });
 
   it("should transform keyframes to animation name string", async () => {
-    const code = `import { keyframes } from 'styled-static';
+    const code = `import { keyframes } from '@alex.radulescu/styled-static';
 const spin = keyframes\`
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
@@ -576,7 +576,7 @@ const spin = keyframes\`
   });
 
   it("should handle keyframes used in styled component", async () => {
-    const code = `import { styled, keyframes } from 'styled-static';
+    const code = `import { styled, keyframes } from '@alex.radulescu/styled-static';
 const spin = keyframes\`
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
@@ -593,7 +593,7 @@ const Spinner = styled.div\`
   });
 
   it("should handle exported keyframes", async () => {
-    const code = `import { keyframes } from 'styled-static';
+    const code = `import { keyframes } from '@alex.radulescu/styled-static';
 export const fadeIn = keyframes\`
   from { opacity: 0; }
   to { opacity: 1; }
@@ -604,7 +604,7 @@ export const fadeIn = keyframes\`
   });
 
   it("should handle multiple keyframes declarations", async () => {
-    const code = `import { keyframes } from 'styled-static';
+    const code = `import { keyframes } from '@alex.radulescu/styled-static';
 const spin = keyframes\`from { transform: rotate(0deg); } to { transform: rotate(360deg); }\`;
 const fadeIn = keyframes\`from { opacity: 0; } to { opacity: 1; }\`;
 const slideIn = keyframes\`from { transform: translateX(-100%); } to { transform: translateX(0); }\`;`;
@@ -632,7 +632,7 @@ describe("styledVariants transformation", () => {
   });
 
   it("should transform styledVariants with HTML tag", async () => {
-    const code = `import { styledVariants, css } from 'styled-static';
+    const code = `import { styledVariants, css } from '@alex.radulescu/styled-static';
 const Button = styledVariants({
   component: 'button',
   css: css\`padding: 1rem;\`,
@@ -652,7 +652,7 @@ const Button = styledVariants({
   });
 
   it("should transform styledVariants extending a component", async () => {
-    const code = `import { styled, styledVariants, css } from 'styled-static';
+    const code = `import { styled, styledVariants, css } from '@alex.radulescu/styled-static';
 const BaseButton = styled.button\`padding: 1rem;\`;
 const Button = styledVariants({
   component: BaseButton,
@@ -672,7 +672,7 @@ const Button = styledVariants({
   });
 
   it("should handle multiple variant dimensions", async () => {
-    const code = `import { styledVariants, css } from 'styled-static';
+    const code = `import { styledVariants, css } from '@alex.radulescu/styled-static';
 const Button = styledVariants({
   component: 'button',
   css: css\`padding: 1rem;\`,
@@ -699,7 +699,7 @@ const Button = styledVariants({
   });
 
   it("should handle exported styledVariants", async () => {
-    const code = `import { styledVariants, css } from 'styled-static';
+    const code = `import { styledVariants, css } from '@alex.radulescu/styled-static';
 export const Button = styledVariants({
   component: 'button',
   css: css\`padding: 1rem;\`,
@@ -713,7 +713,7 @@ export const Button = styledVariants({
   });
 
   it("should handle styledVariants with plain template literal css", async () => {
-    const code = `import { styledVariants } from 'styled-static';
+    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
 const Button = styledVariants({
   component: 'button',
   css: \`padding: 1rem;\`,
@@ -741,7 +741,7 @@ describe("cssVariants transformation", () => {
   });
 
   it("should transform cssVariants to function", async () => {
-    const code = `import { cssVariants, css } from 'styled-static';
+    const code = `import { cssVariants, css } from '@alex.radulescu/styled-static';
 const buttonClass = cssVariants({
   css: css\`padding: 1rem;\`,
   variants: {
@@ -763,7 +763,7 @@ const buttonClass = cssVariants({
   });
 
   it("should handle multiple variant dimensions in cssVariants", async () => {
-    const code = `import { cssVariants, css } from 'styled-static';
+    const code = `import { cssVariants, css } from '@alex.radulescu/styled-static';
 const styles = cssVariants({
   css: css\`display: flex;\`,
   variants: {
@@ -779,7 +779,7 @@ const styles = cssVariants({
   });
 
   it("should handle exported cssVariants", async () => {
-    const code = `import { cssVariants, css } from 'styled-static';
+    const code = `import { cssVariants, css } from '@alex.radulescu/styled-static';
 export const buttonClass = cssVariants({
   css: css\`padding: 1rem;\`,
   variants: {
@@ -805,7 +805,7 @@ describe("export handling", () => {
   });
 
   it("should handle exported styled components", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 export const Button = styled.button\`padding: 1rem;\`;`;
     const result = await transform(plugin, code, "/test.tsx");
 
@@ -813,7 +813,7 @@ export const Button = styled.button\`padding: 1rem;\`;`;
   });
 
   it("should handle multiple exports", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 export const Button = styled.button\`padding: 1rem;\`;
 export const Card = styled.div\`margin: 1rem;\`;`;
     const result = await transform(plugin, code, "/test.tsx");
@@ -823,7 +823,7 @@ export const Card = styled.div\`margin: 1rem;\`;`;
   });
 
   it("should handle mix of exported and non-exported", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 export const Button = styled.button\`padding: 1rem;\`;
 const InternalCard = styled.div\`margin: 1rem;\`;`;
     const result = await transform(plugin, code, "/test.tsx");
@@ -833,7 +833,7 @@ const InternalCard = styled.div\`margin: 1rem;\`;`;
   });
 
   it("should handle exported css classes", async () => {
-    const code = `import { css } from 'styled-static';
+    const code = `import { css } from '@alex.radulescu/styled-static';
 export const activeClass = css\`background: blue;\`;`;
     const result = await transform(plugin, code, "/test.tsx");
 
@@ -854,7 +854,7 @@ describe("import aliasing", () => {
   });
 
   it("should handle aliased styled import", async () => {
-    const code = `import { styled as s } from 'styled-static';
+    const code = `import { styled as s } from '@alex.radulescu/styled-static';
 const Button = s.button\`padding: 1rem;\`;`;
     const result = await transform(plugin, code, "/test.tsx");
 
@@ -862,7 +862,7 @@ const Button = s.button\`padding: 1rem;\`;`;
   });
 
   it("should handle aliased css import", async () => {
-    const code = `import { css as c } from 'styled-static';
+    const code = `import { css as c } from '@alex.radulescu/styled-static';
 const activeClass = c\`background: blue;\`;`;
     const result = await transform(plugin, code, "/test.tsx");
 
@@ -870,7 +870,7 @@ const activeClass = c\`background: blue;\`;`;
   });
 
   it("should handle aliased createGlobalStyle import", async () => {
-    const code = `import { createGlobalStyle as global } from 'styled-static';
+    const code = `import { createGlobalStyle as global } from '@alex.radulescu/styled-static';
 const GlobalStyle = global\`body { margin: 0; }\`;`;
     const result = await transform(plugin, code, "/test.tsx");
 
@@ -878,7 +878,7 @@ const GlobalStyle = global\`body { margin: 0; }\`;`;
   });
 
   it("should handle multiple aliased imports", async () => {
-    const code = `import { styled as s, css as c, createGlobalStyle as g } from 'styled-static';
+    const code = `import { styled as s, css as c, createGlobalStyle as g } from '@alex.radulescu/styled-static';
 const GlobalStyle = g\`body { margin: 0; }\`;
 const Button = s.button\`padding: 1rem;\`;
 const activeClass = c\`background: blue;\`;`;
@@ -890,7 +890,7 @@ const activeClass = c\`background: blue;\`;`;
   });
 
   it("should handle aliased keyframes import", async () => {
-    const code = `import { keyframes as kf } from 'styled-static';
+    const code = `import { keyframes as kf } from '@alex.radulescu/styled-static';
 const spin = kf\`from { transform: rotate(0deg); } to { transform: rotate(360deg); }\`;`;
     const result = await transform(plugin, code, "/test.tsx");
 
@@ -898,7 +898,7 @@ const spin = kf\`from { transform: rotate(0deg); } to { transform: rotate(360deg
   });
 
   it("should handle aliased styledVariants import", async () => {
-    const code = `import { styledVariants as sv, css } from 'styled-static';
+    const code = `import { styledVariants as sv, css } from '@alex.radulescu/styled-static';
 const Button = sv({
   component: 'button',
   css: css\`padding: 1rem;\`,
@@ -911,7 +911,7 @@ const Button = sv({
   });
 
   it("should handle aliased cssVariants import", async () => {
-    const code = `import { cssVariants as cv, css } from 'styled-static';
+    const code = `import { cssVariants as cv, css } from '@alex.radulescu/styled-static';
 const styles = cv({
   css: css\`padding: 1rem;\`,
   variants: { size: { sm: css\`font-size: 0.875rem;\` } },
@@ -922,7 +922,7 @@ const styles = cv({
   });
 
   it("should handle aliased withComponent import", async () => {
-    const code = `import { styled, withComponent as wc } from 'styled-static';
+    const code = `import { styled, withComponent as wc } from '@alex.radulescu/styled-static';
 import { Link } from 'react-router-dom';
 const Button = styled.button\`padding: 1rem;\`;
 const LinkButton = wc(Link, Button);`;
@@ -946,7 +946,7 @@ describe("CSS content preservation", () => {
   });
 
   it("should handle CSS with special characters", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Box = styled.div\`
   content: "Hello World";
   background: url('image.png');
@@ -959,7 +959,7 @@ const Box = styled.div\`
   });
 
   it("should handle CSS variables", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Box = styled.div\`
   --custom-color: #3b82f6;
   color: var(--custom-color);
@@ -971,7 +971,7 @@ const Box = styled.div\`
   });
 
   it("should handle nested selectors with &", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Button = styled.button\`
   padding: 1rem;
 
@@ -993,7 +993,7 @@ const Button = styled.button\`
   });
 
   it("should handle complex nested selectors", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const List = styled.ul\`
   & > li {
     padding: 0.5rem;
@@ -1017,7 +1017,7 @@ const List = styled.ul\`
   });
 
   it("should handle media queries", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Container = styled.div\`
   padding: 1rem;
 
@@ -1039,7 +1039,7 @@ const Container = styled.div\`
   });
 
   it("should handle keyframe animations", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Spinner = styled.div\`
   animation: spin 1s linear infinite;
 
@@ -1054,7 +1054,7 @@ const Spinner = styled.div\`
   });
 
   it("should handle empty CSS content", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Empty = styled.div\`\`;`;
     const result = await transform(plugin, code, "/test.tsx");
 
@@ -1063,7 +1063,7 @@ const Empty = styled.div\`\`;`;
   });
 
   it("should handle whitespace-only CSS content", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Whitespace = styled.div\`   \`;`;
     const result = await transform(plugin, code, "/test.tsx");
 
@@ -1084,7 +1084,7 @@ describe("edge cases", () => {
   });
 
   it("should handle component names with numbers", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Button2 = styled.button\`padding: 1rem;\`;
 const Card3D = styled.div\`transform: perspective(500px);\`;`;
     const result = await transform(plugin, code, "/test.tsx");
@@ -1095,7 +1095,7 @@ const Card3D = styled.div\`transform: perspective(500px);\`;`;
   });
 
   it("should handle underscore in component names", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Primary_Button = styled.button\`background: blue;\`;
 const _PrivateCard = styled.div\`padding: 1rem;\`;`;
     const result = await transform(plugin, code, "/test.tsx");
@@ -1105,7 +1105,7 @@ const _PrivateCard = styled.div\`padding: 1rem;\`;`;
   });
 
   it("should transform let declarations", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 let Button = styled.button\`padding: 1rem;\`;`;
     const result = await transform(plugin, code, "/test.tsx");
 
@@ -1115,7 +1115,7 @@ let Button = styled.button\`padding: 1rem;\`;`;
   });
 
   it("should transform var declarations", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 var Button = styled.button\`padding: 1rem;\`;`;
     const result = await transform(plugin, code, "/test.tsx");
 
@@ -1126,7 +1126,7 @@ var Button = styled.button\`padding: 1rem;\`;`;
 
   it("should handle files with mixed content", async () => {
     const code = `import React from 'react';
-import { styled } from 'styled-static';
+import { styled } from '@alex.radulescu/styled-static';
 
 // Regular code
 const regularVar = 'test';
@@ -1155,7 +1155,7 @@ export { Button, Card, helper };`;
   });
 
   it("should not transform strings that look like styled calls", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 // Comment about styled.button
 const config = { styled: { button: true } };
 const text = "styled.button is great";
@@ -1189,7 +1189,7 @@ describe("source maps", () => {
   });
 
   it("should generate source maps", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Button = styled.button\`padding: 1rem;\`;`;
     const result = await transform(plugin, code, "/test.tsx");
 
@@ -1197,7 +1197,7 @@ const Button = styled.button\`padding: 1rem;\`;`;
   });
 
   it("should generate hires source maps", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Button = styled.button\`padding: 1rem;\`;`;
     const result = await transform(plugin, code, "/test.tsx");
 
@@ -1215,7 +1215,7 @@ describe("custom class prefix", () => {
     const plugin = styledStatic({ classPrefix: "myapp" });
     (plugin.configResolved as Function)?.({ command: "serve" });
 
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Button = styled.button\`padding: 1rem;\`;`;
     const result = await transform(plugin, code, "/test.tsx");
 
@@ -1227,7 +1227,7 @@ const Button = styled.button\`padding: 1rem;\`;`;
     const plugin = styledStatic({ classPrefix: "app" });
     (plugin.configResolved as Function)?.({ command: "serve" });
 
-    const code = `import { css } from 'styled-static';
+    const code = `import { css } from '@alex.radulescu/styled-static';
 const activeClass = css\`background: blue;\`;`;
     const result = await transform(plugin, code, "/test.tsx");
 
@@ -1365,7 +1365,7 @@ describe("security: build-time variant safety", () => {
   });
 
   it("should generate explicit equality checks for variant values", async () => {
-    const code = `import { styledVariants, css } from 'styled-static';
+    const code = `import { styledVariants, css } from '@alex.radulescu/styled-static';
 const Button = styledVariants({
   component: 'button',
   css: css\`padding: 1rem;\`,
@@ -1386,7 +1386,7 @@ const Button = styledVariants({
   });
 
   it("should use static class names for variants", async () => {
-    const code = `import { styledVariants, css } from 'styled-static';
+    const code = `import { styledVariants, css } from '@alex.radulescu/styled-static';
 const Button = styledVariants({
   component: 'button',
   css: css\`padding: 1rem;\`,
@@ -1406,7 +1406,7 @@ const Button = styledVariants({
   });
 
   it("should generate correct cssVariants class names without variants. prefix", async () => {
-    const code = `import { cssVariants, css } from 'styled-static';
+    const code = `import { cssVariants, css } from '@alex.radulescu/styled-static';
 const calloutStyles = cssVariants({
   css: css\`padding: 1rem;\`,
   variants: {
@@ -1429,7 +1429,7 @@ const calloutStyles = cssVariants({
 
   it("should use if/else for <= 4 total variant values", async () => {
     // 2 variants × 2 values = 4 total (at threshold, should use if/else)
-    const code = `import { styledVariants, css } from 'styled-static';
+    const code = `import { styledVariants, css } from '@alex.radulescu/styled-static';
 const Button = styledVariants({
   component: 'button',
   css: css\`padding: 1rem;\`,
@@ -1456,7 +1456,7 @@ const Button = styledVariants({
 
   it("should use hoisted map for > 4 total variant values", async () => {
     // 1 variant × 5 values = 5 total (above threshold, should use hoisted map)
-    const code = `import { styledVariants, css } from 'styled-static';
+    const code = `import { styledVariants, css } from '@alex.radulescu/styled-static';
 const Button = styledVariants({
   component: 'button',
   css: css\`padding: 1rem;\`,
@@ -1482,7 +1482,7 @@ const Button = styledVariants({
 
   it("should use hoisted map for complex multi-variant components", async () => {
     // 3 variants × 2 values each = 6 total (above threshold)
-    const code = `import { styledVariants, css } from 'styled-static';
+    const code = `import { styledVariants, css } from '@alex.radulescu/styled-static';
 const Button = styledVariants({
   component: 'button',
   css: css\`padding: 1rem;\`,
@@ -1512,7 +1512,7 @@ const Button = styledVariants({
   });
 
   it("should use hoisted map for cssVariants with > 4 values", async () => {
-    const code = `import { cssVariants, css } from 'styled-static';
+    const code = `import { cssVariants, css } from '@alex.radulescu/styled-static';
 const calloutStyles = cssVariants({
   css: css\`padding: 1rem;\`,
   variants: {
@@ -1573,7 +1573,7 @@ describe("security: debug logging control", () => {
     (plugin.configResolved as Function)?.({ command: "serve" });
 
     // Transform should not log without debug enabled
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Button = styled.button\`padding: 1rem;\`;`;
 
     // Reset spy before transform
@@ -1597,7 +1597,7 @@ const Button = styled.button\`padding: 1rem;\`;`;
     const plugin = styledStatic({ debug: true });
     (plugin.configResolved as Function)?.({ command: "serve" });
 
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Button = styled.button\`padding: 1rem;\`;`;
 
     consoleSpy.mockClear();
@@ -1624,7 +1624,7 @@ describe("security: identifier validation", () => {
   });
 
   it("should handle components with valid identifiers", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const MyButton = styled.button\`padding: 1rem;\`;
 const _PrivateButton = styled.button\`margin: 1rem;\`;
 const $special = styled.button\`color: red;\`;`;
@@ -1642,7 +1642,7 @@ const $special = styled.button\`color: red;\`;`;
     const prodPlugin = styledStatic();
     (prodPlugin.configResolved as Function)?.({ command: "build" });
 
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Button = styled.button\`padding: 1rem;\`;`;
 
     const result = await transform(prodPlugin, code, "/test-prod-hash.tsx");
@@ -1664,7 +1664,7 @@ describe("security: file path based CSS modules", () => {
   });
 
   it("should use file path in CSS module ID (for proper chunk association)", async () => {
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Button = styled.button\`padding: 1rem;\`;`;
 
     const result = await transform(plugin, code, "/test-collision.tsx");
@@ -1732,7 +1732,7 @@ describe("dev-friendly class names", () => {
     const plugin = styledStatic();
     (plugin.configResolved as Function)?.({ command: "serve" });
 
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const MyButton = styled.button\`padding: 1rem;\`;`;
     const result = await transform(plugin, code, "/src/components/Button.tsx");
 
@@ -1745,7 +1745,7 @@ const MyButton = styled.button\`padding: 1rem;\`;`;
     const plugin = styledStatic();
     (plugin.configResolved as Function)?.({ command: "build" });
 
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const MyButton = styled.button\`padding: 1rem;\`;`;
     const result = await transform(plugin, code, "/src/components/Button.tsx");
 
@@ -1759,7 +1759,7 @@ const MyButton = styled.button\`padding: 1rem;\`;`;
     const plugin = styledStatic();
     (plugin.configResolved as Function)?.({ command: "serve" });
 
-    const code = `import { css } from 'styled-static';
+    const code = `import { css } from '@alex.radulescu/styled-static';
 const highlightClass = css\`background: yellow;\`;`;
     const result = await transform(plugin, code, "/src/styles/shared.tsx");
 
@@ -1772,7 +1772,7 @@ const highlightClass = css\`background: yellow;\`;`;
     const plugin = styledStatic();
     (plugin.configResolved as Function)?.({ command: "serve" });
 
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Button = styled.button\`padding: 1rem;\`;
 const PrimaryButton = styled(Button)\`background: blue;\`;`;
     const result = await transform(plugin, code, "/src/App.tsx");
@@ -1786,7 +1786,7 @@ const PrimaryButton = styled(Button)\`background: blue;\`;`;
     const plugin = styledStatic();
     (plugin.configResolved as Function)?.({ command: "serve" });
 
-    const code = `import { styled } from 'styled-static';
+    const code = `import { styled } from '@alex.radulescu/styled-static';
 const Box = styled.div\`display: flex;\`;`;
     const result = await transform(plugin, code, "/src/my-component.test.tsx");
 

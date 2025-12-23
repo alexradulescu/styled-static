@@ -520,7 +520,7 @@ export default css;
       const runtimeBasePath =
         imports.source === "./index" || imports.source === "../index"
           ? imports.source.replace("/index", "/runtime")
-          : "styled-static/runtime";
+          : "@alex.radulescu/styled-static/runtime";
 
       // Prepend imports: CSS first, then runtime, then hoisted declarations
       let prepend = "";
@@ -562,9 +562,9 @@ function findStyledStaticImports(ast: ESTree.Program): StyledStaticImports {
   for (const node of ast.body) {
     if (node.type === "ImportDeclaration") {
       const source = node.source.value as string;
-      // Match both "styled-static" (package) and "./index" (local dev)
+      // Match "@alex.radulescu/styled-static" (package) and "./index" (local dev)
       const isStyledStaticImport =
-        source === "styled-static" ||
+        source === "@alex.radulescu/styled-static" ||
         source === "./index" ||
         source === "../index";
 
