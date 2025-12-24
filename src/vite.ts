@@ -91,6 +91,14 @@ export interface StyledStaticOptions {
    * @default false
    */
   debug?: boolean;
+  /**
+   * How to output CSS:
+   * - 'auto' (default): Uses 'file' for library builds (build.lib set), 'virtual' for apps
+   * - 'virtual': CSS as virtual modules (Vite bundles into single file)
+   * - 'file': CSS as separate files co-located with JS (enables tree-shaking for libraries)
+   * @default 'auto'
+   */
+  cssOutput?: "auto" | "virtual" | "file";
 }
 
 /** Import tracking for styled-static */
@@ -190,7 +198,7 @@ function getFileBaseName(filePath: string): string {
 }
 
 export function styledStatic(options: StyledStaticOptions = {}): Plugin {
-  const { classPrefix = "ss", debug: debugOption } = options;
+  const { classPrefix = "ss", debug: debugOption, cssOutput = "auto" } = options;
 
   // SECURITY: Debug logging can expose file paths and internal state.
   // Only enable via explicit option or environment variable.
@@ -201,6 +209,7 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
 
   let config: ResolvedConfig;
   let isDev = false;
+  let actualCssOutput: "virtual" | "file" = "virtual";
 
   return {
     name: "styled-static",
@@ -209,6 +218,20 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
     configResolved(resolvedConfig) {
       config = resolvedConfig;
       isDev = config.command === "serve";
+
+      // Resolve 'auto' CSS output mode based on build type
+      if (cssOutput === "auto") {
+        // Library builds get file mode for tree-shaking, apps get virtual mode
+        actualCssOutput = config.build?.lib ? "file" : "virtual";
+      } else {
+        actualCssOutput = cssOutput;
+      }
+
+      if (DEBUG) {
+        console.log(
+          `[styled-static] CSS output mode: ${actualCssOutput} (config: ${cssOutput}, isLib: ${!!config.build?.lib})`
+        );
+      }
     },
 
     // Resolve virtual CSS module IDs
@@ -261,7 +284,12 @@ if (import.meta.hot) {
 export default css;
 `;
         }
-        // Build mode: return raw CSS for extraction
+        // Build mode with file output: return empty, we'll emit files in generateBundle
+        if (actualCssOutput === "file") {
+          return "";
+        }
+
+        // Build mode with virtual output: return raw CSS for Vite to bundle
         return css;
       }
       return null;
@@ -545,6 +573,45 @@ export default css;
         map: s.generateMap({ hires: true }),
       };
     },
+
+    // Emit CSS files for library builds (cssOutput: 'file')
+    generateBundle(_options, bundle) {
+      if (actualCssOutput !== "file") return;
+
+      for (const [fileName, chunk] of Object.entries(bundle)) {
+        if (chunk.type !== "chunk") continue;
+
+        // Collect CSS for all modules in this chunk
+        const moduleIds = chunk.moduleIds || [];
+        let aggregatedCss = "";
+
+        for (const moduleId of moduleIds) {
+          // Find CSS modules that came from this source file
+          for (const [, data] of cssModules) {
+            if (data.sourceFile === moduleId) {
+              aggregatedCss += data.css + "\n";
+            }
+          }
+        }
+
+        if (!aggregatedCss.trim()) continue;
+
+        // Emit CSS file with same path as JS chunk
+        const cssFileName = fileName.replace(/\.js$/, ".css");
+        this.emitFile({
+          type: "asset",
+          fileName: cssFileName,
+          source: aggregatedCss.trim(),
+        });
+
+        // Rewrite the chunk's code to use relative CSS import
+        chunk.code = rewriteCssImports(chunk.code, cssFileName);
+
+        if (DEBUG) {
+          console.log(`[styled-static] Emitted CSS file: ${cssFileName}`);
+        }
+      }
+    },
   };
 }
 
@@ -812,6 +879,31 @@ function generateReplacement(
  */
 function normalizePath(p: string): string {
   return p.replace(/\\/g, "/").replace(/^\/+/, "").toLowerCase();
+}
+
+/**
+ * Rewrite CSS imports in chunk code for library builds.
+ * Removes virtual CSS imports and adds a single relative CSS file import.
+ */
+function rewriteCssImports(code: string, cssFileName: string): string {
+  // Remove all virtual:styled-static imports
+  code = code.replace(
+    /import\s*["']virtual:styled-static[^"']*["'];?\n?/g,
+    ""
+  );
+  // Remove /* empty css */ comments Vite adds
+  code = code.replace(/\/\*\s*empty css\s*\*\/\s*/g, "");
+  // Remove useless side-effect import of styled-static package
+  code = code.replace(
+    /import\s*["']@alex\.radulescu\/styled-static["'];?\n?/g,
+    ""
+  );
+
+  // Get just the filename for relative import (same directory)
+  const baseName = cssFileName.split("/").pop() || cssFileName;
+
+  // Add single relative CSS import at top
+  return `import "./${baseName}";\n${code}`;
 }
 
 // ============================================================================

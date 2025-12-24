@@ -709,8 +709,38 @@ const LinkButton = withComponent(Link, Button);
 styledStatic({
   // Prefix for generated class names (default: 'ss')
   classPrefix: "my-app",
+
+  // CSS output mode (default: 'auto')
+  // - 'auto': Uses 'file' for library builds (build.lib set), 'virtual' for apps
+  // - 'virtual': CSS as virtual modules (Vite bundles into single file)
+  // - 'file': CSS as separate files co-located with JS (for library builds)
+  cssOutput: "auto",
 });
 ```
+
+### Library Builds
+
+When building a component library with `build.lib` configured, styled-static automatically outputs CSS as separate files co-located with each JS file. This enables CSS tree-shaking for consuming applications.
+
+```
+dist/
+  components/
+    Button/
+      Button.js    # imports "./Button.css"
+      Button.css   # Button-specific styles only
+    Alert/
+      Alert.js     # imports "./Alert.css"
+      Alert.css    # Alert-specific styles only
+```
+
+Consuming apps automatically get only the CSS for components they import:
+
+```tsx
+// In your app - only Button.css is included in the bundle
+import { Button } from "my-component-library/components/Button";
+```
+
+For app builds (no `build.lib`), CSS is bundled as virtual modules into a single CSS file, which is the default Vite behavior.
 
 ---
 

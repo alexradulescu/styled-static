@@ -397,6 +397,80 @@ const Button = Object.assign(
           will show the variable name from your source code.
         </Paragraph>
       </Section>
+
+      {/* Plugin Configuration */}
+      <Section id="configuration">
+        <Breadcrumb>Internals</Breadcrumb>
+        <SubsectionTitle>Plugin Configuration</SubsectionTitle>
+        <Paragraph>
+          The Vite plugin accepts configuration options for customizing class
+          name prefixes, debug logging, and CSS output mode:
+        </Paragraph>
+
+        <CodeBlock>{`// vite.config.ts
+styledStatic({
+  classPrefix: 'ss',   // Prefix for generated class names (default: 'ss')
+  debug: false,        // Debug logging (default: false)
+  cssOutput: 'auto',   // CSS output mode (default: 'auto')
+})`}</CodeBlock>
+
+        <Paragraph>
+          The <InlineCode>cssOutput</InlineCode> option controls how CSS is
+          emitted during builds:
+        </Paragraph>
+        <ul
+          style={{ marginLeft: "1.5rem", color: "var(--color-text-secondary)" }}
+        >
+          <li>
+            <strong>'auto'</strong> (default) — Uses 'file' for library builds,
+            'virtual' for apps
+          </li>
+          <li>
+            <strong>'virtual'</strong> — CSS as virtual modules (Vite bundles
+            into single file)
+          </li>
+          <li>
+            <strong>'file'</strong> — CSS as separate files co-located with JS
+            (enables tree-shaking)
+          </li>
+        </ul>
+      </Section>
+
+      {/* Library Builds */}
+      <Section id="library-builds">
+        <Breadcrumb>Internals</Breadcrumb>
+        <SubsectionTitle>Library Builds</SubsectionTitle>
+        <Paragraph>
+          When building a component library with{" "}
+          <InlineCode>build.lib</InlineCode> configured, styled-static
+          automatically outputs CSS as separate files co-located with each JS
+          file. This enables CSS tree-shaking for consuming applications.
+        </Paragraph>
+
+        <CodeBlock>{`# Output structure for library builds
+dist/
+  components/
+    Button/
+      Button.js    # imports "./Button.css"
+      Button.css   # Button-specific styles only
+    Alert/
+      Alert.js     # imports "./Alert.css"
+      Alert.css    # Alert-specific styles only`}</CodeBlock>
+
+        <Paragraph>
+          Consuming apps automatically get only the CSS for components they
+          import:
+        </Paragraph>
+
+        <CodeBlock>{`// In your app - only Button.css is included in the bundle
+import { Button } from "my-component-library/components/Button";`}</CodeBlock>
+
+        <Callout type="tip" icon={<Lightbulb size={20} />}>
+          For app builds (no <InlineCode>build.lib</InlineCode>), CSS is bundled
+          as virtual modules into a single CSS file, which is the default Vite
+          behavior.
+        </Callout>
+      </Section>
     </HowItWorksWrapper>
   );
 }

@@ -12,6 +12,14 @@ export interface StyledStaticOptions {
      * @default false
      */
     debug?: boolean;
+    /**
+     * How to output CSS:
+     * - 'auto' (default): Uses 'file' for library builds (build.lib set), 'virtual' for apps
+     * - 'virtual': CSS as virtual modules (Vite bundles into single file)
+     * - 'file': CSS as separate files co-located with JS (enables tree-shaking for libraries)
+     * @default 'auto'
+     */
+    cssOutput?: "auto" | "virtual" | "file";
 }
 export declare function styledStatic(options?: StyledStaticOptions): Plugin;
 export default styledStatic;

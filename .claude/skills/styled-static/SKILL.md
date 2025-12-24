@@ -391,8 +391,30 @@ Variant values are validated against a build-time Set of known values, preventin
 styledStatic({
   classPrefix: 'ss',  // Custom prefix (default: 'ss')
   debug: false,       // Debug logging (don't use in prod)
+  cssOutput: 'auto',  // CSS output mode (see below)
 })
 ```
+
+### CSS Output Mode
+
+The `cssOutput` option controls how CSS is emitted during builds:
+
+| Value | Behavior |
+|-------|----------|
+| `'auto'` (default) | Uses `'file'` for library builds (`build.lib` set), `'virtual'` for apps |
+| `'virtual'` | CSS as virtual modules - Vite bundles into single CSS file |
+| `'file'` | CSS as separate files co-located with JS - enables tree-shaking |
+
+**Library builds** (with `build.lib` configured) automatically output per-component CSS files:
+```
+dist/
+  components/
+    Button/
+      Button.js    # imports "./Button.css"
+      Button.css   # Button-specific styles only
+```
+
+This enables CSS tree-shaking - consuming apps only get CSS for imported components.
 
 ### Autoprefixing with Lightning CSS
 
