@@ -24,26 +24,6 @@ import {
   SubsectionTitle,
   highlightClass,
 } from "./shared";
-import {
-  AlertTriangle,
-  Breadcrumb,
-  Button,
-  ButtonGroup,
-  Callout,
-  CodeBlock,
-  DemoArea,
-  DemoLabel,
-  ExtendedButton,
-  Info,
-  InlineCode,
-  Lightbulb,
-  Paragraph,
-  Section,
-  SectionTitle,
-  StyledButton,
-  SubsectionTitle,
-  highlightClass,
-} from "./shared";
 
 // Section-specific styled component (tests CSS code splitting)
 const ApiWrapper = styled.div`

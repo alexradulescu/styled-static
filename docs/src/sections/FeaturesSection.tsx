@@ -20,22 +20,6 @@ import {
   StyledButton,
   SubsectionTitle,
 } from "./shared";
-import {
-  Breadcrumb,
-  Button,
-  ButtonGroup,
-  Callout,
-  CodeBlock,
-  DemoArea,
-  DemoLabel,
-  InlineCode,
-  Lightbulb,
-  Paragraph,
-  Section,
-  SectionTitle,
-  StyledButton,
-  SubsectionTitle,
-} from "./shared";
 
 // Section-specific styled component (tests CSS code splitting)
 const FeaturesWrapper = styled.div`
