@@ -2,8 +2,24 @@
  * Features Section - Lazy loaded
  * Contains: withComponent, CSS nesting, theming
  */
-import { styled } from "styled-static";
+import { styled } from "@alex.radulescu/styled-static";
 import { Moon, Sun } from "lucide-react";
+import {
+  Breadcrumb,
+  Button,
+  ButtonGroup,
+  Callout,
+  CodeBlock,
+  DemoArea,
+  DemoLabel,
+  InlineCode,
+  Lightbulb,
+  Paragraph,
+  Section,
+  SectionTitle,
+  StyledButton,
+  SubsectionTitle,
+} from "./shared";
 import {
   Breadcrumb,
   Button,
@@ -43,9 +59,10 @@ export function FeaturesSection({ theme, toggleTheme }: FeaturesSectionProps) {
         <Breadcrumb>Features</Breadcrumb>
         <SectionTitle>Polymorphism & Composition</SectionTitle>
         <Paragraph>
-          Every styled component exposes a static <InlineCode>.className</InlineCode>{" "}
-          property for manual composition. For rendering one component with
-          another's styles, use <InlineCode>withComponent</InlineCode>.
+          Every styled component exposes a static{" "}
+          <InlineCode>.className</InlineCode> property for manual composition.
+          For rendering one component with another's styles, use{" "}
+          <InlineCode>withComponent</InlineCode>.
         </Paragraph>
         <CodeBlock>{`const Button = styled.button\`
   padding: 0.5rem 1rem;
@@ -60,7 +77,7 @@ export function FeaturesSection({ theme, toggleTheme }: FeaturesSectionProps) {
 
 // Use withComponent for polymorphic rendering
 import { Link } from 'react-router-dom';
-import { withComponent } from 'styled-static';
+import { withComponent } from '@alex.radulescu/styled-static';
 
 const LinkButton = withComponent(Link, Button);
 
@@ -140,7 +157,7 @@ const Card = styled.div\`
 \`;`}</CodeBlock>
 
         <SubsectionTitle>Theme Helpers</SubsectionTitle>
-        <CodeBlock>{`import { initTheme, setTheme, getTheme, onSystemThemeChange } from 'styled-static';
+        <CodeBlock>{`import { initTheme, setTheme, getTheme, onSystemThemeChange } from '@alex.radulescu/styled-static';
 
 // Initialize (reads localStorage → system preference → default)
 initTheme({ defaultTheme: 'light', useSystemPreference: true });

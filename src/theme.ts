@@ -6,7 +6,7 @@
  *
  * @example
  * ```tsx
- * import { initTheme, setTheme, getTheme } from 'styled-static';
+ * import { initTheme, setTheme, getTheme } from '@alex.radulescu/styled-static';
  *
  * // Initialize on app load
  * initTheme({ defaultTheme: 'light', useSystemPreference: true });

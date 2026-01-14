@@ -4,6 +4,7 @@
     "": {
       "name": "styled-static-example",
       "dependencies": {
+        "@alex.radulescu/styled-static": "^0.7.3",
         "lucide-react": "^0.468.0",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
@@ -20,6 +21,8 @@
     },
   },
   "packages": {
+    "@alex.radulescu/styled-static": ["@alex.radulescu/styled-static@0.7.3", "", { "peerDependencies": { "react": "^19.0.0", "vite": "^5.0.0 || ^6.0.0" } }, "sha512-ACk+Av4TDKkjXQemf5ybGjzI0ES8ePuT1TlaiREMsfITxuCvv2wom4llmPizlK3rpNe0WY685XkRxfjtWwk/yw=="],
+
     "@babel/code-frame": ["@babel/code-frame@7.27.1", "", { "dependencies": { "@babel/helper-validator-identifier": "^7.27.1", "js-tokens": "^4.0.0", "picocolors": "^1.1.1" } }, "sha512-cjQ7ZlQ0Mv3b47hABuTevyTuYN4i+loJKGeV9flcCgIK37cCXRh+L1bd3iBHlynerhQ7BhCkn2BPbQUL+rGqFg=="],
 
     "@babel/compat-data": ["@babel/compat-data@7.28.5", "", {}, "sha512-6uFXyCayocRbqhZOB+6XcuZbkMNimwfVGFji8CTZnCzOHVGvDqzvitu1re2AU5LROliz7eQPhB8CpAMvnx9EjA=="],

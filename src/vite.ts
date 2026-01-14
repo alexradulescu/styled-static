@@ -62,6 +62,7 @@ import type * as ESTree from "estree";
 import MagicString from "magic-string";
 import type { Plugin, ResolvedConfig } from "vite";
 import { hash } from "./hash.js";
+import { hash } from "./hash.js";
 
 // ============================================================================
 // Types
@@ -198,7 +199,11 @@ function getFileBaseName(filePath: string): string {
 }
 
 export function styledStatic(options: StyledStaticOptions = {}): Plugin {
-  const { classPrefix = "ss", debug: debugOption, cssOutput = "auto" } = options;
+  const {
+    classPrefix = "ss",
+    debug: debugOption,
+    cssOutput = "auto",
+  } = options;
 
   // SECURITY: Debug logging can expose file paths and internal state.
   // Only enable via explicit option or environment variable.
@@ -395,7 +400,11 @@ export default css;
           withComponentCalls.length
         );
 
-      if (templates.length === 0 && variantCalls.length === 0 && withComponentCalls.length === 0) {
+      if (
+        templates.length === 0 &&
+        variantCalls.length === 0 &&
+        withComponentCalls.length === 0
+      ) {
         if (DEBUG)
           console.log(
             "[styled-static] No templates, variants, or withComponent found, skipping"
@@ -447,7 +456,11 @@ export default css;
         s.overwrite(t.node.start, t.node.end, replacement);
 
         // styled, styledExtend, styledAttrs need createElement and m
-        if (t.type === "styled" || t.type === "styledExtend" || t.type === "styledAttrs") {
+        if (
+          t.type === "styled" ||
+          t.type === "styledExtend" ||
+          t.type === "styledAttrs"
+        ) {
           needsCreateElement = true;
         }
         // css, keyframes, createGlobalStyle don't need runtime
@@ -620,8 +633,8 @@ export default css;
 // ============================================================================
 
 /**
- * Find all imports from 'styled-static' and return their local names.
- * Handles aliased imports like `import { styled as s } from 'styled-static'`
+ * Find all imports from '@alex.radulescu/styled-static' and return their local names.
+ * Handles aliased imports like `import { styled as s } from '@alex.radulescu/styled-static'`
  */
 function findStyledStaticImports(ast: ESTree.Program): StyledStaticImports {
   const imports: StyledStaticImports = {};
@@ -887,10 +900,7 @@ function normalizePath(p: string): string {
  */
 function rewriteCssImports(code: string, cssFileName: string): string {
   // Remove all virtual:styled-static imports
-  code = code.replace(
-    /import\s*["']virtual:styled-static[^"']*["'];?\n?/g,
-    ""
-  );
+  code = code.replace(/import\s*["']virtual:styled-static[^"']*["'];?\n?/g, "");
   // Remove /* empty css */ comments Vite adds
   code = code.replace(/\/\*\s*empty css\s*\*\/\s*/g, "");
   // Remove useless side-effect import of styled-static package

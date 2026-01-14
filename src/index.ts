@@ -6,7 +6,7 @@
  *
  * @example
  * ```tsx
- * import { styled, css, createGlobalStyle } from 'styled-static';
+ * import { styled, css, createGlobalStyle } from '@alex.radulescu/styled-static';
  *
  * // Style HTML elements
  * const Button = styled.button`
@@ -343,6 +343,9 @@ export function cssVariants<V extends import("./types").VariantsConfig>(
 export function withComponent<
   T extends import("./types").HTMLTag | import("react").ComponentType<any>,
   F extends { className: string },
->(_toComponent: T, _fromComponent: F): import("./types").StyledComponent<T> & { className: string } {
+>(
+  _toComponent: T,
+  _fromComponent: F
+): import("./types").StyledComponent<T> & { className: string } {
   throwConfigError("withComponent");
 }

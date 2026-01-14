@@ -1,6 +1,6 @@
 {
   "name": "@alex.radulescu/styled-static",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "description": "Near-zero-runtime styled components for React 19+ with Vite. CSS extracted at build time, minimal runtime.",
   "type": "module",
   "private": false,

@@ -2,7 +2,7 @@
  * How It Works Section - Explains the build-time transformation
  * Contains: compilation process, virtual CSS modules, runtime wrappers, bundle size
  */
-import { styled } from "styled-static";
+import { styled } from "@alex.radulescu/styled-static";
 import { Lightbulb } from "lucide-react";
 import {
   Breadcrumb,

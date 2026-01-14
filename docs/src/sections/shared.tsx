@@ -4,7 +4,7 @@
  */
 import { type ReactNode, useState } from "react";
 import { AlertTriangle, Check, Copy, Info, Lightbulb } from "lucide-react";
-import { css, cssVariants, cx, styled, styledVariants } from "styled-static";
+import { css, cssVariants, cx, styled, styledVariants } from "@alex.radulescu/styled-static";
 import { highlight } from "sugar-high";
 
 // =============================================================================

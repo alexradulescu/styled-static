@@ -3,7 +3,7 @@
  * Contains: styled, extension, css, cx, keyframes, attrs, variants, global
  */
 import { useState } from "react";
-import { styled, cx } from "styled-static";
+import { cx, styled } from "@alex.radulescu/styled-static";
 import {
   AlertTriangle,
   Breadcrumb,
@@ -14,7 +14,6 @@ import {
   DemoArea,
   DemoLabel,
   ExtendedButton,
-  highlightClass,
   Info,
   InlineCode,
   Lightbulb,
@@ -23,6 +22,27 @@ import {
   SectionTitle,
   StyledButton,
   SubsectionTitle,
+  highlightClass,
+} from "./shared";
+import {
+  AlertTriangle,
+  Breadcrumb,
+  Button,
+  ButtonGroup,
+  Callout,
+  CodeBlock,
+  DemoArea,
+  DemoLabel,
+  ExtendedButton,
+  Info,
+  InlineCode,
+  Lightbulb,
+  Paragraph,
+  Section,
+  SectionTitle,
+  StyledButton,
+  SubsectionTitle,
+  highlightClass,
 } from "./shared";
 
 // Section-specific styled component (tests CSS code splitting)
@@ -47,7 +67,7 @@ export function ApiSection() {
           Create styled React components with static CSS extraction. CSS is
           extracted at build time.
         </Paragraph>
-        <CodeBlock filename="Button.tsx">{`import { styled } from 'styled-static';
+        <CodeBlock filename="Button.tsx">{`import { styled } from '@alex.radulescu/styled-static';
 
 const Button = styled.button\`
   padding: 0.5rem 1rem;
@@ -107,7 +127,7 @@ const BoldButton = styled(Button)\`
           string. Use it for conditional styles or to mix with styled
           components.
         </Paragraph>
-        <CodeBlock>{`import { css } from 'styled-static';
+        <CodeBlock>{`import { css } from '@alex.radulescu/styled-static';
 
 const highlightClass = css\`
   box-shadow: 0 0 0 3px #10b981;
@@ -137,10 +157,10 @@ const highlightClass = css\`
         <Breadcrumb>API</Breadcrumb>
         <SectionTitle>cx Utility</SectionTitle>
         <Paragraph>
-          A minimal utility for conditionally joining class names.
-          Filters out falsy values automatically.
+          A minimal utility for conditionally joining class names. Filters out
+          falsy values automatically.
         </Paragraph>
-        <CodeBlock>{`import { cx } from 'styled-static';
+        <CodeBlock>{`import { cx } from '@alex.radulescu/styled-static';
 
 // Multiple class names
 cx('base', 'active')           // → 'base active'
@@ -164,7 +184,7 @@ cx('a', null, undefined, false, 'b') // → 'a b'`}</CodeBlock>
           Create scoped keyframe animations. The animation name is hashed to
           avoid conflicts between components.
         </Paragraph>
-        <CodeBlock>{`import { styled, keyframes } from 'styled-static';
+        <CodeBlock>{`import { styled, keyframes } from '@alex.radulescu/styled-static';
 
 const spin = keyframes\`
   from { transform: rotate(0deg); }
@@ -207,7 +227,7 @@ const PulsingDot = styled.div\`
           Set default HTML attributes on styled components using the{" "}
           <InlineCode>.attrs()</InlineCode> method.
         </Paragraph>
-        <CodeBlock>{`import { styled } from 'styled-static';
+        <CodeBlock>{`import { styled } from '@alex.radulescu/styled-static';
 
 // Set default type for input
 const PasswordInput = styled.input.attrs({ type: 'password' })\`
@@ -254,7 +274,7 @@ const SubmitButton = styled.button.attrs({
           syntax highlighting from the styled-components VSCode extension.
         </Callout>
         <SubsectionTitle>styledVariants</SubsectionTitle>
-        <CodeBlock>{`import { styledVariants, css } from 'styled-static';
+        <CodeBlock>{`import { styledVariants, css } from '@alex.radulescu/styled-static';
 
 // With css\`\` for syntax highlighting (recommended)
 const Button = styledVariants({
@@ -316,7 +336,7 @@ const SimpleButton = styledVariants({
         </DemoArea>
 
         <SubsectionTitle>cssVariants</SubsectionTitle>
-        <CodeBlock>{`import { cssVariants, css, cx } from 'styled-static';
+        <CodeBlock>{`import { cssVariants, css, cx } from '@alex.radulescu/styled-static';
 
 // With css\`\` for syntax highlighting (recommended)
 const badgeCss = cssVariants({
@@ -350,7 +370,7 @@ const badgeCss = cssVariants({
           Use <InlineCode>createGlobalStyle</InlineCode> for global CSS like
           resets, CSS variables, or base styles.
         </Paragraph>
-        <CodeBlock>{`import { createGlobalStyle } from 'styled-static';
+        <CodeBlock>{`import { createGlobalStyle } from '@alex.radulescu/styled-static';
 
 const GlobalStyle = createGlobalStyle\`
   :root {

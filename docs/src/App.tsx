@@ -27,7 +27,7 @@ import {
   onSystemThemeChange,
   setTheme,
   styled,
-} from "styled-static";
+} from "@alex.radulescu/styled-static";
 import { CodeBlock } from "./sections/shared";
 
 // Lazy-loaded sections for code splitting
