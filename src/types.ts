@@ -28,6 +28,14 @@ export type VariantOptions = Record<string, VariantValue>;
 export type VariantsConfig = Record<string, VariantOptions>;
 
 /**
+ * A single compound variant definition.
+ * Combines multiple variant conditions with CSS to apply when all match.
+ */
+export type CompoundVariantDefinition<V extends VariantsConfig> = Partial<{
+  [K in keyof V]: keyof V[K];
+}> & { css: string };
+
+/**
  * Base configuration for variants (used by cssVariants).
  */
 export interface VariantsDefinition<V extends VariantsConfig = VariantsConfig> {
@@ -35,6 +43,10 @@ export interface VariantsDefinition<V extends VariantsConfig = VariantsConfig> {
   css?: string;
   /** Variant definitions */
   variants: V;
+  /** Default values for variants (applied when prop is undefined) */
+  defaultVariants?: Partial<{ [K in keyof V]: keyof V[K] }>;
+  /** Compound variants - styles applied when multiple conditions match */
+  compoundVariants?: Array<CompoundVariantDefinition<V>>;
 }
 
 /**

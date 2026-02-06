@@ -267,33 +267,33 @@ const Button = styledVariants({
   \`,
   variants: {
     variant: {
-      primary: css\`
-        background: #10b981;
-        color: white;
-      \`,
-      secondary: css\`
-        background: #e5e7eb;
-        color: #1a1a1a;
-      \`,
+      primary: css\`background: #10b981; color: white;\`,
+      secondary: css\`background: #e5e7eb; color: #1a1a1a;\`,
+      danger: css\`background: #ef4444; color: white;\`,
     },
     size: {
       sm: css\`font-size: 0.875rem;\`,
       lg: css\`font-size: 1.125rem;\`,
     },
   },
-});
-
-// Plain strings also work (no highlighting)
-const SimpleButton = styledVariants({
-  component: 'button',
-  css: \`padding: 0.5rem;\`,
-  variants: {
-    size: { sm: \`font-size: 0.875rem;\` },
+  // Default values (applied when prop is undefined)
+  defaultVariants: {
+    variant: 'primary',
+    size: 'sm',
   },
+  // Compound variants (styles when multiple conditions match)
+  compoundVariants: [
+    {
+      variant: 'danger',
+      size: 'lg',
+      css: css\`font-weight: 900; text-transform: uppercase;\`,
+    },
+  ],
 });
 
-// Usage with type-safe props
-<Button variant="primary" size="lg">Click</Button>`}</CodeBlock>
+// Usage - defaults are applied automatically
+<Button>Click</Button>  // variant="primary", size="sm"
+<Button size="lg" variant="danger">Delete</Button>  // Gets compound styles`}</CodeBlock>
         <DemoArea>
           <DemoLabel>Result</DemoLabel>
           <ButtonGroup>

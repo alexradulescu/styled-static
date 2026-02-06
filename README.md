@@ -397,10 +397,28 @@ const Button = styledVariants({
       lg: css`font-size: 1.125rem; padding: 0.75rem 1.5rem;`,
     },
   },
+  // Default variant values (applied when prop is undefined)
+  defaultVariants: {
+    color: "primary",
+    size: "sm",
+  },
+  // Compound variants (special styles when multiple conditions match)
+  compoundVariants: [
+    {
+      size: "lg",
+      color: "danger",
+      css: css`font-weight: 900; text-transform: uppercase;`,
+    },
+  ],
 });
 
-<Button color="primary" size="lg">Click me</Button>
-// Renders: <button class="ss-abc ss-abc--color-primary ss-abc--size-lg">
+<Button>Click me</Button>
+// Uses defaults: color="primary", size="sm"
+// Renders: <button class="ss-abc ss-abc--color-primary ss-abc--size-sm">
+
+<Button size="lg" color="danger">Delete</Button>
+// Gets compound styles (font-weight: 900, text-transform: uppercase)
+// Renders: <button class="ss-abc ss-abc--color-danger ss-abc--size-lg">
 ```
 
 #### cssVariants
@@ -422,6 +440,7 @@ const badgeCss = cssVariants({
       warning: css`background: #fef3c7; color: #92400e;`,
     },
   },
+  // defaultVariants and compoundVariants also work with cssVariants
 });
 
 // Usage - returns class string

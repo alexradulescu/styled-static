@@ -159,10 +159,24 @@ const Button = styledVariants({
       lg: css`font-size: 1.125rem; padding: 0.75rem 1.5rem;`,
     },
   },
+  // Default variant values (applied when prop is undefined)
+  defaultVariants: {
+    color: 'primary',
+    size: 'sm',
+  },
+  // Compound variants (styles when multiple conditions match)
+  compoundVariants: [
+    {
+      color: 'danger',
+      size: 'lg',
+      css: css`font-weight: 900; text-transform: uppercase;`,
+    },
+  ],
 });
 
-<Button color="primary" size="lg">Large Primary</Button>
-// Renders: class="ss-base ss-base--color-primary ss-base--size-lg"
+<Button>Click</Button>  // Uses defaults: color="primary", size="sm"
+<Button color="danger" size="lg">Delete</Button>  // Gets compound styles
+// Renders: class="ss-base ss-base--color-danger ss-base--size-lg"
 ```
 
 ### cssVariants
@@ -174,8 +188,14 @@ import { cssVariants, css } from '@alex.radulescu/styled-static';
 const buttonClass = cssVariants({
   css: css`padding: 0.5rem 1rem;`,
   variants: {
-    color: { primary: css`background: blue;` },
+    color: { primary: css`background: blue;`, danger: css`background: red;` },
+    size: { sm: css`font-size: 0.875rem;`, lg: css`font-size: 1.25rem;` },
   },
+  // defaultVariants and compoundVariants also work with cssVariants
+  defaultVariants: { color: 'primary', size: 'sm' },
+  compoundVariants: [
+    { color: 'danger', size: 'lg', css: css`font-weight: bold;` },
+  ],
 });
 
 <button className={buttonClass({ color: 'primary' })}>Click</button>

@@ -726,6 +726,90 @@ const Button = styledVariants({
     expect(result).not.toBeNull();
     expect(result?.code).toContain("Object.assign");
   });
+
+  it("should apply defaultVariants as default parameter values", async () => {
+    const code = `import { styledVariants, css } from '@alex.radulescu/styled-static';
+const Button = styledVariants({
+  component: 'button',
+  css: css\`padding: 1rem;\`,
+  variants: {
+    size: {
+      sm: css\`font-size: 0.875rem;\`,
+      md: css\`font-size: 1rem;\`,
+      lg: css\`font-size: 1.25rem;\`,
+    },
+    intent: {
+      primary: css\`background: blue;\`,
+      danger: css\`background: red;\`,
+    },
+  },
+  defaultVariants: {
+    size: 'md',
+    intent: 'primary',
+  },
+});`;
+    const result = await transform(plugin, code, "/test.tsx");
+
+    expect(result).not.toBeNull();
+    // Default values should appear in the destructure
+    expect(result?.code).toContain('size = "md"');
+    expect(result?.code).toContain('intent = "primary"');
+  });
+
+  it("should generate compoundVariants CSS with combined selectors", async () => {
+    const code = `import { styledVariants, css } from '@alex.radulescu/styled-static';
+const Button = styledVariants({
+  component: 'button',
+  css: css\`padding: 1rem;\`,
+  variants: {
+    size: {
+      sm: css\`font-size: 0.875rem;\`,
+      lg: css\`font-size: 1.25rem;\`,
+    },
+    intent: {
+      primary: css\`background: blue;\`,
+      danger: css\`background: red;\`,
+    },
+  },
+  compoundVariants: [
+    {
+      size: 'lg',
+      intent: 'danger',
+      css: css\`font-weight: 900; text-transform: uppercase;\`,
+    },
+  ],
+});`;
+    const result = await transform(plugin, code, "/test.tsx");
+
+    expect(result).not.toBeNull();
+    // Component should still work normally
+    expect(result?.code).toContain("Object.assign");
+    expect(result?.code).toContain("createElement");
+  });
+
+  it("should handle both defaultVariants and compoundVariants together", async () => {
+    const code = `import { styledVariants, css } from '@alex.radulescu/styled-static';
+const Button = styledVariants({
+  component: 'button',
+  css: css\`padding: 1rem;\`,
+  variants: {
+    size: { sm: css\`font-size: 0.875rem;\`, lg: css\`font-size: 1.25rem;\` },
+    intent: { primary: css\`background: blue;\`, danger: css\`background: red;\` },
+  },
+  defaultVariants: {
+    size: 'sm',
+    intent: 'primary',
+  },
+  compoundVariants: [
+    { size: 'lg', intent: 'danger', css: css\`font-weight: bold;\` },
+  ],
+});`;
+    const result = await transform(plugin, code, "/test.tsx");
+
+    expect(result).not.toBeNull();
+    expect(result?.code).toContain('size = "sm"');
+    expect(result?.code).toContain('intent = "primary"');
+  });
 });
 
 // =============================================================================
@@ -789,6 +873,41 @@ export const buttonClass = cssVariants({
     const result = await transform(plugin, code, "/test.tsx");
 
     expect(result?.code).toContain("export const buttonClass = (variants) =>");
+  });
+
+  it("should handle cssVariants with defaultVariants", async () => {
+    const code = `import { cssVariants, css } from '@alex.radulescu/styled-static';
+const buttonClass = cssVariants({
+  css: css\`padding: 1rem;\`,
+  variants: {
+    size: { sm: css\`font-size: 0.875rem;\`, md: css\`font-size: 1rem;\`, lg: css\`font-size: 1.25rem;\` },
+  },
+  defaultVariants: {
+    size: 'md',
+  },
+});`;
+    const result = await transform(plugin, code, "/test.tsx");
+
+    expect(result).not.toBeNull();
+    expect(result?.code).toContain("(variants) =>");
+  });
+
+  it("should handle cssVariants with compoundVariants", async () => {
+    const code = `import { cssVariants, css } from '@alex.radulescu/styled-static';
+const buttonClass = cssVariants({
+  css: css\`padding: 1rem;\`,
+  variants: {
+    size: { sm: css\`font-size: 0.875rem;\`, lg: css\`font-size: 1.25rem;\` },
+    intent: { primary: css\`background: blue;\`, danger: css\`background: red;\` },
+  },
+  compoundVariants: [
+    { size: 'lg', intent: 'danger', css: css\`font-weight: bold;\` },
+  ],
+});`;
+    const result = await transform(plugin, code, "/test.tsx");
+
+    expect(result).not.toBeNull();
+    expect(result?.code).toContain("(variants) =>");
   });
 });
 

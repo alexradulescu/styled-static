@@ -62,7 +62,6 @@ import type * as ESTree from "estree";
 import MagicString from "magic-string";
 import type { Plugin, ResolvedConfig } from "vite";
 import { hash } from "./hash.js";
-import { hash } from "./hash.js";
 
 // ============================================================================
 // Types
@@ -155,6 +154,11 @@ interface FoundVariant {
   baseCss: string | undefined; // Base CSS string
   variants: Map<string, Map<string, string>>; // variantName -> { valueName -> css }
   variableName: string; // Variable name for displayName
+  defaultVariants?: Map<string, string>; // variantName -> defaultValue
+  compoundVariants?: Array<{
+    conditions: Map<string, string>; // variantName -> requiredValue
+    css: string;
+  }>;
 }
 
 // ============================================================================
@@ -492,6 +496,20 @@ export default css;
           for (const [valueName, cssContent] of values) {
             const modifierClass = `${baseClass}--${variantName}-${valueName}`;
             allCss += `.${modifierClass} { ${cssContent} }\n`;
+          }
+        }
+
+        // Compound variant CSS (combined selectors for higher specificity)
+        if (v.compoundVariants) {
+          for (const cv of v.compoundVariants) {
+            // Build combined selector: .ss-btn--size-lg.ss-btn--intent-danger
+            const selectors = Array.from(cv.conditions.entries())
+              .map(
+                ([variantName, value]) =>
+                  `.${baseClass}--${variantName}-${value}`
+              )
+              .join("");
+            allCss += `${selectors} { ${cv.css} }\n`;
           }
         }
 
@@ -995,6 +1013,10 @@ function classifyVariantCall(
   let component: string | undefined;
   let baseCss: string | undefined;
   const variants = new Map<string, Map<string, string>>();
+  let defaultVariants: Map<string, string> | undefined;
+  let compoundVariants:
+    | Array<{ conditions: Map<string, string>; css: string }>
+    | undefined;
 
   for (const prop of configObj.properties) {
     if (prop.type !== "Property" || prop.key.type !== "Identifier") continue;
@@ -1101,9 +1123,103 @@ function classifyVariantCall(
         }
       }
     }
+
+    // defaultVariants: { size: 'md', intent: 'primary' }
+    if (propName === "defaultVariants" && prop.value.type === "ObjectExpression") {
+      const defaults = new Map<string, string>();
+      for (const defaultProp of prop.value.properties) {
+        if (
+          defaultProp.type !== "Property" ||
+          defaultProp.key.type !== "Identifier"
+        )
+          continue;
+
+        const variantName = defaultProp.key.name;
+        let defaultValue: string | undefined;
+
+        if (
+          defaultProp.value.type === "Literal" &&
+          typeof defaultProp.value.value === "string"
+        ) {
+          defaultValue = defaultProp.value.value;
+        }
+
+        if (defaultValue) {
+          defaults.set(variantName, defaultValue);
+        }
+      }
+      if (defaults.size > 0) {
+        defaultVariants = defaults;
+      }
+    }
+
+    // compoundVariants: [{ size: 'lg', intent: 'danger', css: `...` }]
+    if (propName === "compoundVariants" && prop.value.type === "ArrayExpression") {
+      const compounds: Array<{ conditions: Map<string, string>; css: string }> =
+        [];
+
+      for (const element of prop.value.elements) {
+        if (element?.type !== "ObjectExpression") continue;
+
+        const conditions = new Map<string, string>();
+        let cssContent: string | undefined;
+
+        for (const cvProp of element.properties) {
+          if (cvProp.type !== "Property" || cvProp.key.type !== "Identifier")
+            continue;
+
+          const key = cvProp.key.name;
+
+          if (key === "css") {
+            // Parse CSS content (same logic as regular variants)
+            if (
+              cvProp.value.type === "Literal" &&
+              typeof cvProp.value.value === "string"
+            ) {
+              cssContent = cvProp.value.value;
+            } else if (cvProp.value.type === "TemplateLiteral") {
+              const tpl = cvProp.value as ESTree.TemplateLiteral & {
+                start: number;
+                end: number;
+              };
+              cssContent = code.slice(tpl.start + 1, tpl.end - 1);
+            } else if (cvProp.value.type === "TaggedTemplateExpression") {
+              const tagged = cvProp.value as ESTree.TaggedTemplateExpression & {
+                quasi: ESTree.TemplateLiteral & { start: number; end: number };
+              };
+              if (
+                tagged.tag.type === "Identifier" &&
+                tagged.tag.name === imports.css
+              ) {
+                cssContent = code.slice(
+                  tagged.quasi.start + 1,
+                  tagged.quasi.end - 1
+                );
+              }
+            }
+          } else {
+            // It's a condition: size: 'lg'
+            if (
+              cvProp.value.type === "Literal" &&
+              typeof cvProp.value.value === "string"
+            ) {
+              conditions.set(key, cvProp.value.value);
+            }
+          }
+        }
+
+        if (cssContent && conditions.size > 0) {
+          compounds.push({ conditions, css: cssContent });
+        }
+      }
+
+      if (compounds.length > 0) {
+        compoundVariants = compounds;
+      }
+    }
   }
 
-  return {
+  const result: FoundVariant = {
     type: isStyledVariants ? "styledVariants" : "cssVariants",
     start: node.start,
     end: node.end,
@@ -1112,6 +1228,15 @@ function classifyVariantCall(
     variants,
     variableName,
   };
+
+  if (defaultVariants) {
+    result.defaultVariants = defaultVariants;
+  }
+  if (compoundVariants) {
+    result.compoundVariants = compoundVariants;
+  }
+
+  return result;
 }
 
 /** Threshold for switching from if/else to hoisted map */
@@ -1151,10 +1276,14 @@ function generateVariantReplacement(
   );
   const useHoistedMap = totalVariantValues > VARIANT_MAP_THRESHOLD;
 
-  // Destructure variant props from the component props
+  // Destructure variant props from the component props, with defaults if specified
+  const propsEntries = variantKeys.map((key) => {
+    const defaultValue = variant.defaultVariants?.get(key);
+    return defaultValue ? `${key} = ${safeStringLiteral(defaultValue)}` : key;
+  });
   const propsDestructure =
     variantKeys.length > 0
-      ? `{ ${variantKeys.join(", ")}, className, ...p }`
+      ? `{ ${propsEntries.join(", ")}, className, ...p }`
       : `{ className, ...p }`;
 
   let variantLogic: string;
@@ -1205,6 +1334,11 @@ function generateVariantReplacement(
     variantLogic =
       variantChecks.length > 0 ? variantChecks.join("; ") + "; " : "";
   }
+
+  // Note: Compound variants work through CSS specificity alone.
+  // The combined selectors (e.g., .ss-btn--size-lg.ss-btn--intent-danger)
+  // automatically match when individual variant classes are present.
+  // No additional runtime logic is needed.
 
   if (variant.type === "styledVariants") {
     // Check if component is an HTML tag (lowercase) or component reference
