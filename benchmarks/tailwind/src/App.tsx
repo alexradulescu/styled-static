@@ -796,7 +796,7 @@ export function App() {
             {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
           </ThemeToggle>
           <IconLink
-            href="https://github.com/nicholascostadev/styled-static"
+            href="https://github.com/alexradulescu/styled-static"
             target="_blank"
             rel="noopener noreferrer"
             aria-label="GitHub repository"

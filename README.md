@@ -805,9 +805,9 @@ Zero runtime dependencies. Uses native CSS nesting (Chrome 112+, Safari 16.5+, F
 | `css` helper | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `css` inline prop | ✗ | ✓ | ✗ | ✓ | ✓ |
 | Runtime interpolation | ✗ | ✓ | ✗ | ✓ | ✗ |
+| Default variants | ✓ | ✗ | ✗ | ✗ | ✓ |
+| Compound variants | ✓ | ✗ | ✗ | ✗ | ✓ |
 | `.className` access | ✓ | ✗ | ✗ | ✗ | ✗ |
-
-**When to choose:** styled-static for familiar DX + zero deps + React 19/Vite. Emotion for runtime interpolation + ThemeProvider. Linaria for multi-bundler zero-runtime. [Restyle](https://restyle.dev) for `css` prop + Server Components. Panda for atomic CSS + design tokens.
 
 ---
 

@@ -283,6 +283,22 @@ const GlobalStyles = () => null;`}</CodeBlock>
                 <td style={{ padding: "0.75rem" }}>✓</td>
                 <td style={{ padding: "0.75rem" }}>✗</td>
               </tr>
+              <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
+                <td style={{ padding: "0.75rem" }}>Default variants</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>✗</td>
+                <td style={{ padding: "0.75rem" }}>✗</td>
+                <td style={{ padding: "0.75rem" }}>✗</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
+              </tr>
+              <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
+                <td style={{ padding: "0.75rem" }}>Compound variants</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
+                <td style={{ padding: "0.75rem" }}>✗</td>
+                <td style={{ padding: "0.75rem" }}>✗</td>
+                <td style={{ padding: "0.75rem" }}>✗</td>
+                <td style={{ padding: "0.75rem" }}>✓</td>
+              </tr>
               <tr>
                 <td style={{ padding: "0.75rem" }}><InlineCode>.className</InlineCode> access</td>
                 <td style={{ padding: "0.75rem" }}>✓</td>
@@ -294,14 +310,6 @@ const GlobalStyles = () => null;`}</CodeBlock>
             </tbody>
           </table>
         </div>
-
-        <Paragraph style={{ color: "var(--color-text-secondary)" }}>
-          <strong>When to choose:</strong> styled-static for familiar DX + zero deps + React 19/Vite.
-          Emotion for runtime interpolation + ThemeProvider.
-          Linaria for multi-bundler zero-runtime.{" "}
-          <a href="https://restyle.dev" target="_blank" rel="noopener noreferrer">Restyle</a> for <InlineCode>css</InlineCode> prop + Server Components.
-          Panda for atomic CSS + design tokens.
-        </Paragraph>
       </Section>
 
       {/* Component Extensions */}

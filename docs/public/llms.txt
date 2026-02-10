@@ -1,0 +1,631 @@
+# styled-static
+
+> Near-zero-runtime CSS-in-JS for React 19+ with Vite. Write styled-components syntax, get static CSS extracted at build time. Minimal ~45 byte runtime for className merging. Zero runtime dependencies.
+
+styled-static is a Vite plugin that transforms styled-components-like template literals into static CSS at build time. Components are generated inline as lightweight functions with a static `.className` property for composition.
+
+Package: `@alex.radulescu/styled-static`
+
+Requirements:
+- React 19+ (uses automatic ref forwarding, no forwardRef)
+- Vite only (uses Vite's AST parser and virtual modules)
+
+Constraints:
+- No runtime interpolation -- cannot write `${props => props.color}`. Use variants, CSS variables, or data attributes instead.
+- No `css` prop -- use named `css` variables with `className`.
+- No `shouldForwardProp` -- not needed. Variants auto-strip their props.
+- No `as` prop -- replaced by `withComponent(To, From)` for build-time polymorphism.
+
+Exports (from `@alex.radulescu/styled-static`):
+- `styled` -- create styled components with template literals
+- `css` -- get scoped class names for conditional styling
+- `keyframes` -- create scoped animations with hashed names
+- `createGlobalStyle` -- global CSS (renders as no-op component)
+- `cx` -- minimal className joining utility (~40 bytes)
+- `styledVariants` -- type-safe component variants with props
+- `cssVariants` -- type-safe class variant functions
+- `withComponent` -- build-time polymorphism
+
+Theme helpers (from `@alex.radulescu/styled-static`):
+- `initTheme` -- initialize theme (reads localStorage, system preference, or default)
+- `setTheme` -- switch themes with optional localStorage persistence
+- `getTheme` -- read current theme from `data-theme` attribute
+- `onSystemThemeChange` -- subscribe to OS theme changes
+
+## Getting Started
+
+Install the package:
+
+```bash
+npm install @alex.radulescu/styled-static
+# or
+bun add @alex.radulescu/styled-static
+```
+
+Configure the Vite plugin (must be placed before the React plugin):
+
+```ts
+// vite.config.ts
+import react from "@vitejs/plugin-react";
+import { styledStatic } from "@alex.radulescu/styled-static/vite";
+import { defineConfig } from "vite";
+
+export default defineConfig({
+  plugins: [styledStatic(), react()],
+});
+```
+
+Optional: Add Lightning CSS for autoprefixing:
+
+```ts
+export default defineConfig({
+  css: { transformer: "lightningcss" },
+  plugins: [styledStatic(), react()],
+});
+```
+
+## API Reference
+
+### styled
+
+Create styled React components. CSS is extracted at build time; the component becomes an inline function.
+
+```tsx
+import { styled } from "@alex.radulescu/styled-static";
+
+const Button = styled.button`
+  padding: 0.5rem 1rem;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+
+  &:hover {
+    background: #2563eb;
+  }
+`;
+
+<Button onClick={handleClick}>Click me</Button>
+```
+
+### Component Extension
+
+Extend existing styled components by passing them to `styled()`. Classes are ordered: base first, extension second, user className last.
+
+```tsx
+const Button = styled.button`
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+`;
+
+const PrimaryButton = styled(Button)`
+  background: #3b82f6;
+  color: white;
+`;
+
+// Chain extensions (multi-level)
+const LargePrimaryButton = styled(PrimaryButton)`
+  padding: 1rem 2rem;
+  font-size: 1.25rem;
+`;
+
+<LargePrimaryButton className="custom" />
+// Renders: class="ss-base ss-primary ss-large custom"
+```
+
+### css Helper
+
+Get a scoped class name string. At build time, `css` becomes a plain string literal -- zero runtime cost.
+
+```tsx
+import { css } from "@alex.radulescu/styled-static";
+
+const activeClass = css`
+  outline: 2px solid blue;
+`;
+
+const highlightClass = css`
+  box-shadow: 0 0 10px yellow;
+`;
+
+<Button className={isActive ? activeClass : ""}>Conditional styling</Button>
+<div className={`${activeClass} ${highlightClass}`}>Multiple classes</div>
+```
+
+### keyframes
+
+Create scoped keyframe animations. The animation name is hashed at build time to avoid conflicts.
+
+```tsx
+import { keyframes, styled } from "@alex.radulescu/styled-static";
+
+const spin = keyframes`
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+`;
+
+const pulse = keyframes`
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+`;
+
+const Spinner = styled.div`
+  width: 24px;
+  height: 24px;
+  border: 2px solid #3b82f6;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: ${spin} 1s linear infinite;
+`;
+```
+
+### attrs
+
+Set default HTML attributes using `.attrs()`. Attributes must be static objects (no functions).
+
+```tsx
+const SubmitButton = styled.button.attrs({
+  type: "submit",
+  "aria-label": "Submit form",
+})`
+  padding: 0.5rem 1rem;
+  background: #3b82f6;
+  color: white;
+`;
+
+<SubmitButton>Send</SubmitButton>
+// Renders: <button type="submit" aria-label="Submit form" class="ss-xyz789">
+```
+
+### cx Utility
+
+Combine class names conditionally. Intentionally flat (no nested arrays/objects) for minimal bundle size (~40 bytes).
+
+```tsx
+import { css, cx } from "@alex.radulescu/styled-static";
+
+const activeClass = css`color: blue;`;
+
+cx("base", "active")                     // "base active"
+cx("btn", isActive && activeClass)        // "btn ss-abc123" or "btn"
+cx("a", null, undefined, false, "b")      // "a b"
+```
+
+### createGlobalStyle
+
+Create global (unscoped) CSS. Returns a component that renders nothing -- CSS is extracted at build time.
+
+```tsx
+import { createGlobalStyle } from "@alex.radulescu/styled-static";
+
+const GlobalStyle = createGlobalStyle`
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, sans-serif; }
+  :root {
+    --color-primary: #3b82f6;
+    --color-text: #1a1a1a;
+  }
+`;
+
+// Render once at app root
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <GlobalStyle />
+    <App />
+  </StrictMode>
+);
+```
+
+### styledVariants
+
+Create a styled component with type-safe variant props. CSS for base and all variants is extracted at build time. Variant props are mapped to modifier classes at runtime.
+
+Wrap CSS strings in `css` template literals for IDE syntax highlighting.
+
+```tsx
+import { css, styledVariants } from "@alex.radulescu/styled-static";
+
+const Button = styledVariants({
+  component: "button",
+  css: css`
+    padding: 0.5rem 1rem;
+    background: gray;
+    color: white;
+    font-size: 1rem;
+  `,
+  variants: {
+    color: {
+      primary: css`background: blue;`,
+      danger: css`background: red;`,
+      success: css`background: green;`,
+    },
+    size: {
+      sm: css`font-size: 0.875rem; padding: 0.25rem 0.5rem;`,
+      lg: css`font-size: 1.125rem; padding: 0.75rem 1.5rem;`,
+    },
+  },
+  defaultVariants: {
+    color: "primary",
+    size: "sm",
+  },
+  compoundVariants: [
+    {
+      size: "lg",
+      color: "danger",
+      css: css`font-weight: 900; text-transform: uppercase;`,
+    },
+  ],
+});
+
+<Button>Click me</Button>
+// Uses defaults: color="primary", size="sm"
+// Renders: <button class="ss-abc ss-abc--color-primary ss-abc--size-sm">
+
+<Button size="lg" color="danger">Delete</Button>
+// Compound styles applied (font-weight: 900, text-transform: uppercase)
+```
+
+### cssVariants
+
+Create a variant function that returns class strings instead of rendering a component. Same variant features as styledVariants (defaultVariants, compoundVariants).
+
+```tsx
+import { cssVariants, css, cx } from "@alex.radulescu/styled-static";
+
+const badgeCss = cssVariants({
+  css: css`
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+  `,
+  variants: {
+    variant: {
+      info: css`background: #e0f2fe; color: #0369a1;`,
+      success: css`background: #dcfce7; color: #166534;`,
+      warning: css`background: #fef3c7; color: #92400e;`,
+    },
+  },
+});
+
+<span className={badgeCss({ variant: "info" })}>Info</span>
+// Returns: "ss-xyz ss-xyz--variant-info"
+
+<span className={cx(badgeCss({ variant: "info" }), isActive && activeClass)}>
+  Info
+</span>
+```
+
+## Features
+
+### Polymorphism with withComponent
+
+Render one component with another's styles. Build-time alternative to the `as` prop.
+
+```tsx
+import { Link } from "react-router-dom";
+import { styled, withComponent } from "@alex.radulescu/styled-static";
+
+const Button = styled.button`
+  padding: 0.5rem 1rem;
+  background: blue;
+  color: white;
+`;
+
+// Create a Link that looks like Button
+const LinkButton = withComponent(Link, Button);
+
+// Also works with HTML tags
+const AnchorButton = withComponent("a", Button);
+
+<LinkButton to="/path">Router link styled as button</LinkButton>
+<AnchorButton href="/external">External link</AnchorButton>
+```
+
+`withComponent(toComponent, fromComponent)` accepts:
+- First argument: the component to render (React component or HTML tag string)
+- Second argument: the styled component whose styles to use
+
+### Manual Composition with .className
+
+Every styled component exposes a static `.className` property for manual composition:
+
+```tsx
+const Button = styled.button`
+  padding: 0.5rem 1rem;
+  background: blue;
+`;
+
+// Use className directly on any element
+<a className={Button.className} href="/link">
+  Link with button styles
+</a>
+
+// Combine with cx utility
+<div className={cx(Button.className, Card.className, "custom")}>
+  Combined styles
+</div>
+```
+
+### CSS Nesting
+
+styled-static uses native CSS nesting (Chrome 112+, Safari 16.5+, Firefox 117+). No build-time processing -- CSS is passed directly to the browser.
+
+```tsx
+const Card = styled.div`
+  padding: 1rem;
+  background: white;
+  border-radius: 8px;
+
+  &:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  & h2 {
+    margin: 0 0 0.5rem;
+  }
+
+  @media (max-width: 640px) {
+    padding: 0.5rem;
+  }
+
+  &::before {
+    content: "";
+    position: absolute;
+  }
+`;
+```
+
+### Dynamic Styling
+
+No runtime interpolation. Use these patterns instead:
+
+- Variants API -- type-safe component variants (recommended)
+- cx utility -- conditional class toggling
+- CSS variables -- pass via `style` prop for truly dynamic values
+- Data attributes -- style with `&[data-variant="x"]` selectors
+
+### Theming
+
+CSS-first theming with CSS variables and `data-theme` attributes:
+
+```tsx
+const GlobalStyle = createGlobalStyle`
+  :root, [data-theme="light"] { --bg: #fff; --text: #1a1a1a; }
+  [data-theme="dark"] { --bg: #0a0a0a; --text: #f1f5f9; }
+  [data-theme="pokemon"] { --bg: #ffcb05; --text: #2a75bb; }
+`;
+
+const Card = styled.div`
+  background: var(--bg);
+  color: var(--text);
+`;
+```
+
+Theme helpers:
+
+```tsx
+import { initTheme, setTheme, getTheme, onSystemThemeChange } from "@alex.radulescu/styled-static";
+
+// Initialize (reads localStorage, then system preference, then default)
+initTheme({ defaultTheme: "light", useSystemPreference: true });
+
+// Switch themes
+setTheme("dark");              // persists to localStorage
+setTheme("pokemon", false);    // no persist (preview)
+
+// Read current
+const current = getTheme();    // "light" | "dark" | etc.
+
+// React to OS changes
+const unsub = onSystemThemeChange((prefersDark) => {
+  if (!localStorage.getItem("theme")) setTheme(prefersDark ? "dark" : "light", false);
+});
+```
+
+| Function | Description |
+|----------|-------------|
+| `initTheme(options?)` | Init on load. Priority: localStorage, system preference, default |
+| `setTheme(theme, persist?)` | Set theme. Persists to localStorage by default |
+| `getTheme()` | Get current theme from `data-theme` attribute |
+| `onSystemThemeChange(cb)` | Subscribe to OS theme changes. Returns unsubscribe function |
+
+## Configuration
+
+```ts
+styledStatic({
+  // Prefix for generated class names (default: "ss")
+  classPrefix: "my-app",
+
+  // CSS output mode (default: "auto")
+  // - "auto": Uses "file" for library builds (build.lib set), "virtual" for apps
+  // - "virtual": CSS as virtual modules (Vite bundles into single file)
+  // - "file": CSS as separate files co-located with JS (for library builds)
+  cssOutput: "auto",
+});
+```
+
+### Library Builds
+
+When building a component library with `build.lib` configured, styled-static automatically outputs CSS as separate files co-located with each JS file. This enables CSS tree-shaking for consuming applications.
+
+```
+dist/
+  components/
+    Button/
+      Button.js    # imports "./Button.css"
+      Button.css   # Button-specific styles only
+    Alert/
+      Alert.js     # imports "./Alert.css"
+      Alert.css    # Alert-specific styles only
+```
+
+Consuming apps automatically get only the CSS for components they import:
+
+```tsx
+import { Button } from "my-component-library/components/Button";
+// Only Button.css is included in the bundle
+```
+
+## TypeScript
+
+Full type inference is provided:
+
+```tsx
+const Button = styled.button`...`;
+
+// Type-safe: button props are available
+<Button type="submit" disabled>Submit</Button>
+
+// Type-safe: withComponent infers props from target component
+const LinkButton = withComponent(Link, Button);
+<LinkButton to="/path">Link</LinkButton>
+
+// Type-safe: .className is always string
+const classes = Button.className; // string
+
+// Type-safe: variant props are inferred
+const VariantButton = styledVariants({
+  component: "button",
+  css: css`padding: 1rem;`,
+  variants: {
+    color: {
+      primary: css`background: blue;`,
+      danger: css`background: red;`,
+    },
+  },
+});
+
+<VariantButton color="primary">Click</VariantButton>
+// TypeScript enforces: color must be "primary" | "danger" | undefined
+```
+
+## Optional
+
+### How It Works
+
+styled-static uses a Vite plugin to transform styled components at build time via AST-based transformation.
+
+Input:
+
+```tsx
+import { styled } from "@alex.radulescu/styled-static";
+
+const Button = styled.button`
+  padding: 1rem;
+  background: blue;
+  color: white;
+`;
+```
+
+Output:
+
+```tsx
+import { createElement } from "react";
+import { m } from "@alex.radulescu/styled-static/runtime";
+import "@alex.radulescu/styled-static:abc123-0.css";
+
+const Button = Object.assign(
+  (p) => createElement("button", {...p, className: m("ss-abc123", p.className)}),
+  { className: "ss-abc123" }
+);
+```
+
+The CSS is extracted to a virtual CSS module. The component becomes an inline function with a static `.className` property.
+
+### Extension Chain Transformation
+
+```tsx
+// Input
+const Button = styled.button`padding: 1rem;`;
+const Primary = styled(Button)`background: blue;`;
+
+// Output
+const Button = Object.assign(
+  (p) => createElement("button", {...p, className: m("ss-btn", p.className)}),
+  { className: "ss-btn" }
+);
+const Primary = Object.assign(
+  (p) => createElement(Button, {...p, className: m("ss-primary", p.className)}),
+  { className: Button.className + " ss-primary" }
+);
+// Primary.className === "ss-btn ss-primary"
+```
+
+### Virtual CSS Modules
+
+Each styled component gets its own virtual CSS module (e.g., `styled-static:abc123-0.css`). Benefits:
+- Deduplication via Vite's CSS pipeline
+- Code splitting -- CSS loads only with the components that use it
+- Hot Module Replacement for instant style updates
+- Production optimization -- CSS can be extracted to a single file
+
+### Minimal Runtime
+
+The entire runtime is a className merge function (~45 bytes minified):
+
+```tsx
+export const m = (base, user) => user ? `${base} ${user}` : base;
+```
+
+| Module | Minified | Brotli |
+|--------|----------|--------|
+| runtime/index.js | 45 B | 50 B |
+
+### Zero-Runtime Features
+
+Some features have zero runtime cost -- completely replaced at build time:
+
+```tsx
+// css helper becomes a string literal
+const activeClass = css`outline: 2px solid blue;`;
+// Generated: const activeClass = "ss-xyz789";
+
+// Global styles become a no-op component
+const GlobalStyles = createGlobalStyle`* { box-sizing: border-box; }`;
+// Generated: const GlobalStyles = () => null;
+
+// withComponent is resolved at build time
+const LinkButton = withComponent(Link, Button);
+// Generated: Object.assign((p) => createElement(Link, {...p, className: m(Button.className, p.className)}), { className: Button.className })
+```
+
+### Comparison
+
+| | styled-static | Emotion | Linaria | Restyle | Panda CSS |
+|-|---------------|---------|---------|---------|-----------|
+| Runtime | ~50 B | ~11 KB | ~1.5 KB | ~2.2 KB | 0 B |
+| Dependencies | 0 | 5+ | 10+ | 0 | 5+ |
+| React | 19+ | 16+ | 16+ | 19+ | 16+ |
+| Bundler | Vite | Any | Many | Any | Any |
+| `styled.el` | Yes | Yes | Yes | Yes | Partial |
+| `styled(Comp)` | Yes | Yes | Yes | Yes | Partial |
+| Variants | Yes | Partial | Partial | Partial | Yes |
+| `css` helper | Yes | Yes | Yes | Yes | Yes |
+| `css` inline prop | No | Yes | No | Yes | Yes |
+| Runtime interpolation | No | Yes | No | Yes | No |
+| Default variants | Yes | No | No | No | Yes |
+| Compound variants | Yes | No | No | No | Yes |
+| `.className` access | Yes | No | No | No | No |
+
+### Troubleshooting
+
+Storybook "This package is ESM only" error: Add the package to Vite's `optimizeDeps.include` in your Storybook config:
+
+```ts
+// .storybook/main.ts
+export default {
+  viteFinal: async (config) => {
+    config.optimizeDeps = config.optimizeDeps || {};
+    config.optimizeDeps.include = [
+      ...(config.optimizeDeps.include || []),
+      "@alex.radulescu/styled-static",
+    ];
+    return config;
+  },
+};
+```
+
+### VS Code Support
+
+Install the vscode-styled-components extension for syntax highlighting in template literals.
