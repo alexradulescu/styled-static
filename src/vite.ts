@@ -61,22 +61,27 @@
 import type * as ESTree from "estree";
 import MagicString from "magic-string";
 import type { Plugin, ResolvedConfig } from "vite";
+import {
+  generateReplacement,
+  generateVariantReplacement,
+  getFileBaseName,
+  isValidIdentifier,
+  normalizePath,
+  rewriteCssImports,
+  safeStringLiteral,
+} from "./codegen.js";
 import { hash } from "./hash.js";
+import {
+  extractTemplateContent,
+  findStyledStaticImports,
+  findTaggedTemplates,
+  findVariantCalls,
+  findWithComponentCalls,
+} from "./parse.js";
 
 // ============================================================================
 // Types
 // ============================================================================
-
-interface TaggedTemplateWithPosition extends ESTree.TaggedTemplateExpression {
-  start: number;
-  end: number;
-  quasi: TemplateLiteralWithPosition;
-}
-
-interface TemplateLiteralWithPosition extends ESTree.TemplateLiteral {
-  start: number;
-  end: number;
-}
 
 /** Plugin configuration options */
 export interface StyledStaticOptions {
@@ -101,66 +106,6 @@ export interface StyledStaticOptions {
   cssOutput?: "auto" | "virtual" | "file";
 }
 
-/** Import tracking for styled-static */
-interface StyledStaticImports {
-  styled?: string;
-  css?: string;
-  createGlobalStyle?: string;
-  keyframes?: string;
-  styledVariants?: string;
-  cssVariants?: string;
-  withComponent?: string;
-  /** The source path of the import (e.g., "styled-static" or "./index") */
-  source?: string;
-}
-
-/** Types of styled templates we can transform */
-type TemplateType =
-  | "styled"
-  | "styledExtend"
-  | "styledAttrs"
-  | "css"
-  | "createGlobalStyle"
-  | "keyframes";
-
-/** Types of variant calls we can transform */
-type VariantType = "styledVariants" | "cssVariants";
-
-/** Information about a found withComponent call */
-interface FoundWithComponent {
-  start: number;
-  end: number;
-  toComponent: string; // Component reference or HTML tag string
-  fromComponent: string; // Styled component reference
-  variableName?: string;
-}
-
-/** Information about a found template */
-interface FoundTemplate {
-  type: TemplateType;
-  node: TaggedTemplateWithPosition;
-  tag: string; // HTML tag for styled.element
-  baseComponent?: string; // Component name for styled(Component)
-  variableName?: string; // Variable name for displayName
-  attrsArg?: string; // Serialized attrs object for styled.element.attrs({})
-}
-
-/** Information about a found variant call */
-interface FoundVariant {
-  type: VariantType;
-  start: number;
-  end: number;
-  component: string | undefined; // 'button' or Component reference
-  baseCss: string | undefined; // Base CSS string
-  variants: Map<string, Map<string, string>>; // variantName -> { valueName -> css }
-  variableName: string; // Variable name for displayName
-  defaultVariants?: Map<string, string>; // variantName -> defaultValue
-  compoundVariants?: Array<{
-    conditions: Map<string, string>; // variantName -> requiredValue
-    css: string;
-  }>;
-}
-
 // ============================================================================
 // Plugin
 // ============================================================================
@@ -177,31 +122,6 @@ interface FoundVariant {
  *   plugins: [styledStatic(), react()],
  * });
  */
-/**
- * SECURITY: Validates that a string is a safe identifier (alphanumeric + underscore).
- * Prevents code injection via displayName or component name interpolation.
- */
-function isValidIdentifier(str: string): boolean {
-  return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(str);
-}
-
-/**
- * SECURITY: Safely escape a string for use in generated code.
- * Uses JSON.stringify to properly escape special characters.
- */
-function safeStringLiteral(str: string): string {
-  return JSON.stringify(str);
-}
-
-/**
- * Extract a clean, CSS-safe filename from a file path.
- * Used in dev mode to generate readable class names.
- */
-function getFileBaseName(filePath: string): string {
-  const base = filePath.split("/").pop() || "unknown";
-  return base.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9]/g, "");
-}
-
 export function styledStatic(options: StyledStaticOptions = {}): Plugin {
   const {
     classPrefix = "ss",
@@ -219,6 +139,8 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
   let config: ResolvedConfig;
   let isDev = false;
   let actualCssOutput: "virtual" | "file" = "virtual";
+  // Per-plugin-instance counter for unique hoisted variant map names
+  let variantMapId = 0;
 
   return {
     name: "styled-static",
@@ -311,10 +233,11 @@ export default css;
       // cached virtual modules.
       if (/\.[tj]sx?$/.test(file)) {
         const normalizedPath = normalizePath(file);
-        // Invalidate all virtual CSS modules from this source file
+        // Invalidate all virtual CSS modules from this source file.
+        // Use normalizedPath + "/" to avoid matching files with a common prefix
+        // (e.g., "Button.tsx" must not invalidate "ButtonGroup.tsx" CSS modules).
         for (const [moduleId] of cssModules) {
-          // New format: virtual:styled-static/path/to/file.tsx/0.css
-          if (moduleId.includes(normalizedPath)) {
+          if (moduleId.includes(normalizedPath + "/")) {
             const mod = server.moduleGraph.getModuleById(`\0${moduleId}`);
             if (mod) {
               server.moduleGraph.invalidateModule(mod);
@@ -421,6 +344,16 @@ export default css;
       // Track if we need React's createElement and our merge helper
       let needsCreateElement = false;
 
+      // Clean up stale CSS modules from previous transforms of this file.
+      // Prevents unbounded memory growth during long dev sessions with HMR.
+      // Use normalizedId + "/" to avoid false matches with files sharing a common prefix.
+      const normalizedId = normalizePath(id);
+      for (const key of cssModules.keys()) {
+        if (key.includes(normalizedId + "/")) {
+          cssModules.delete(key);
+        }
+      }
+
       let cssIndex = 0;
 
       for (let i = 0; i < templates.length; i++) {
@@ -439,12 +372,17 @@ export default css;
           className = `${classPrefix}-${cssHash}`;
         }
 
-        // Wrap CSS in class selector (unless global)
+        // Wrap CSS appropriately per type:
+        // - createGlobalStyle: unscoped (raw CSS)
+        // - keyframes: wrapped in @keyframes rule
+        // - styled/css: wrapped in class selector
         // Lightning CSS (via Vite's CSS pipeline) handles nesting, prefixes, etc.
         const processedCss =
           t.type === "createGlobalStyle"
             ? cssContent
-            : `.${className} { ${cssContent} }`;
+            : t.type === "keyframes"
+              ? `@keyframes ${className} { ${cssContent} }`
+              : `.${className} { ${cssContent} }`;
 
         // Create virtual CSS module with source file path for proper chunk association
         // Use .js extension in dev mode (to avoid Vite's CSS plugin processing)
@@ -456,7 +394,7 @@ export default css;
         cssImports.push(`import "${importId}";`);
 
         // Generate replacement code and track runtime needs
-        const replacement = generateReplacement(t, className, isDev);
+        const replacement = generateReplacement(t, className);
         s.overwrite(t.node.start, t.node.end, replacement);
 
         // styled, styledExtend, styledAttrs need createElement and m
@@ -527,7 +465,7 @@ export default css;
           v,
           baseClass,
           variantKeys,
-          isDev
+          () => variantMapId++
         );
         s.overwrite(v.start, v.end, result.code);
 
@@ -547,6 +485,7 @@ export default css;
       for (const wc of withComponentCalls) {
         // SECURITY: Validate component references
         if (!isValidIdentifier(wc.fromComponent)) {
+          /* v8 ignore next — unreachable: fromComponent is an AST Identifier node, always valid */
           throw new Error(
             `[styled-static] Invalid fromComponent name: ${wc.fromComponent}`
           );
@@ -563,6 +502,7 @@ export default css;
         } else {
           // Component reference: withComponent(Link, Button)
           if (!isValidIdentifier(wc.toComponent)) {
+            /* v8 ignore next — unreachable: toComponent is an AST Identifier node, always valid */
             throw new Error(
               `[styled-static] Invalid toComponent name: ${wc.toComponent}`
             );
@@ -609,6 +549,17 @@ export default css;
     generateBundle(_options, bundle) {
       if (actualCssOutput !== "file") return;
 
+      // Build reverse index: sourceFile → CSS strings for O(1) lookup per module
+      const cssBySource = new Map<string, string[]>();
+      for (const [, data] of cssModules) {
+        let arr = cssBySource.get(data.sourceFile);
+        if (!arr) {
+          arr = [];
+          cssBySource.set(data.sourceFile, arr);
+        }
+        arr.push(data.css);
+      }
+
       for (const [fileName, chunk] of Object.entries(bundle)) {
         if (chunk.type !== "chunk") continue;
 
@@ -617,10 +568,10 @@ export default css;
         let aggregatedCss = "";
 
         for (const moduleId of moduleIds) {
-          // Find CSS modules that came from this source file
-          for (const [, data] of cssModules) {
-            if (data.sourceFile === moduleId) {
-              aggregatedCss += data.css + "\n";
+          const cssEntries = cssBySource.get(moduleId);
+          if (cssEntries) {
+            for (const css of cssEntries) {
+              aggregatedCss += css + "\n";
             }
           }
         }
@@ -644,819 +595,6 @@ export default css;
       }
     },
   };
-}
-
-// ============================================================================
-// AST Helpers
-// ============================================================================
-
-/**
- * Find all imports from '@alex.radulescu/styled-static' and return their local names.
- * Handles aliased imports like `import { styled as s } from '@alex.radulescu/styled-static'`
- */
-function findStyledStaticImports(ast: ESTree.Program): StyledStaticImports {
-  const imports: StyledStaticImports = {};
-
-  for (const node of ast.body) {
-    if (node.type === "ImportDeclaration") {
-      const source = node.source.value as string;
-      // Match "@alex.radulescu/styled-static" (package) and "./index" (local dev)
-      const isStyledStaticImport =
-        source === "@alex.radulescu/styled-static" ||
-        source === "./index" ||
-        source === "../index";
-
-      if (isStyledStaticImport) {
-        // Track the source for determining runtime import path
-        imports.source = source;
-
-        for (const spec of node.specifiers) {
-          if (spec.type === "ImportSpecifier") {
-            const imported = (spec.imported as ESTree.Identifier).name;
-            const local = spec.local.name;
-
-            if (imported === "styled") imports.styled = local;
-            if (imported === "css") imports.css = local;
-            if (imported === "createGlobalStyle")
-              imports.createGlobalStyle = local;
-            if (imported === "keyframes") imports.keyframes = local;
-            if (imported === "styledVariants") imports.styledVariants = local;
-            if (imported === "cssVariants") imports.cssVariants = local;
-            if (imported === "withComponent") imports.withComponent = local;
-          }
-        }
-      }
-    }
-  }
-
-  return imports;
-}
-
-/**
- * Find all tagged template literals that use styled-static imports.
- * Walks the AST to find variable declarations with our tagged templates.
- */
-function findTaggedTemplates(
-  ast: ESTree.Program,
-  imports: StyledStaticImports,
-  code: string
-): FoundTemplate[] {
-  const results: FoundTemplate[] = [];
-
-  /**
-   * Process a variable declaration that might contain a styled template
-   */
-  function processVariableDeclaration(node: ESTree.VariableDeclaration) {
-    for (const decl of node.declarations) {
-      if (
-        decl.init?.type === "TaggedTemplateExpression" &&
-        decl.id.type === "Identifier"
-      ) {
-        const template = decl.init as TaggedTemplateWithPosition;
-        const varName = decl.id.name;
-        const found = classifyTemplate(template, imports, varName, code);
-        if (found) results.push(found);
-      }
-    }
-  }
-
-  for (const node of ast.body) {
-    // Regular variable declaration: const X = styled.div`...`
-    if (node.type === "VariableDeclaration") {
-      processVariableDeclaration(node);
-    }
-
-    // Exported variable: export const X = styled.div`...`
-    if (
-      node.type === "ExportNamedDeclaration" &&
-      node.declaration?.type === "VariableDeclaration"
-    ) {
-      processVariableDeclaration(node.declaration);
-    }
-  }
-
-  return results;
-}
-
-/**
- * Classify a tagged template expression into one of our supported types.
- */
-function classifyTemplate(
-  node: TaggedTemplateWithPosition,
-  imports: StyledStaticImports,
-  variableName: string,
-  code: string
-): FoundTemplate | null {
-  const { tag } = node;
-
-  // styled.element`...`
-  if (
-    tag.type === "MemberExpression" &&
-    tag.object.type === "Identifier" &&
-    tag.object.name === imports.styled &&
-    tag.property.type === "Identifier"
-  ) {
-    return {
-      type: "styled",
-      node,
-      tag: tag.property.name,
-      variableName,
-    };
-  }
-
-  // styled(Component)`...`
-  if (
-    tag.type === "CallExpression" &&
-    tag.callee.type === "Identifier" &&
-    tag.callee.name === imports.styled &&
-    tag.arguments[0]?.type === "Identifier"
-  ) {
-    return {
-      type: "styledExtend",
-      node,
-      tag: "",
-      baseComponent: (tag.arguments[0] as ESTree.Identifier).name,
-      variableName,
-    };
-  }
-
-  // css`...`
-  if (tag.type === "Identifier" && tag.name === imports.css) {
-    return {
-      type: "css",
-      node,
-      tag: "",
-      variableName,
-    };
-  }
-
-  // createGlobalStyle`...`
-  if (tag.type === "Identifier" && tag.name === imports.createGlobalStyle) {
-    return {
-      type: "createGlobalStyle",
-      node,
-      tag: "",
-      variableName,
-    };
-  }
-
-  // keyframes`...`
-  if (tag.type === "Identifier" && tag.name === imports.keyframes) {
-    return {
-      type: "keyframes",
-      node,
-      tag: "",
-      variableName,
-    };
-  }
-
-  // styled.element.attrs({...})`...`
-  // Pattern: CallExpression -> MemberExpression -> MemberExpression
-  if (
-    tag.type === "CallExpression" &&
-    tag.callee.type === "MemberExpression" &&
-    tag.callee.property.type === "Identifier" &&
-    tag.callee.property.name === "attrs" &&
-    tag.callee.object.type === "MemberExpression" &&
-    tag.callee.object.object.type === "Identifier" &&
-    tag.callee.object.object.name === imports.styled &&
-    tag.callee.object.property.type === "Identifier" &&
-    tag.arguments.length === 1
-  ) {
-    const elementTag = (tag.callee.object.property as ESTree.Identifier).name;
-    // Capture the attrs argument as a string for later use
-    const attrsNode = tag.arguments[0] as ESTree.Node & {
-      start: number;
-      end: number;
-    };
-    const attrsArg = code.slice(attrsNode.start, attrsNode.end);
-    return {
-      type: "styledAttrs",
-      node,
-      tag: elementTag,
-      variableName,
-      attrsArg,
-    };
-  }
-
-  return null;
-}
-
-// ============================================================================
-// CSS Processing
-// ============================================================================
-
-/**
- * Extract raw CSS content from a template literal.
- * Handles the content between the backticks.
- */
-function extractTemplateContent(
-  code: string,
-  quasi: TemplateLiteralWithPosition
-): string {
-  // Get raw content between backticks
-  return code.slice(quasi.start + 1, quasi.end - 1);
-}
-
-// ============================================================================
-// Code Generation
-// ============================================================================
-
-/**
- * Generate the replacement code for a styled template.
- *
- * This generates inline React components using Object.assign pattern:
- * Object.assign((p) => createElement(tag, {...p, className: m(cls, p.className)}), { className: cls })
- *
- * SECURITY: Uses safeStringLiteral() for className to prevent code injection.
- */
-function generateReplacement(
-  template: FoundTemplate,
-  className: string,
-  _isDev: boolean
-): string {
-  const cls = safeStringLiteral(className);
-
-  switch (template.type) {
-    case "styled":
-      // Inline component: Object.assign((p) => createElement("tag", {...p, className: m("cls", p.className)}), { className: "cls" })
-      return `Object.assign((p) => createElement(${safeStringLiteral(template.tag)}, {...p, className: m(${cls}, p.className)}), { className: ${cls} })`;
-
-    case "styledExtend":
-      // Extension: renders base component with merged className
-      // className is concatenated at runtime: Base.className + " " + newClass
-      return `Object.assign((p) => createElement(${template.baseComponent}, {...p, className: m(${cls}, p.className)}), { className: ${template.baseComponent}.className + " " + ${cls} })`;
-
-    case "styledAttrs":
-      // Attrs: spread default attrs, then props, with className merge
-      return `Object.assign((p) => createElement(${safeStringLiteral(template.tag)}, {...(${template.attrsArg ?? "{}"}), ...p, className: m(${cls}, p.className)}), { className: ${cls} })`;
-
-    case "css":
-      return cls;
-
-    case "keyframes":
-      // Keyframes are replaced with just the scoped animation name
-      return cls;
-
-    case "createGlobalStyle":
-      // GlobalStyle is a no-op component (CSS is imported via side-effect)
-      return `() => null`;
-  }
-}
-
-/**
- * Normalize file paths for consistent hashing across platforms.
- * Strips leading slashes to avoid double-slash in virtual module IDs.
- */
-function normalizePath(p: string): string {
-  return p.replace(/\\/g, "/").replace(/^\/+/, "").toLowerCase();
-}
-
-/**
- * Rewrite CSS imports in chunk code for library builds.
- * Removes virtual CSS imports and adds a single relative CSS file import.
- */
-function rewriteCssImports(code: string, cssFileName: string): string {
-  // Remove all virtual:styled-static imports
-  code = code.replace(/import\s*["']virtual:styled-static[^"']*["'];?\n?/g, "");
-  // Remove /* empty css */ comments Vite adds
-  code = code.replace(/\/\*\s*empty css\s*\*\/\s*/g, "");
-  // Remove useless side-effect import of styled-static package
-  code = code.replace(
-    /import\s*["']@alex\.radulescu\/styled-static["'];?\n?/g,
-    ""
-  );
-
-  // Get just the filename for relative import (same directory)
-  const baseName = cssFileName.split("/").pop() || cssFileName;
-
-  // Add single relative CSS import at top
-  return `import "./${baseName}";\n${code}`;
-}
-
-// ============================================================================
-// Variant Detection
-// ============================================================================
-
-/**
- * Find all styledVariants and cssVariants calls in the AST.
- */
-function findVariantCalls(
-  ast: ESTree.Program,
-  code: string,
-  imports: StyledStaticImports
-): FoundVariant[] {
-  const results: FoundVariant[] = [];
-
-  function processVariableDeclaration(node: ESTree.VariableDeclaration) {
-    for (const decl of node.declarations) {
-      if (
-        decl.init?.type === "CallExpression" &&
-        decl.id.type === "Identifier"
-      ) {
-        const call = decl.init as ESTree.CallExpression & {
-          start: number;
-          end: number;
-        };
-        const varName = decl.id.name;
-        const found = classifyVariantCall(call, code, imports, varName);
-        if (found) results.push(found);
-      }
-    }
-  }
-
-  for (const node of ast.body) {
-    // Regular variable declaration: const X = styledVariants({...})
-    if (node.type === "VariableDeclaration") {
-      processVariableDeclaration(node);
-    }
-
-    // Exported variable: export const X = styledVariants({...})
-    if (
-      node.type === "ExportNamedDeclaration" &&
-      node.declaration?.type === "VariableDeclaration"
-    ) {
-      processVariableDeclaration(node.declaration);
-    }
-  }
-
-  return results;
-}
-
-/**
- * Classify a call expression as styledVariants or cssVariants.
- */
-function classifyVariantCall(
-  node: ESTree.CallExpression & { start: number; end: number },
-  code: string,
-  imports: StyledStaticImports,
-  variableName: string
-): FoundVariant | null {
-  if (node.callee.type !== "Identifier") return null;
-
-  const calleeName = node.callee.name;
-  const isStyledVariants = calleeName === imports.styledVariants;
-  const isCssVariants = calleeName === imports.cssVariants;
-
-  if (!isStyledVariants && !isCssVariants) return null;
-
-  // The argument should be an object expression
-  if (
-    node.arguments.length !== 1 ||
-    node.arguments[0]?.type !== "ObjectExpression"
-  ) {
-    return null;
-  }
-
-  const configObj = node.arguments[0] as ESTree.ObjectExpression;
-
-  let component: string | undefined;
-  let baseCss: string | undefined;
-  const variants = new Map<string, Map<string, string>>();
-  let defaultVariants: Map<string, string> | undefined;
-  let compoundVariants:
-    | Array<{ conditions: Map<string, string>; css: string }>
-    | undefined;
-
-  for (const prop of configObj.properties) {
-    if (prop.type !== "Property" || prop.key.type !== "Identifier") continue;
-
-    const propName = prop.key.name;
-
-    // component: 'button' or component: Button
-    if (propName === "component") {
-      if (
-        prop.value.type === "Literal" &&
-        typeof prop.value.value === "string"
-      ) {
-        component = prop.value.value;
-      } else if (prop.value.type === "Identifier") {
-        component = prop.value.name;
-      }
-    }
-
-    // css: `...` or css: css`...`
-    if (propName === "css") {
-      if (
-        prop.value.type === "Literal" &&
-        typeof prop.value.value === "string"
-      ) {
-        baseCss = prop.value.value;
-      } else if (prop.value.type === "TemplateLiteral") {
-        const tpl = prop.value as ESTree.TemplateLiteral & {
-          start: number;
-          end: number;
-        };
-        baseCss = code.slice(tpl.start + 1, tpl.end - 1);
-      } else if (prop.value.type === "TaggedTemplateExpression") {
-        // Support css`...` tagged template for syntax highlighting
-        const tagged = prop.value as ESTree.TaggedTemplateExpression & {
-          quasi: ESTree.TemplateLiteral & { start: number; end: number };
-        };
-        if (
-          tagged.tag.type === "Identifier" &&
-          tagged.tag.name === imports.css
-        ) {
-          baseCss = code.slice(tagged.quasi.start + 1, tagged.quasi.end - 1);
-        }
-      }
-    }
-
-    // variants: { color: { primary: `...` }, size: { sm: `...` } }
-    if (propName === "variants" && prop.value.type === "ObjectExpression") {
-      for (const variantProp of prop.value.properties) {
-        if (
-          variantProp.type !== "Property" ||
-          variantProp.key.type !== "Identifier"
-        )
-          continue;
-        if (variantProp.value.type !== "ObjectExpression") continue;
-
-        const variantName = variantProp.key.name;
-        const variantValues = new Map<string, string>();
-
-        for (const valueProp of variantProp.value.properties) {
-          if (
-            valueProp.type !== "Property" ||
-            valueProp.key.type !== "Identifier"
-          )
-            continue;
-
-          const valueName = valueProp.key.name;
-          let cssContent: string | undefined;
-
-          if (
-            valueProp.value.type === "Literal" &&
-            typeof valueProp.value.value === "string"
-          ) {
-            cssContent = valueProp.value.value;
-          } else if (valueProp.value.type === "TemplateLiteral") {
-            const tpl = valueProp.value as ESTree.TemplateLiteral & {
-              start: number;
-              end: number;
-            };
-            cssContent = code.slice(tpl.start + 1, tpl.end - 1);
-          } else if (valueProp.value.type === "TaggedTemplateExpression") {
-            // Support css`...` tagged template for syntax highlighting
-            const tagged =
-              valueProp.value as ESTree.TaggedTemplateExpression & {
-                quasi: ESTree.TemplateLiteral & { start: number; end: number };
-              };
-            if (
-              tagged.tag.type === "Identifier" &&
-              tagged.tag.name === imports.css
-            ) {
-              cssContent = code.slice(
-                tagged.quasi.start + 1,
-                tagged.quasi.end - 1
-              );
-            }
-          }
-
-          if (cssContent) {
-            variantValues.set(valueName, cssContent);
-          }
-        }
-
-        if (variantValues.size > 0) {
-          variants.set(variantName, variantValues);
-        }
-      }
-    }
-
-    // defaultVariants: { size: 'md', intent: 'primary' }
-    if (propName === "defaultVariants" && prop.value.type === "ObjectExpression") {
-      const defaults = new Map<string, string>();
-      for (const defaultProp of prop.value.properties) {
-        if (
-          defaultProp.type !== "Property" ||
-          defaultProp.key.type !== "Identifier"
-        )
-          continue;
-
-        const variantName = defaultProp.key.name;
-        let defaultValue: string | undefined;
-
-        if (
-          defaultProp.value.type === "Literal" &&
-          typeof defaultProp.value.value === "string"
-        ) {
-          defaultValue = defaultProp.value.value;
-        }
-
-        if (defaultValue) {
-          defaults.set(variantName, defaultValue);
-        }
-      }
-      if (defaults.size > 0) {
-        defaultVariants = defaults;
-      }
-    }
-
-    // compoundVariants: [{ size: 'lg', intent: 'danger', css: `...` }]
-    if (propName === "compoundVariants" && prop.value.type === "ArrayExpression") {
-      const compounds: Array<{ conditions: Map<string, string>; css: string }> =
-        [];
-
-      for (const element of prop.value.elements) {
-        if (element?.type !== "ObjectExpression") continue;
-
-        const conditions = new Map<string, string>();
-        let cssContent: string | undefined;
-
-        for (const cvProp of element.properties) {
-          if (cvProp.type !== "Property" || cvProp.key.type !== "Identifier")
-            continue;
-
-          const key = cvProp.key.name;
-
-          if (key === "css") {
-            // Parse CSS content (same logic as regular variants)
-            if (
-              cvProp.value.type === "Literal" &&
-              typeof cvProp.value.value === "string"
-            ) {
-              cssContent = cvProp.value.value;
-            } else if (cvProp.value.type === "TemplateLiteral") {
-              const tpl = cvProp.value as ESTree.TemplateLiteral & {
-                start: number;
-                end: number;
-              };
-              cssContent = code.slice(tpl.start + 1, tpl.end - 1);
-            } else if (cvProp.value.type === "TaggedTemplateExpression") {
-              const tagged = cvProp.value as ESTree.TaggedTemplateExpression & {
-                quasi: ESTree.TemplateLiteral & { start: number; end: number };
-              };
-              if (
-                tagged.tag.type === "Identifier" &&
-                tagged.tag.name === imports.css
-              ) {
-                cssContent = code.slice(
-                  tagged.quasi.start + 1,
-                  tagged.quasi.end - 1
-                );
-              }
-            }
-          } else {
-            // It's a condition: size: 'lg'
-            if (
-              cvProp.value.type === "Literal" &&
-              typeof cvProp.value.value === "string"
-            ) {
-              conditions.set(key, cvProp.value.value);
-            }
-          }
-        }
-
-        if (cssContent && conditions.size > 0) {
-          compounds.push({ conditions, css: cssContent });
-        }
-      }
-
-      if (compounds.length > 0) {
-        compoundVariants = compounds;
-      }
-    }
-  }
-
-  const result: FoundVariant = {
-    type: isStyledVariants ? "styledVariants" : "cssVariants",
-    start: node.start,
-    end: node.end,
-    component,
-    baseCss,
-    variants,
-    variableName,
-  };
-
-  if (defaultVariants) {
-    result.defaultVariants = defaultVariants;
-  }
-  if (compoundVariants) {
-    result.compoundVariants = compoundVariants;
-  }
-
-  return result;
-}
-
-/** Threshold for switching from if/else to hoisted map */
-const VARIANT_MAP_THRESHOLD = 4;
-
-/** Counter for unique variant map names */
-let variantMapId = 0;
-
-/** Result from variant replacement generation */
-interface VariantReplacementResult {
-  code: string;
-  hoisted: string | undefined;
-}
-
-/**
- * Generate replacement code for a variant call.
- *
- * Uses a hybrid approach:
- * - For ≤ 4 total variant values: if/else chains (zero allocation, simple)
- * - For > 4 total variant values: hoisted static map (O(1) lookup, compact)
- *
- * SECURITY: Validates component names and generates explicit equality checks.
- */
-function generateVariantReplacement(
-  variant: FoundVariant,
-  baseClass: string,
-  variantKeys: string[],
-  _isDev: boolean
-): VariantReplacementResult {
-  const cls = safeStringLiteral(baseClass);
-  const isCssVariants = variant.type === "cssVariants";
-
-  // Calculate total variant values to determine strategy
-  const totalVariantValues = variantKeys.reduce(
-    (sum, key) => sum + (variant.variants.get(key)?.size ?? 0),
-    0
-  );
-  const useHoistedMap = totalVariantValues > VARIANT_MAP_THRESHOLD;
-
-  // Destructure variant props from the component props, with defaults if specified
-  const propsEntries = variantKeys.map((key) => {
-    const defaultValue = variant.defaultVariants?.get(key);
-    return defaultValue ? `${key} = ${safeStringLiteral(defaultValue)}` : key;
-  });
-  const propsDestructure =
-    variantKeys.length > 0
-      ? `{ ${propsEntries.join(", ")}, className, ...p }`
-      : `{ className, ...p }`;
-
-  let variantLogic: string;
-  let hoisted: string | undefined;
-
-  if (useHoistedMap && variantKeys.length > 0) {
-    // Generate hoisted static map for > 4 values
-    const mapName = `_vm${variantMapId++}`;
-
-    // Build the map object: { color: {"primary": " ss-abc--color-primary", ...}, ... }
-    const mapEntries = variantKeys.map((key) => {
-      const values = variant.variants.get(key);
-      if (!values) return "";
-      const valueEntries = Array.from(values.keys())
-        .map(
-          (v) =>
-            `${safeStringLiteral(v)}:${safeStringLiteral(` ${baseClass}--${key}-${v}`)}`
-        )
-        .join(",");
-      return `${key}:{${valueEntries}}`;
-    });
-    hoisted = `const ${mapName}={${mapEntries.join(",")}};`;
-
-    // Generate lookup logic: c += _vm0.color[color] || "";
-    const lookups = variantKeys.map((key) => {
-      const keyRef = isCssVariants ? `variants.${key}` : key;
-      return `c+=${mapName}.${key}[${keyRef}]||""`;
-    });
-    variantLogic = lookups.join(";") + ";";
-  } else {
-    // Generate if/else checks for ≤ 4 values (original approach)
-    const variantChecks: string[] = [];
-    for (const key of variantKeys) {
-      const values = variant.variants.get(key);
-      if (values) {
-        const keyRef = isCssVariants ? `variants.${key}` : key;
-        const valueChecks = Array.from(values.keys())
-          .map(
-            (value, i) =>
-              `${i === 0 ? "if" : "else if"} (${keyRef} === ${safeStringLiteral(value)}) c += ${safeStringLiteral(` ${baseClass}--${key}-${value}`)}`
-          )
-          .join("; ");
-        if (valueChecks) {
-          variantChecks.push(valueChecks);
-        }
-      }
-    }
-    variantLogic =
-      variantChecks.length > 0 ? variantChecks.join("; ") + "; " : "";
-  }
-
-  // Note: Compound variants work through CSS specificity alone.
-  // The combined selectors (e.g., .ss-btn--size-lg.ss-btn--intent-danger)
-  // automatically match when individual variant classes are present.
-  // No additional runtime logic is needed.
-
-  if (variant.type === "styledVariants") {
-    // Check if component is an HTML tag (lowercase) or component reference
-    const isHtmlTag = variant.component && /^[a-z]/.test(variant.component);
-
-    if (isHtmlTag) {
-      // SECURITY: Validate HTML tag name
-      if (!variant.component || !/^[a-z][a-z0-9]*$/.test(variant.component)) {
-        throw new Error(
-          `[styled-static] Invalid HTML tag name: ${variant.component}`
-        );
-      }
-      const tag = safeStringLiteral(variant.component);
-      return {
-        code: `Object.assign((${propsDestructure}) => { let c = ${cls}; ${variantLogic}return createElement(${tag}, {...p, className: m(c, className)}); }, { className: ${cls} })`,
-        hoisted,
-      };
-    } else {
-      // SECURITY: Validate component reference is a valid identifier
-      if (!variant.component || !isValidIdentifier(variant.component)) {
-        throw new Error(
-          `[styled-static] Invalid component name: ${variant.component}`
-        );
-      }
-      // Extension: className includes base component's className
-      return {
-        code: `Object.assign((${propsDestructure}) => { let c = ${cls}; ${variantLogic}return createElement(${variant.component}, {...p, className: m(c, className)}); }, { className: ${variant.component}.className + " " + ${cls} })`,
-        hoisted,
-      };
-    }
-  }
-
-  // cssVariants: returns a function that generates class string
-  return {
-    code: `(variants) => { let c = ${cls}; ${variantLogic}return c; }`,
-    hoisted,
-  };
-}
-
-// ============================================================================
-// withComponent Detection
-// ============================================================================
-
-/**
- * Find all withComponent(To, From) calls in the AST.
- */
-function findWithComponentCalls(
-  ast: ESTree.Program,
-  imports: StyledStaticImports
-): FoundWithComponent[] {
-  const results: FoundWithComponent[] = [];
-
-  function processVariableDeclaration(node: ESTree.VariableDeclaration) {
-    for (const decl of node.declarations) {
-      if (
-        decl.init?.type === "CallExpression" &&
-        decl.id.type === "Identifier"
-      ) {
-        const call = decl.init as ESTree.CallExpression & {
-          start: number;
-          end: number;
-        };
-        const varName = decl.id.name;
-
-        // Check if this is a withComponent call
-        if (
-          call.callee.type === "Identifier" &&
-          call.callee.name === imports.withComponent &&
-          call.arguments.length === 2
-        ) {
-          const toArg = call.arguments[0];
-          const fromArg = call.arguments[1];
-
-          let toComponent: string | undefined;
-          let fromComponent: string | undefined;
-
-          // toComponent can be a string literal (HTML tag) or identifier (component)
-          if (toArg?.type === "Literal" && typeof toArg.value === "string") {
-            toComponent = toArg.value;
-          } else if (toArg?.type === "Identifier") {
-            toComponent = toArg.name;
-          }
-
-          // fromComponent must be an identifier (styled component reference)
-          if (fromArg?.type === "Identifier") {
-            fromComponent = fromArg.name;
-          }
-
-          if (toComponent && fromComponent) {
-            results.push({
-              start: call.start,
-              end: call.end,
-              toComponent,
-              fromComponent,
-              variableName: varName,
-            });
-          }
-        }
-      }
-    }
-  }
-
-  for (const node of ast.body) {
-    // Regular variable declaration: const X = withComponent(Link, Button)
-    if (node.type === "VariableDeclaration") {
-      processVariableDeclaration(node);
-    }
-
-    // Exported variable: export const X = withComponent(Link, Button)
-    if (
-      node.type === "ExportNamedDeclaration" &&
-      node.declaration?.type === "VariableDeclaration"
-    ) {
-      processVariableDeclaration(node.declaration);
-    }
-  }
-
-  return results;
 }
 
 // Default export for convenience

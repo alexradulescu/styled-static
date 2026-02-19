@@ -67,7 +67,8 @@ export function getTheme(attribute = "data-theme"): string {
 
   // Handle both data-* and regular attributes
   if (attribute.startsWith("data-")) {
-    const key = attribute.slice(5); // Remove 'data-' prefix
+    // dataset uses camelCase keys: data-color-mode → colorMode
+    const key = attribute.slice(5).replace(/-([a-z])/g, (_, l: string) => l.toUpperCase());
     return document.documentElement.dataset[key] || DEFAULT_THEME;
   }
   return document.documentElement.getAttribute(attribute) || DEFAULT_THEME;
@@ -99,7 +100,8 @@ export function setTheme(
 
   // Handle both data-* and regular attributes
   if (attribute.startsWith("data-")) {
-    const key = attribute.slice(5);
+    // dataset uses camelCase keys: data-color-mode → colorMode
+    const key = attribute.slice(5).replace(/-([a-z])/g, (_, l: string) => l.toUpperCase());
     document.documentElement.dataset[key] = theme;
   } else {
     document.documentElement.setAttribute(attribute, theme);
@@ -209,13 +211,7 @@ export function onSystemThemeChange(
     callback(e.matches);
   };
 
-  // Modern browsers
-  if (mediaQuery.addEventListener) {
-    mediaQuery.addEventListener("change", handler);
-    return () => mediaQuery.removeEventListener("change", handler);
-  }
-
-  // Legacy Safari
-  mediaQuery.addListener(handler);
-  return () => mediaQuery.removeListener(handler);
+  // React 19 requires Safari 15.4+, which has addEventListener on MediaQueryList
+  mediaQuery.addEventListener("change", handler);
+  return () => mediaQuery.removeEventListener("change", handler);
 }

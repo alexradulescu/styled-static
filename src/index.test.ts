@@ -17,10 +17,12 @@ describe("runtime error guards (untransformed calls)", () => {
     );
   });
 
-  it("styled proxy apply should throw when called as function", () => {
-    // The Proxy target is {}, not a function, so calling styled() throws a TypeError.
-    // The apply trap is unreachable — the get trap handles styled(Component)`...` instead.
-    expect(() => (styled as any)()).toThrow();
+  it("styled proxy apply should throw config error when called as function", () => {
+    // The Proxy uses a function target so the apply trap fires when styled() is called
+    // directly at runtime (i.e., the plugin didn't transform styled(Component)`...`).
+    expect(() => (styled as any)()).toThrow(
+      "styled was not transformed at build time"
+    );
   });
 
   it("css should throw config error", () => {

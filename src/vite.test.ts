@@ -8,6 +8,7 @@
 import { parse } from "acorn";
 import type { Plugin } from "vite";
 import {  beforeEach, describe, expect, it, vi } from "vitest";
+import { hash } from "./hash";
 import { styledStatic } from "./vite";
 
 // =============================================================================
@@ -2504,8 +2505,10 @@ const Button = styledVariants({
 });`;
     const result = await transform(plugin, code, "/src/ProdVariant.tsx");
     expect(result).not.toBeNull();
-    // In prod mode, should use hash-based names, not variable name
-    expect(result!.code).not.toContain("ProdVariant");
+    // In prod mode, class names should be hash-based, not variable-name-based.
+    // The file path in CSS imports will naturally contain "ProdVariant", so only
+    // check that no variable-derived class name (e.g. ss-Button-ProdVariant) appears.
+    expect(result!.code).not.toMatch(/["']ss-\w+-ProdVariant/);
     expect(result!.code).toContain("ss-");
   });
 
@@ -2863,5 +2866,241 @@ const Button = styledVariants({
 });`;
     const result = await transform(plugin, code, "/src/CompoundTagged.tsx");
     expect(result).not.toBeNull();
+  });
+});
+
+// =============================================================================
+// Hash Collision Rate Tests
+// =============================================================================
+
+describe("hash collision rate", () => {
+  it("should have zero collisions for 1000 typical CSS inputs", () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 1000; i++) {
+      const css = `.class-${i} { color: red; padding: ${i}px; margin: ${i * 2}px; }`;
+      const h = hash(css).slice(0, 8);
+      expect(seen.has(h), `collision at index ${i}: "${h}"`).toBe(false);
+      seen.add(h);
+    }
+  });
+
+  it("should have zero collisions for 10000 similar inputs at 8-char truncation", () => {
+    const seen = new Set<string>();
+    let collisions = 0;
+    for (let i = 0; i < 10000; i++) {
+      const css = `padding: ${i}px`;
+      const h = hash(css).slice(0, 8);
+      if (seen.has(h)) collisions++;
+      seen.add(h);
+    }
+    expect(collisions).toBe(0);
+  });
+});
+
+// =============================================================================
+// Branch Coverage — vite.ts: debug log + CSS module cleanup
+// =============================================================================
+
+describe("debug mode no-templates log (vite.ts:336)", () => {
+  it("should log when styled is imported but not used as a tagged template", async () => {
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const plugin = styledStatic({ debug: true });
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    // File imports styled (so hasTemplateImports is true) but doesn't use it as a template tag.
+    // findTaggedTemplates returns [] → falls through to line 335 "No templates found" log.
+    const code = `import { styled } from '@alex.radulescu/styled-static';
+export { styled };`;
+    const result = await transform(plugin, code, "/src/ReExport.tsx");
+    expect(result).toBeNull();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("No templates")
+    );
+    consoleSpy.mockRestore();
+  });
+});
+
+describe("CSS module stale cleanup on re-transform (vite.ts:352-353)", () => {
+  it("should delete stale CSS entries when same file is transformed twice", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    const code = `import { styled } from '@alex.radulescu/styled-static';
+const Box = styled.div\`color: red;\`;`;
+
+    // First transform populates cssModules
+    const result1 = await transform(plugin, code, "/src/Box.tsx");
+    expect(result1).not.toBeNull();
+
+    // Second transform of same file should clean up old entries and re-populate
+    const result2 = await transform(plugin, code, "/src/Box.tsx");
+    expect(result2).not.toBeNull();
+    // Both results should produce equivalent output (no stale state)
+    expect(result1!.code).toBe(result2!.code);
+  });
+});
+
+// =============================================================================
+// Branch Coverage — parse.ts: edge cases in AST walking
+// =============================================================================
+
+describe("parse.ts edge cases", () => {
+  it("should skip styledVariants call with wrong number of arguments (line 399)", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    // styledVariants called with 2 args instead of 1 — classifyVariantCall returns null
+    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
+const Button = styledVariants({ component: 'button', variants: {} }, extraArg);`;
+    const result = await transform(plugin, code, "/src/WrongArgs.tsx");
+    // Plugin skips unparseable variant calls — returns null (no templates either)
+    expect(result).toBeNull();
+  });
+
+  it("should skip variant group with quoted name key (line 441)", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    // Quoted variant group name → key.type === "Literal", not "Identifier" → skipped at line 441
+    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
+const Button = styledVariants({
+  component: 'button',
+  css: \`padding: 1rem;\`,
+  variants: {
+    "size": {
+      sm: \`font-size: 12px;\`,
+    },
+  },
+});`;
+    const result = await transform(plugin, code, "/src/QuotedGroupKey.tsx");
+    // Transform succeeds but the "size" variant group is skipped (quoted group key)
+    expect(result).not.toBeNull();
+    expect(result!.code).toContain("ss-Button-QuotedGroupKey");
+  });
+
+  it("should skip variant value with quoted key inside identifier-named group (line 452)", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    // Variant group key is Identifier (passes line 441) but value key is Literal (triggers line 452)
+    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
+const Button = styledVariants({
+  component: 'button',
+  css: \`padding: 1rem;\`,
+  variants: {
+    size: {
+      "sm": \`font-size: 12px;\`,
+    },
+  },
+});`;
+    const result = await transform(plugin, code, "/src/QuotedValueKey.tsx");
+    // Transform succeeds but the "sm" value is skipped (quoted value key)
+    expect(result).not.toBeNull();
+    expect(result!.code).toContain("ss-Button-QuotedValueKey");
+  });
+
+  it("should skip defaultVariants properties with quoted keys (line 483)", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
+const Button = styledVariants({
+  component: 'button',
+  variants: { size: { sm: \`font-size: 12px;\` } },
+  defaultVariants: { "size": "sm" },
+});`;
+    const result = await transform(plugin, code, "/src/QuotedDefaults.tsx");
+    expect(result).not.toBeNull();
+  });
+
+  it("should skip compoundVariants properties with quoted condition keys (line 522)", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
+const Button = styledVariants({
+  component: 'button',
+  variants: { size: { lg: \`font-size: 18px;\` } },
+  compoundVariants: [{ "size": "lg", css: \`font-weight: bold;\` }],
+});`;
+    const result = await transform(plugin, code, "/src/QuotedCompound.tsx");
+    expect(result).not.toBeNull();
+  });
+
+  it("should return undefined from extractCssFromValueNode for unrecognized node type (line 135)", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    // Using an Identifier as the css value — not a literal/template/tagged template
+    // extractCssFromValueNode returns undefined → baseCss is undefined
+    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
+const myStyles = \`padding: 1rem;\`;
+const Button = styledVariants({
+  component: 'button',
+  css: myStyles,
+  variants: { size: { sm: \`font-size: 12px;\` } },
+});`;
+    const result = await transform(plugin, code, "/src/IdentifierCss.tsx");
+    expect(result).not.toBeNull();
+    // baseCss is undefined so no base class selector, but variant classes are generated
+    expect(result!.code).toContain("ss-Button-IdentifierCss");
+  });
+
+  it("should return null from classifyTemplate for unrecognized tag pattern (line 328)", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    // styled["button"]`...` — computed member expression, property.type === "Literal"
+    // classifyTemplate falls through all cases and returns null
+    const code = `import { styled } from '@alex.radulescu/styled-static';
+const Box = styled["div"]\`color: red;\`;`;
+    const result = await transform(plugin, code, "/src/ComputedMember.tsx");
+    // Plugin skips the unrecognized pattern — no templates transformed
+    expect(result).toBeNull();
+  });
+
+  it("should skip null elements in compoundVariants array (parse.ts:515)", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    // compoundVariants array with a null/sparse element — element?.type !== "ObjectExpression"
+    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
+const Button = styledVariants({
+  component: 'button',
+  variants: { size: { sm: \`font-size: 12px;\`, lg: \`font-size: 18px;\` } },
+  compoundVariants: [null, { size: 'lg', css: \`font-weight: bold;\` }],
+});`;
+    const result = await transform(plugin, code, "/src/NullCompound.tsx");
+    expect(result).not.toBeNull();
+  });
+
+  it("should handle withComponent with Identifier toComponent (parse.ts:611)", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    // withComponent(Link, Button) — toArg is Identifier, not string literal
+    // Covers the `else if (toArg?.type === "Identifier")` branch
+    const code = `import { styled, withComponent } from '@alex.radulescu/styled-static';
+const Button = styled.button\`padding: 1rem;\`;
+const LinkButton = withComponent(Link, Button);`;
+    const result = await transform(plugin, code, "/src/IdentifierTo.tsx");
+    expect(result).not.toBeNull();
+    expect(result!.code).toContain("createElement(Link,");
+  });
+
+  it("should skip withComponent when toComponent is unresolvable (parse.ts:619)", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    // withComponent(42, Button) — toArg is Literal number, not string or Identifier
+    // toComponent is undefined → `if (toComponent && fromComponent)` is false → skipped
+    const code = `import { styled, withComponent } from '@alex.radulescu/styled-static';
+const Button = styled.button\`padding: 1rem;\`;
+const Bad = withComponent(42, Button);`;
+    const result = await transform(plugin, code, "/src/UnresolvableTo.tsx");
+    // Button IS transformed, but withComponent(42,...) is skipped
+    expect(result).not.toBeNull();
+    // The withComponent call should NOT be replaced
+    expect(result!.code).toContain("withComponent(42, Button)");
   });
 });

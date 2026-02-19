@@ -176,23 +176,64 @@ describe("theme helpers (browser environment)", () => {
       expect(callback).toHaveBeenCalledWith(true);
     });
 
-    it("should use legacy addListener for older browsers", () => {
-      const addListenerMock = vi.fn();
-      const removeListenerMock = vi.fn();
+    it("should use addEventListener and return a working unsubscribe function", () => {
+      // React 19 requires Safari 15.4+, so we only support the modern addEventListener API.
+      // This test verifies addEventListener/removeEventListener are used (not the removed legacy API).
+      const addEventListenerMock = vi.fn();
+      const removeEventListenerMock = vi.fn();
       const matchMediaMock = vi.fn().mockReturnValue({
         matches: false,
-        addListener: addListenerMock,
-        removeListener: removeListenerMock,
+        addEventListener: addEventListenerMock,
+        removeEventListener: removeEventListenerMock,
       });
       vi.stubGlobal("matchMedia", matchMediaMock);
 
       const callback = vi.fn();
       const unsubscribe = onSystemThemeChange(callback);
 
-      expect(addListenerMock).toHaveBeenCalled();
+      expect(addEventListenerMock).toHaveBeenCalledWith("change", expect.any(Function));
 
       unsubscribe();
-      expect(removeListenerMock).toHaveBeenCalled();
+      expect(removeEventListenerMock).toHaveBeenCalledWith("change", expect.any(Function));
+    });
+  });
+
+  describe("non-data-* attribute support", () => {
+    it("getTheme should use getAttribute for non-data-* attributes", () => {
+      document.documentElement.setAttribute("class", "dark-theme");
+      expect(getTheme("class")).toBe("dark-theme");
+    });
+
+    it("getTheme should return DEFAULT_THEME when non-data-* attribute is absent", () => {
+      document.documentElement.removeAttribute("aria-label");
+      expect(getTheme("aria-label")).toBe("light");
+    });
+
+    it("setTheme should use setAttribute for non-data-* attributes", () => {
+      setTheme("dark", false, { attribute: "aria-theme" });
+      expect(document.documentElement.getAttribute("aria-theme")).toBe("dark");
+    });
+  });
+
+  describe("kebab-case data attributes", () => {
+    it("getTheme should convert kebab data attribute to camelCase for dataset", () => {
+      // data-color-mode maps to dataset.colorMode
+      document.documentElement.dataset.colorMode = "dark";
+      expect(getTheme("data-color-mode")).toBe("dark");
+    });
+
+    it("setTheme should convert kebab data attribute to camelCase for dataset", () => {
+      setTheme("dark", false, { attribute: "data-color-mode" });
+      expect(document.documentElement.dataset.colorMode).toBe("dark");
+    });
+  });
+
+  describe("initTheme without localStorage", () => {
+    it("should skip localStorage check when localStorage is undefined", () => {
+      vi.stubGlobal("localStorage", undefined);
+      // Falls through to system preference check (false) then default theme
+      const result = initTheme({ defaultTheme: "dark" });
+      expect(result).toBe("dark");
     });
   });
 });
