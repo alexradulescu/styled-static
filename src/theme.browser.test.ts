@@ -48,6 +48,11 @@ describe("theme helpers (browser environment)", () => {
       document.documentElement.dataset.colorMode = "high-contrast";
       expect(getTheme("data-colorMode")).toBe("high-contrast");
     });
+
+    it("should handle kebab-case data-* attributes", () => {
+      document.documentElement.dataset.colorMode = "sepia";
+      expect(getTheme("data-color-mode")).toBe("sepia");
+    });
   });
 
   describe("setTheme", () => {
@@ -176,23 +181,7 @@ describe("theme helpers (browser environment)", () => {
       expect(callback).toHaveBeenCalledWith(true);
     });
 
-    it("should use legacy addListener for older browsers", () => {
-      const addListenerMock = vi.fn();
-      const removeListenerMock = vi.fn();
-      const matchMediaMock = vi.fn().mockReturnValue({
-        matches: false,
-        addListener: addListenerMock,
-        removeListener: removeListenerMock,
-      });
-      vi.stubGlobal("matchMedia", matchMediaMock);
-
-      const callback = vi.fn();
-      const unsubscribe = onSystemThemeChange(callback);
-
-      expect(addListenerMock).toHaveBeenCalled();
-
-      unsubscribe();
-      expect(removeListenerMock).toHaveBeenCalled();
-    });
+    // Legacy Safari addListener/removeListener removed — React 19+ requires
+    // Safari 15.4+ which supports addEventListener on MediaQueryList.
   });
 });

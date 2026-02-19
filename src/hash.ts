@@ -5,9 +5,9 @@
  * Based on https://github.com/garycourt/murmurhash-js
  * This is a well-known, fast, non-cryptographic hash function.
  */
-export function hash(str = ""): string {
+export function hash(str: string): string {
   let l = str.length;
-  let h = l ^ l;
+  let h = 0x9747b28c ^ l;
   let i = 0;
   let k: number;
 

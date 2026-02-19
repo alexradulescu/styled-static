@@ -219,7 +219,9 @@ export function createGlobalStyle(
  * cx('a', null, undefined, false, 'b') // → 'a b'
  */
 export function cx(...args: (string | false | null | undefined)[]): string {
-  return args.filter(Boolean).join(" ");
+  let r = "";
+  for (const a of args) if (a) r = r ? r + " " + a : a;
+  return r;
 }
 
 // ============================================================================

@@ -617,6 +617,28 @@ const slideIn = keyframes\`from { transform: translateX(-100%); } to { transform
     );
     expect(cssImportCount).toBe(3);
   });
+
+  it("should wrap keyframes CSS in @keyframes rule", async () => {
+    const code = `import { keyframes } from '@alex.radulescu/styled-static';
+const spin = keyframes\`
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+\`;`;
+    // Use build mode to get raw CSS from load
+    const buildPlugin = styledStatic();
+    (buildPlugin.configResolved as Function)?.({ command: "build" });
+
+    await transform(buildPlugin, code, "/test-kf.tsx");
+
+    // Extract the virtual module ID from the transform output
+    const loadFn = buildPlugin.load as Function;
+    // Build the expected virtual module ID pattern
+    // After transform, cssModules should contain an entry with @keyframes
+    // We test by calling load with the expected ID pattern
+    const result = loadFn("\0virtual:styled-static/test-kf.tsx/0.css");
+    expect(result).toContain("@keyframes");
+    expect(result).not.toMatch(/^\./); // Should NOT start with a class selector
+  });
 });
 
 // =============================================================================
@@ -890,6 +912,26 @@ const buttonClass = cssVariants({
 
     expect(result).not.toBeNull();
     expect(result?.code).toContain("(variants) =>");
+  });
+
+  it("should apply defaultVariants in cssVariants output", async () => {
+    const code = `import { cssVariants, css } from '@alex.radulescu/styled-static';
+const buttonClass = cssVariants({
+  css: css\`padding: 1rem;\`,
+  variants: {
+    size: { sm: css\`font-size: 0.875rem;\`, md: css\`font-size: 1rem;\`, lg: css\`font-size: 1.25rem;\` },
+  },
+  defaultVariants: {
+    size: 'md',
+  },
+});`;
+    const result = await transform(plugin, code, "/test.tsx");
+
+    expect(result).not.toBeNull();
+    // Should merge defaults into the variants parameter
+    expect(result?.code).toContain("variants = {");
+    expect(result?.code).toContain('"size"');
+    expect(result?.code).toContain('"md"');
   });
 
   it("should handle cssVariants with compoundVariants", async () => {

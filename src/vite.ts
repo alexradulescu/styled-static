@@ -219,6 +219,8 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
   let config: ResolvedConfig;
   let isDev = false;
   let actualCssOutput: "virtual" | "file" = "virtual";
+  // Per-plugin-instance counter for unique hoisted variant map names
+  let variantMapId = 0;
 
   return {
     name: "styled-static",
@@ -421,6 +423,15 @@ export default css;
       // Track if we need React's createElement and our merge helper
       let needsCreateElement = false;
 
+      // Clean up stale CSS modules from previous transforms of this file
+      // Prevents unbounded memory growth during long dev sessions with HMR
+      const normalizedId = normalizePath(id);
+      for (const key of cssModules.keys()) {
+        if (key.includes(normalizedId)) {
+          cssModules.delete(key);
+        }
+      }
+
       let cssIndex = 0;
 
       for (let i = 0; i < templates.length; i++) {
@@ -439,12 +450,17 @@ export default css;
           className = `${classPrefix}-${cssHash}`;
         }
 
-        // Wrap CSS in class selector (unless global)
+        // Wrap CSS appropriately per type:
+        // - createGlobalStyle: unscoped (raw CSS)
+        // - keyframes: wrapped in @keyframes rule
+        // - styled/css: wrapped in class selector
         // Lightning CSS (via Vite's CSS pipeline) handles nesting, prefixes, etc.
         const processedCss =
           t.type === "createGlobalStyle"
             ? cssContent
-            : `.${className} { ${cssContent} }`;
+            : t.type === "keyframes"
+              ? `@keyframes ${className} { ${cssContent} }`
+              : `.${className} { ${cssContent} }`;
 
         // Create virtual CSS module with source file path for proper chunk association
         // Use .js extension in dev mode (to avoid Vite's CSS plugin processing)
@@ -456,7 +472,7 @@ export default css;
         cssImports.push(`import "${importId}";`);
 
         // Generate replacement code and track runtime needs
-        const replacement = generateReplacement(t, className, isDev);
+        const replacement = generateReplacement(t, className);
         s.overwrite(t.node.start, t.node.end, replacement);
 
         // styled, styledExtend, styledAttrs need createElement and m
@@ -527,7 +543,7 @@ export default css;
           v,
           baseClass,
           variantKeys,
-          isDev
+          () => variantMapId++
         );
         s.overwrite(v.start, v.end, result.code);
 
@@ -872,8 +888,7 @@ function extractTemplateContent(
  */
 function generateReplacement(
   template: FoundTemplate,
-  className: string,
-  _isDev: boolean
+  className: string
 ): string {
   const cls = safeStringLiteral(className);
 
@@ -905,11 +920,11 @@ function generateReplacement(
 }
 
 /**
- * Normalize file paths for consistent hashing across platforms.
- * Strips leading slashes to avoid double-slash in virtual module IDs.
+ * Normalize file paths for consistent virtual module IDs across platforms.
+ * Converts backslashes to forward slashes and strips leading slashes.
  */
 function normalizePath(p: string): string {
-  return p.replace(/\\/g, "/").replace(/^\/+/, "").toLowerCase();
+  return p.replace(/\\/g, "/").replace(/^\/+/, "");
 }
 
 /**
@@ -1242,9 +1257,6 @@ function classifyVariantCall(
 /** Threshold for switching from if/else to hoisted map */
 const VARIANT_MAP_THRESHOLD = 4;
 
-/** Counter for unique variant map names */
-let variantMapId = 0;
-
 /** Result from variant replacement generation */
 interface VariantReplacementResult {
   code: string;
@@ -1264,7 +1276,7 @@ function generateVariantReplacement(
   variant: FoundVariant,
   baseClass: string,
   variantKeys: string[],
-  _isDev: boolean
+  nextMapId: () => number
 ): VariantReplacementResult {
   const cls = safeStringLiteral(baseClass);
   const isCssVariants = variant.type === "cssVariants";
@@ -1291,7 +1303,7 @@ function generateVariantReplacement(
 
   if (useHoistedMap && variantKeys.length > 0) {
     // Generate hoisted static map for > 4 values
-    const mapName = `_vm${variantMapId++}`;
+    const mapName = `_vm${nextMapId()}`;
 
     // Build the map object: { color: {"primary": " ss-abc--color-primary", ...}, ... }
     const mapEntries = variantKeys.map((key) => {
@@ -1372,8 +1384,16 @@ function generateVariantReplacement(
   }
 
   // cssVariants: returns a function that generates class string
+  // Apply defaultVariants by merging defaults with provided variants
+  let defaultsPrefix = "";
+  if (isCssVariants && variant.defaultVariants && variant.defaultVariants.size > 0) {
+    const defaultEntries = Array.from(variant.defaultVariants.entries())
+      .map(([k, v]) => `${safeStringLiteral(k)}:${safeStringLiteral(v)}`)
+      .join(",");
+    defaultsPrefix = `variants = {...{${defaultEntries}}, ...variants}; `;
+  }
   return {
-    code: `(variants) => { let c = ${cls}; ${variantLogic}return c; }`,
+    code: `(variants) => { ${defaultsPrefix}let c = ${cls}; ${variantLogic}return c; }`,
     hoisted,
   };
 }
