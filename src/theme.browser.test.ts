@@ -197,4 +197,43 @@ describe("theme helpers (browser environment)", () => {
       expect(removeEventListenerMock).toHaveBeenCalledWith("change", expect.any(Function));
     });
   });
+
+  describe("non-data-* attribute support", () => {
+    it("getTheme should use getAttribute for non-data-* attributes", () => {
+      document.documentElement.setAttribute("class", "dark-theme");
+      expect(getTheme("class")).toBe("dark-theme");
+    });
+
+    it("getTheme should return DEFAULT_THEME when non-data-* attribute is absent", () => {
+      document.documentElement.removeAttribute("aria-label");
+      expect(getTheme("aria-label")).toBe("light");
+    });
+
+    it("setTheme should use setAttribute for non-data-* attributes", () => {
+      setTheme("dark", false, { attribute: "aria-theme" });
+      expect(document.documentElement.getAttribute("aria-theme")).toBe("dark");
+    });
+  });
+
+  describe("kebab-case data attributes", () => {
+    it("getTheme should convert kebab data attribute to camelCase for dataset", () => {
+      // data-color-mode maps to dataset.colorMode
+      document.documentElement.dataset.colorMode = "dark";
+      expect(getTheme("data-color-mode")).toBe("dark");
+    });
+
+    it("setTheme should convert kebab data attribute to camelCase for dataset", () => {
+      setTheme("dark", false, { attribute: "data-color-mode" });
+      expect(document.documentElement.dataset.colorMode).toBe("dark");
+    });
+  });
+
+  describe("initTheme without localStorage", () => {
+    it("should skip localStorage check when localStorage is undefined", () => {
+      vi.stubGlobal("localStorage", undefined);
+      // Falls through to system preference check (false) then default theme
+      const result = initTheme({ defaultTheme: "dark" });
+      expect(result).toBe("dark");
+    });
+  });
 });

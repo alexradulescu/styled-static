@@ -485,6 +485,7 @@ export default css;
       for (const wc of withComponentCalls) {
         // SECURITY: Validate component references
         if (!isValidIdentifier(wc.fromComponent)) {
+          /* v8 ignore next — unreachable: fromComponent is an AST Identifier node, always valid */
           throw new Error(
             `[styled-static] Invalid fromComponent name: ${wc.fromComponent}`
           );
@@ -501,6 +502,7 @@ export default css;
         } else {
           // Component reference: withComponent(Link, Button)
           if (!isValidIdentifier(wc.toComponent)) {
+            /* v8 ignore next — unreachable: toComponent is an AST Identifier node, always valid */
             throw new Error(
               `[styled-static] Invalid toComponent name: ${wc.toComponent}`
             );

@@ -109,10 +109,15 @@ function throwConfigError(name: string): never {
  * // Use withComponent for polymorphism
  * const LinkButton = withComponent(Link, Button);
  */
-export const styled = new Proxy({} as never, {
-  get: () => () => throwConfigError("styled"),
-  apply: () => throwConfigError("styled"),
-}) as import("./types").StyledFunction;
+export const styled = new Proxy(
+  // Use a function target so the `apply` trap is reachable when styled() is called
+  // directly (e.g. styled(Button)`...` at runtime without plugin transformation).
+  /* v8 ignore next */ function () {} as never,
+  {
+    get: () => () => throwConfigError("styled"),
+    apply: () => throwConfigError("styled"),
+  }
+) as import("./types").StyledFunction;
 
 /**
  * Get a scoped class name for CSS.
