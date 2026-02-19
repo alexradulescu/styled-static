@@ -7,7 +7,7 @@
  */
 import { parse } from "acorn";
 import type { Plugin } from "vite";
-import {  beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { hash } from "./hash";
 import { styledStatic } from "./vite";
 
@@ -1686,7 +1686,7 @@ describe("security: prototype pollution prevention", () => {
 
 describe("security: debug logging control", () => {
   it("should not log by default (no debug option)", async () => {
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const consoleSpy = spyOn(console, "log").mockImplementation(() => {});
 
     const plugin = styledStatic();
     // Simulate configResolved
@@ -1712,7 +1712,7 @@ const Button = styled.button\`padding: 1rem;\`;`;
   });
 
   it("should log when debug option is true", async () => {
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const consoleSpy = spyOn(console, "log").mockImplementation(() => {});
 
     const plugin = styledStatic({ debug: true });
     (plugin.configResolved as Function)?.({ command: "serve" });
@@ -2049,8 +2049,8 @@ const Button = styled.button\`padding: 1rem;\`;`;
     await transform(plugin, code, "/src/Button.tsx");
 
     const mockMod = { id: "mock-module" };
-    const invalidateModule = vi.fn();
-    const getModuleById = vi.fn().mockReturnValue(mockMod);
+    const invalidateModule = mock();
+    const getModuleById = mock().mockReturnValue(mockMod);
     const mockServer = {
       moduleGraph: { getModuleById, invalidateModule },
     };
@@ -2071,9 +2071,9 @@ const Button = styled.button\`padding: 1rem;\`;`;
 const Button = styled.button\`padding: 1rem;\`;`;
     await transform(plugin, code, "/src/Button.tsx");
 
-    const getModuleById = vi.fn();
+    const getModuleById = mock();
     const mockServer = {
-      moduleGraph: { getModuleById, invalidateModule: vi.fn() },
+      moduleGraph: { getModuleById, invalidateModule: mock() },
     };
 
     const handleHotUpdate = plugin.handleHotUpdate as Function;
@@ -2088,9 +2088,9 @@ const Button = styled.button\`padding: 1rem;\`;`;
     const plugin = styledStatic();
     (plugin.configResolved as Function)?.({ command: "serve" });
 
-    const getModuleById = vi.fn();
+    const getModuleById = mock();
     const mockServer = {
-      moduleGraph: { getModuleById, invalidateModule: vi.fn() },
+      moduleGraph: { getModuleById, invalidateModule: mock() },
     };
 
     const handleHotUpdate = plugin.handleHotUpdate as Function;
@@ -2107,8 +2107,8 @@ const Button = styled.button\`padding: 1rem;\`;`;
 const Button = styled.button\`padding: 1rem;\`;`;
     await transform(plugin, code, "/src/Button.tsx");
 
-    const invalidateModule = vi.fn();
-    const getModuleById = vi.fn().mockReturnValue(null); // Module not in graph
+    const invalidateModule = mock();
+    const getModuleById = mock().mockReturnValue(null); // Module not in graph
     const mockServer = {
       moduleGraph: { getModuleById, invalidateModule },
     };
@@ -2135,7 +2135,7 @@ describe("generateBundle hook", () => {
 const Button = styled.button\`padding: 1rem;\`;`;
     await transform(plugin, code, "/src/components/Button.tsx");
 
-    const emitFile = vi.fn();
+    const emitFile = mock();
     const generateBundle = plugin.generateBundle as Function;
     const mockBundle: Record<string, any> = {
       "components/Button.js": {
@@ -2162,7 +2162,7 @@ const Button = styled.button\`padding: 1rem;\`;`;
     const plugin = styledStatic({ cssOutput: "file" });
     (plugin.configResolved as Function)?.({ command: "build" });
 
-    const emitFile = vi.fn();
+    const emitFile = mock();
     const generateBundle = plugin.generateBundle as Function;
     const mockBundle: Record<string, any> = {
       "utils/helpers.js": {
@@ -2180,7 +2180,7 @@ const Button = styled.button\`padding: 1rem;\`;`;
     const plugin = styledStatic({ cssOutput: "file" });
     (plugin.configResolved as Function)?.({ command: "build" });
 
-    const emitFile = vi.fn();
+    const emitFile = mock();
     const generateBundle = plugin.generateBundle as Function;
     const mockBundle: Record<string, any> = {
       "styles.css": {
@@ -2197,7 +2197,7 @@ const Button = styled.button\`padding: 1rem;\`;`;
     const plugin = styledStatic(); // default: virtual
     (plugin.configResolved as Function)?.({ command: "build" });
 
-    const emitFile = vi.fn();
+    const emitFile = mock();
     const generateBundle = plugin.generateBundle as Function;
     generateBundle.call({ emitFile }, {}, {});
 
@@ -2234,7 +2234,7 @@ const Button = styled.button\`padding: 1rem;\`;`;
 const Button = styled.button\`padding: 1rem;\`;`;
     await transform(plugin, code, "/src/lib.tsx");
 
-    const emitFile = vi.fn();
+    const emitFile = mock();
     const generateBundle = plugin.generateBundle as Function;
     const mockBundle: Record<string, any> = {
       "lib.js": {
@@ -2351,7 +2351,7 @@ const Button = styled.button\`padding: 1rem;\`;`;
 
 describe("debug mode", () => {
   it("should log debug messages when debug is enabled", async () => {
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const consoleSpy = spyOn(console, "log").mockImplementation(() => {});
     const plugin = styledStatic({ debug: true });
     (plugin.configResolved as Function)?.({
       command: "serve",
@@ -2370,7 +2370,7 @@ const Button = styled.button\`padding: 1rem;\`;`;
   });
 
   it("should log when no templates or variants found after parsing imports", async () => {
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const consoleSpy = spyOn(console, "log").mockImplementation(() => {});
     const plugin = styledStatic({ debug: true });
     (plugin.configResolved as Function)?.({ command: "serve", build: {} });
 
@@ -2389,7 +2389,7 @@ const cls = cx("a", "b");`;
   });
 
   it("should log when parse error occurs", async () => {
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const consoleSpy = spyOn(console, "log").mockImplementation(() => {});
     const plugin = styledStatic({ debug: true });
     (plugin.configResolved as Function)?.({ command: "serve", build: {} });
 
@@ -2407,7 +2407,7 @@ const ??? = invalid syntax here;`;
   });
 
   it("should log CSS output mode during configResolved", async () => {
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const consoleSpy = spyOn(console, "log").mockImplementation(() => {});
     const plugin = styledStatic({ debug: true });
     (plugin.configResolved as Function)?.({ command: "build", build: {} });
 
@@ -2418,7 +2418,7 @@ const ??? = invalid syntax here;`;
   });
 
   it("should log generateBundle emit with debug enabled", async () => {
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const consoleSpy = spyOn(console, "log").mockImplementation(() => {});
     const plugin = styledStatic({ debug: true, cssOutput: "file" });
     (plugin.configResolved as Function)?.({ command: "build", build: {} });
 
@@ -2426,7 +2426,7 @@ const ??? = invalid syntax here;`;
 const Button = styled.button\`padding: 1rem;\`;`;
     await transform(plugin, code, "/src/comp/Dbg.tsx");
 
-    const emitFile = vi.fn();
+    const emitFile = mock();
     const generateBundle = plugin.generateBundle as Function;
     generateBundle.call({ emitFile }, {}, {
       "comp/Dbg.js": {
@@ -2903,7 +2903,7 @@ describe("hash collision rate", () => {
 
 describe("debug mode no-templates log (vite.ts:336)", () => {
   it("should log when styled is imported but not used as a tagged template", async () => {
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const consoleSpy = spyOn(console, "log").mockImplementation(() => {});
     const plugin = styledStatic({ debug: true });
     (plugin.configResolved as Function)?.({ command: "serve" });
 
