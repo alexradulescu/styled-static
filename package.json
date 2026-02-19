@@ -1,6 +1,6 @@
 {
   "name": "@alex.radulescu/styled-static",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "description": "Near-zero-runtime styled components for React 19+ with Vite. CSS extracted at build time, minimal runtime.",
   "type": "module",
   "private": false,
@@ -55,6 +55,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.4",
     "acorn": "^8.15.0",
+    "magic-string": "^0.30.21",
     "prettier": "^3.8.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
