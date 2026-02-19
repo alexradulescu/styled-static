@@ -1956,3 +1956,299 @@ const Box = styled.div\`display: flex;\`;`;
     expect(result?.code).toContain('className: "ss-Box-mycomponenttest"');
   });
 });
+
+// =============================================================================
+// Load Hook Tests
+// =============================================================================
+
+describe("load hook", () => {
+  it("should return CSS content for virtual modules in build mode", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "build" });
+
+    const code = `import { styled } from '@alex.radulescu/styled-static';
+const Button = styled.button\`padding: 1rem;\`;`;
+    const result = await transform(plugin, code, "/test-load.tsx");
+
+    expect(result).not.toBeNull();
+
+    // Extract the virtual module path from the import
+    const importMatch = result?.code.match(
+      /import "virtual:styled-static\/([^"]+)"/
+    );
+    expect(importMatch).not.toBeNull();
+    const virtualId = `\0virtual:styled-static/${importMatch![1]}`;
+
+    const loadFn = plugin.load as Function;
+    const css = loadFn(virtualId);
+
+    expect(css).toContain("padding: 1rem;");
+    expect(css).toContain(".ss-"); // Should be wrapped in class selector
+  });
+
+  it("should return JS with DOM injection in dev mode", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    const code = `import { styled } from '@alex.radulescu/styled-static';
+const Button = styled.button\`padding: 1rem;\`;`;
+    const result = await transform(plugin, code, "/test-dev-load.tsx");
+
+    expect(result).not.toBeNull();
+
+    // Dev mode imports .js virtual modules
+    const importMatch = result?.code.match(
+      /import "virtual:styled-static\/([^"]+\.js)"/
+    );
+    expect(importMatch).not.toBeNull();
+
+    // Load with .js extension — load hook normalizes to .css for lookup
+    const virtualId = `\0virtual:styled-static/${importMatch![1]}`;
+    const loadFn = plugin.load as Function;
+    const js = loadFn(virtualId);
+
+    expect(js).toContain("document.createElement('style')");
+    expect(js).toContain("import.meta.hot");
+    expect(js).toContain("padding: 1rem;");
+  });
+
+  it("should return null for non-virtual modules", () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "build" });
+
+    const loadFn = plugin.load as Function;
+    const result = loadFn("/src/regular-file.ts");
+
+    expect(result).toBeNull();
+  });
+});
+
+// =============================================================================
+// HMR Tests
+// =============================================================================
+
+describe("handleHotUpdate", () => {
+  it("should invalidate virtual CSS modules when source file changes", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    const code = `import { styled } from '@alex.radulescu/styled-static';
+const Button = styled.button\`padding: 1rem;\`;`;
+    await transform(plugin, code, "/src/Button.tsx");
+
+    // Mock the server
+    const invalidatedModules: string[] = [];
+    const mockServer = {
+      moduleGraph: {
+        getModuleById(id: string) {
+          if (id.includes("Button.tsx")) {
+            return { id };
+          }
+          return null;
+        },
+        invalidateModule(mod: { id: string }) {
+          invalidatedModules.push(mod.id);
+        },
+      },
+    };
+
+    const hmrFn = plugin.handleHotUpdate as Function;
+    hmrFn({ file: "/src/Button.tsx", server: mockServer });
+
+    expect(invalidatedModules.length).toBeGreaterThan(0);
+    expect(invalidatedModules[0]).toContain("Button.tsx");
+  });
+
+  it("should not invalidate for non-JS files", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    const invalidatedModules: string[] = [];
+    const mockServer = {
+      moduleGraph: {
+        getModuleById() {
+          return null;
+        },
+        invalidateModule(mod: { id: string }) {
+          invalidatedModules.push(mod.id);
+        },
+      },
+    };
+
+    const hmrFn = plugin.handleHotUpdate as Function;
+    hmrFn({ file: "/src/styles.css", server: mockServer });
+
+    expect(invalidatedModules.length).toBe(0);
+  });
+});
+
+// =============================================================================
+// generateBundle Tests
+// =============================================================================
+
+describe("generateBundle (file CSS output)", () => {
+  it("should emit CSS files for library builds", async () => {
+    const plugin = styledStatic({ cssOutput: "file" });
+    (plugin.configResolved as Function)?.({ command: "build" });
+
+    const code = `import { styled } from '@alex.radulescu/styled-static';
+const Button = styled.button\`padding: 1rem;\`;`;
+    await transform(plugin, code, "/src/components/Button.tsx");
+
+    const emittedFiles: Array<{
+      type: string;
+      fileName: string;
+      source: string;
+    }> = [];
+    const mockContext = {
+      emitFile(file: { type: string; fileName: string; source: string }) {
+        emittedFiles.push(file);
+      },
+    };
+
+    const bundle = {
+      "components/Button.js": {
+        type: "chunk" as const,
+        moduleIds: ["/src/components/Button.tsx"],
+        code: 'import "virtual:styled-static/src/components/Button.tsx/0.css";\nconst Button = "test";',
+      },
+    };
+
+    const generateBundleFn = plugin.generateBundle as Function;
+    generateBundleFn.call(mockContext, {}, bundle);
+
+    expect(emittedFiles.length).toBe(1);
+    expect(emittedFiles[0]!.fileName).toBe("components/Button.css");
+    expect(emittedFiles[0]!.source).toContain("padding: 1rem;");
+  });
+
+  it("should skip chunks with no CSS", async () => {
+    const plugin = styledStatic({ cssOutput: "file" });
+    (plugin.configResolved as Function)?.({ command: "build" });
+
+    const emittedFiles: Array<{ fileName: string }> = [];
+    const mockContext = {
+      emitFile(file: { fileName: string }) {
+        emittedFiles.push(file);
+      },
+    };
+
+    const bundle = {
+      "utils/helper.js": {
+        type: "chunk" as const,
+        moduleIds: ["/src/utils/helper.ts"],
+        code: "const x = 1;",
+      },
+    };
+
+    const generateBundleFn = plugin.generateBundle as Function;
+    generateBundleFn.call(mockContext, {}, bundle);
+
+    expect(emittedFiles.length).toBe(0);
+  });
+
+  it("should not emit files when cssOutput is virtual", async () => {
+    const plugin = styledStatic({ cssOutput: "virtual" });
+    (plugin.configResolved as Function)?.({ command: "build" });
+
+    const code = `import { styled } from '@alex.radulescu/styled-static';
+const Button = styled.button\`padding: 1rem;\`;`;
+    await transform(plugin, code, "/src/Button.tsx");
+
+    const emittedFiles: Array<{ fileName: string }> = [];
+    const mockContext = {
+      emitFile(file: { fileName: string }) {
+        emittedFiles.push(file);
+      },
+    };
+
+    const bundle = {
+      "Button.js": {
+        type: "chunk" as const,
+        moduleIds: ["/src/Button.tsx"],
+        code: "test",
+      },
+    };
+
+    const generateBundleFn = plugin.generateBundle as Function;
+    generateBundleFn.call(mockContext, {}, bundle);
+
+    expect(emittedFiles.length).toBe(0);
+  });
+
+  it("should rewrite CSS imports in emitted chunks", async () => {
+    const plugin = styledStatic({ cssOutput: "file" });
+    (plugin.configResolved as Function)?.({ command: "build" });
+
+    const code = `import { styled } from '@alex.radulescu/styled-static';
+const Box = styled.div\`display: flex;\`;`;
+    await transform(plugin, code, "/src/Box.tsx");
+
+    const mockContext = {
+      emitFile() {},
+    };
+
+    const bundle = {
+      "Box.js": {
+        type: "chunk" as const,
+        moduleIds: ["/src/Box.tsx"],
+        code: 'import "virtual:styled-static/src/Box.tsx/0.css";\nconst Box = "test";',
+      },
+    };
+
+    const generateBundleFn = plugin.generateBundle as Function;
+    generateBundleFn.call(mockContext, {}, bundle);
+
+    const chunk = bundle["Box.js"];
+    // Virtual import should be removed and replaced with relative CSS import
+    expect(chunk.code).not.toContain("virtual:styled-static");
+    expect(chunk.code).toContain('./Box.css"');
+  });
+});
+
+// =============================================================================
+// Hash Collision Rate Tests
+// =============================================================================
+
+describe("hash collision rate", () => {
+  it("should have zero collisions for 1000 typical CSS inputs", async () => {
+    const { hash } = await import("./hash");
+
+    const seen = new Set<string>();
+    let collisions = 0;
+
+    for (let i = 0; i < 1000; i++) {
+      // Simulate realistic CSS: different property values, selectors, etc.
+      const css = `.component-${i} { padding: ${i}px; margin: ${i * 2}px; color: #${String(i).padStart(6, "0")}; }`;
+      const h = hash(css).slice(0, 8); // Production length
+
+      if (seen.has(h)) {
+        collisions++;
+      }
+      seen.add(h);
+    }
+
+    expect(collisions).toBe(0);
+  });
+
+  it("should have low collision rate for 10000 similar inputs", async () => {
+    const { hash } = await import("./hash");
+
+    const seen = new Set<string>();
+    let collisions = 0;
+
+    for (let i = 0; i < 10000; i++) {
+      const css = `padding: ${i}rem;`;
+      const h = hash(css).slice(0, 8);
+
+      if (seen.has(h)) {
+        collisions++;
+      }
+      seen.add(h);
+    }
+
+    // With 8 chars of base36 (~41 bits), 10k inputs should have near-zero collisions
+    // Birthday paradox threshold: ~sqrt(2 * 36^8) ≈ 3.7M inputs for 50% collision chance
+    expect(collisions).toBe(0);
+  });
+});
