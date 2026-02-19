@@ -6,7 +6,7 @@
  *
  * Browser tests are in theme.browser.test.ts
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import {
   type InitThemeOptions,
   getTheme,

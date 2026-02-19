@@ -53,7 +53,7 @@ export function generateReplacement(
       // template.baseComponent comes from AST (Identifier node) so it is a valid
       // JS identifier by construction, but assert for defense-in-depth.
       if (!template.baseComponent || !isValidIdentifier(template.baseComponent)) {
-        /* v8 ignore next — unreachable: AST Identifier nodes are always valid identifiers */
+        /* unreachable: unreachable: AST Identifier nodes are always valid identifiers */
         throw new Error(
           `[styled-static] Invalid base component name: ${template.baseComponent}`
         );
@@ -179,7 +179,7 @@ export function generateVariantReplacement(
 
     if (isHtmlTag) {
       if (!variant.component || !/^[a-z][a-z0-9]*$/.test(variant.component)) {
-        /* v8 ignore next — unreachable: component is a lowercase-validated AST value */
+        /* unreachable: unreachable: component is a lowercase-validated AST value */
         throw new Error(
           `[styled-static] Invalid HTML tag name: ${variant.component}`
         );
@@ -191,7 +191,7 @@ export function generateVariantReplacement(
       };
     } else {
       if (!variant.component || !isValidIdentifier(variant.component)) {
-        /* v8 ignore next — unreachable: component comes from AST Identifier node, always valid */
+        /* unreachable: unreachable: component comes from AST Identifier node, always valid */
         throw new Error(
           `[styled-static] Invalid component name: ${variant.component}`
         );

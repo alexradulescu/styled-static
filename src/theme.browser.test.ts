@@ -2,13 +2,13 @@
  * Theme Helper Tests (Browser environment)
  *
  * These tests verify the theme helper functions in a browser-like
- * environment using jsdom.
+ * environment using happy-dom.
  *
  * SSR tests are in theme.test.ts
  *
- * @vitest-environment jsdom
+ * Run with: bun test --preload ./src/setup-dom.ts src/theme.browser.test.ts
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import {
   getTheme,
   initTheme,
@@ -16,17 +16,22 @@ import {
   setTheme,
 } from "./theme";
 
+// Mirror of vi.stubGlobal: uses Object.defineProperty to override read-only globals
+function stubGlobal(name: string, value: unknown) {
+  Object.defineProperty(globalThis, name, {
+    value,
+    writable: true,
+    configurable: true,
+    enumerable: true,
+  });
+}
+
 describe("theme helpers (browser environment)", () => {
   beforeEach(() => {
     // Reset document state
     document.documentElement.removeAttribute("data-theme");
     delete document.documentElement.dataset.theme;
     localStorage.clear();
-    vi.unstubAllGlobals();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
   });
 
   describe("getTheme", () => {
@@ -77,11 +82,12 @@ describe("theme helpers (browser environment)", () => {
     });
 
     it("should handle localStorage errors gracefully", () => {
-      const mockSetItem = vi.spyOn(Storage.prototype, "setItem");
+      const mockSetItem = spyOn(Storage.prototype, "setItem");
       mockSetItem.mockImplementation(() => {
         throw new Error("QuotaExceeded");
       });
       expect(() => setTheme("dark")).not.toThrow();
+      mockSetItem.mockRestore();
     });
   });
 
@@ -100,8 +106,8 @@ describe("theme helpers (browser environment)", () => {
     });
 
     it("should use system preference when enabled and no stored theme", () => {
-      const matchMediaMock = vi.fn().mockReturnValue({ matches: true });
-      vi.stubGlobal("matchMedia", matchMediaMock);
+      const matchMediaMock = mock().mockReturnValue({ matches: true });
+      stubGlobal("matchMedia", matchMediaMock);
 
       const result = initTheme({ useSystemPreference: true });
       expect(result).toBe("dark");
@@ -109,8 +115,8 @@ describe("theme helpers (browser environment)", () => {
     });
 
     it("should use light when system prefers light", () => {
-      const matchMediaMock = vi.fn().mockReturnValue({ matches: false });
-      vi.stubGlobal("matchMedia", matchMediaMock);
+      const matchMediaMock = mock().mockReturnValue({ matches: false });
+      stubGlobal("matchMedia", matchMediaMock);
 
       const result = initTheme({ useSystemPreference: true });
       expect(result).toBe("light");
@@ -122,12 +128,13 @@ describe("theme helpers (browser environment)", () => {
     });
 
     it("should handle localStorage errors gracefully", () => {
-      const mockGetItem = vi.spyOn(Storage.prototype, "getItem");
+      const mockGetItem = spyOn(Storage.prototype, "getItem");
       mockGetItem.mockImplementation(() => {
         throw new Error("SecurityError");
       });
       expect(() => initTheme()).not.toThrow();
       expect(initTheme()).toBe("light");
+      mockGetItem.mockRestore();
     });
 
     it("should use custom attribute", () => {
@@ -139,16 +146,16 @@ describe("theme helpers (browser environment)", () => {
 
   describe("onSystemThemeChange", () => {
     it("should subscribe to system theme changes", () => {
-      const addEventListenerMock = vi.fn();
-      const removeEventListenerMock = vi.fn();
-      const matchMediaMock = vi.fn().mockReturnValue({
+      const addEventListenerMock = mock();
+      const removeEventListenerMock = mock();
+      const matchMediaMock = mock().mockReturnValue({
         matches: false,
         addEventListener: addEventListenerMock,
         removeEventListener: removeEventListenerMock,
       });
-      vi.stubGlobal("matchMedia", matchMediaMock);
+      stubGlobal("matchMedia", matchMediaMock);
 
-      const callback = vi.fn();
+      const callback = mock();
       const unsubscribe = onSystemThemeChange(callback);
 
       expect(addEventListenerMock).toHaveBeenCalledWith("change", expect.any(Function));
@@ -159,16 +166,16 @@ describe("theme helpers (browser environment)", () => {
 
     it("should call callback when system theme changes", () => {
       let changeHandler: ((e: { matches: boolean }) => void) | null = null;
-      const matchMediaMock = vi.fn().mockReturnValue({
+      const matchMediaMock = mock().mockReturnValue({
         matches: false,
         addEventListener: (_event: string, handler: (e: { matches: boolean }) => void) => {
           changeHandler = handler;
         },
-        removeEventListener: vi.fn(),
+        removeEventListener: mock(),
       });
-      vi.stubGlobal("matchMedia", matchMediaMock);
+      stubGlobal("matchMedia", matchMediaMock);
 
-      const callback = vi.fn();
+      const callback = mock();
       onSystemThemeChange(callback);
 
       // Simulate system theme change
@@ -179,22 +186,31 @@ describe("theme helpers (browser environment)", () => {
     it("should use addEventListener and return a working unsubscribe function", () => {
       // React 19 requires Safari 15.4+, so we only support the modern addEventListener API.
       // This test verifies addEventListener/removeEventListener are used (not the removed legacy API).
-      const addEventListenerMock = vi.fn();
-      const removeEventListenerMock = vi.fn();
-      const matchMediaMock = vi.fn().mockReturnValue({
+      const addEventListenerMock = mock();
+      const removeEventListenerMock = mock();
+      const matchMediaMock = mock().mockReturnValue({
         matches: false,
         addEventListener: addEventListenerMock,
         removeEventListener: removeEventListenerMock,
       });
-      vi.stubGlobal("matchMedia", matchMediaMock);
+      stubGlobal("matchMedia", matchMediaMock);
 
-      const callback = vi.fn();
+      const callback = mock();
       const unsubscribe = onSystemThemeChange(callback);
 
       expect(addEventListenerMock).toHaveBeenCalledWith("change", expect.any(Function));
 
       unsubscribe();
       expect(removeEventListenerMock).toHaveBeenCalledWith("change", expect.any(Function));
+    });
+
+    it("should return no-op when matchMedia is unavailable", () => {
+      const origDesc = Object.getOwnPropertyDescriptor(globalThis, "matchMedia")!;
+      stubGlobal("matchMedia", undefined);
+      const unsubscribe = onSystemThemeChange(() => {});
+      expect(typeof unsubscribe).toBe("function");
+      expect(() => unsubscribe()).not.toThrow();
+      Object.defineProperty(globalThis, "matchMedia", origDesc);
     });
   });
 
@@ -230,10 +246,12 @@ describe("theme helpers (browser environment)", () => {
 
   describe("initTheme without localStorage", () => {
     it("should skip localStorage check when localStorage is undefined", () => {
-      vi.stubGlobal("localStorage", undefined);
+      const origDesc = Object.getOwnPropertyDescriptor(globalThis, "localStorage")!;
+      stubGlobal("localStorage", undefined);
       // Falls through to system preference check (false) then default theme
       const result = initTheme({ defaultTheme: "dark" });
       expect(result).toBe("dark");
+      Object.defineProperty(globalThis, "localStorage", origDesc);
     });
   });
 });

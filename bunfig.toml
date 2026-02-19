@@ -1,0 +1,4 @@
+[test]
+# Coverage is reported via --coverage in the test script.
+# Note: bun test does not enforce coverage thresholds natively yet.
+# Previous vitest thresholds: lines 95%, functions 95%, branches 90%

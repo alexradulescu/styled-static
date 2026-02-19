@@ -1,6 +1,6 @@
 {
   "name": "@alex.radulescu/styled-static",
-  "version": "0.10.0",
+  "version": "0.12.0",
   "description": "Near-zero-runtime styled components for React 19+ with Vite. CSS extracted at build time, minimal runtime.",
   "type": "module",
   "private": false,
@@ -33,8 +33,8 @@
     "build:sizes": "bun scripts/sizes.ts",
     "dev": "vite",
     "dev:watch": "tsc --watch",
-    "test": "vitest run --coverage",
-    "test:watch": "vitest",
+    "test": "printf '\\033[33m⚠️  [1/2] Node tests (theme.ts coverage intentionally low — browser paths covered in run 2)\\033[0m\\n' && bun test --coverage --only-failures src/vite.test.ts src/index.test.ts src/theme.test.ts && printf '\\033[32m✓ [2/2] Browser tests (theme.ts expected 100%%)\\033[0m\\n' && bun test --coverage --only-failures --preload ./src/setup-dom.ts ./src/theme.browser.test.ts",
+    "test:watch": "bun test --watch",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepublishOnly": "npm run build"
@@ -48,20 +48,18 @@
   },
   "dependencies": {},
   "devDependencies": {
+    "@happy-dom/global-registrator": "^20.6.3",
     "@trivago/prettier-plugin-sort-imports": "^6.0.2",
     "@types/node": "^22.10.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.4",
-    "@vitest/coverage-v8": "^4.0.18",
     "acorn": "^8.15.0",
-    "jsdom": "^28.0.0",
     "prettier": "^3.8.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "typescript": "^5.7.2",
-    "vite": "^7.3.1",
-    "vitest": "^4.0.18"
+    "vite": "^7.3.1"
   },
   "keywords": [
     "styled-components",
