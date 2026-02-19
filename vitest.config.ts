@@ -4,6 +4,11 @@ export default defineConfig({
   test: {
     include: ["src/**/*.test.ts"],
 
+    // Default environment for plugin and SSR tests
+    environment: "node",
+    // Browser-specific tests (e.g. theme DOM APIs) use jsdom
+    environmentMatchGlobs: [["src/**/*.browser.test.ts", "jsdom"]],
+
     coverage: {
       provider: "v8",
 

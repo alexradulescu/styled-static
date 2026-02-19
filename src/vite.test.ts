@@ -8,6 +8,7 @@
 import { parse } from "acorn";
 import type { Plugin } from "vite";
 import {  beforeEach, describe, expect, it, vi } from "vitest";
+import { hash } from "./hash";
 import { styledStatic } from "./vite";
 
 // =============================================================================
@@ -2504,8 +2505,10 @@ const Button = styledVariants({
 });`;
     const result = await transform(plugin, code, "/src/ProdVariant.tsx");
     expect(result).not.toBeNull();
-    // In prod mode, should use hash-based names, not variable name
-    expect(result!.code).not.toContain("ProdVariant");
+    // In prod mode, class names should be hash-based, not variable-name-based.
+    // The file path in CSS imports will naturally contain "ProdVariant", so only
+    // check that no variable-derived class name (e.g. ss-Button-ProdVariant) appears.
+    expect(result!.code).not.toMatch(/["']ss-\w+-ProdVariant/);
     expect(result!.code).toContain("ss-");
   });
 
@@ -2863,5 +2866,33 @@ const Button = styledVariants({
 });`;
     const result = await transform(plugin, code, "/src/CompoundTagged.tsx");
     expect(result).not.toBeNull();
+  });
+});
+
+// =============================================================================
+// Hash Collision Rate Tests
+// =============================================================================
+
+describe("hash collision rate", () => {
+  it("should have zero collisions for 1000 typical CSS inputs", () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 1000; i++) {
+      const css = `.class-${i} { color: red; padding: ${i}px; margin: ${i * 2}px; }`;
+      const h = hash(css).slice(0, 8);
+      expect(seen.has(h), `collision at index ${i}: "${h}"`).toBe(false);
+      seen.add(h);
+    }
+  });
+
+  it("should have zero collisions for 10000 similar inputs at 8-char truncation", () => {
+    const seen = new Set<string>();
+    let collisions = 0;
+    for (let i = 0; i < 10000; i++) {
+      const css = `padding: ${i}px`;
+      const h = hash(css).slice(0, 8);
+      if (seen.has(h)) collisions++;
+      seen.add(h);
+    }
+    expect(collisions).toBe(0);
   });
 });

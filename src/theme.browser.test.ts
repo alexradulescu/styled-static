@@ -176,23 +176,25 @@ describe("theme helpers (browser environment)", () => {
       expect(callback).toHaveBeenCalledWith(true);
     });
 
-    it("should use legacy addListener for older browsers", () => {
-      const addListenerMock = vi.fn();
-      const removeListenerMock = vi.fn();
+    it("should use addEventListener and return a working unsubscribe function", () => {
+      // React 19 requires Safari 15.4+, so we only support the modern addEventListener API.
+      // This test verifies addEventListener/removeEventListener are used (not the removed legacy API).
+      const addEventListenerMock = vi.fn();
+      const removeEventListenerMock = vi.fn();
       const matchMediaMock = vi.fn().mockReturnValue({
         matches: false,
-        addListener: addListenerMock,
-        removeListener: removeListenerMock,
+        addEventListener: addEventListenerMock,
+        removeEventListener: removeEventListenerMock,
       });
       vi.stubGlobal("matchMedia", matchMediaMock);
 
       const callback = vi.fn();
       const unsubscribe = onSystemThemeChange(callback);
 
-      expect(addListenerMock).toHaveBeenCalled();
+      expect(addEventListenerMock).toHaveBeenCalledWith("change", expect.any(Function));
 
       unsubscribe();
-      expect(removeListenerMock).toHaveBeenCalled();
+      expect(removeEventListenerMock).toHaveBeenCalledWith("change", expect.any(Function));
     });
   });
 });
