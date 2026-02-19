@@ -1914,3 +1914,954 @@ const Box = styled.div\`display: flex;\`;`;
     expect(result?.code).toContain('className: "ss-Box-mycomponenttest"');
   });
 });
+
+// =============================================================================
+// Load Hook Tests
+// =============================================================================
+
+describe("load hook", () => {
+  it("should return null for non-styled-static IDs", () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+    const load = plugin.load as Function;
+    expect(load("\0other-plugin/module.css")).toBeNull();
+  });
+
+  it("should return null for IDs without virtual prefix", () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+    const load = plugin.load as Function;
+    expect(load("regular-module.js")).toBeNull();
+  });
+
+  it("should return JS DOM injection code in dev mode", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    const code = `import { styled } from '@alex.radulescu/styled-static';
+const Button = styled.button\`padding: 1rem;\`;`;
+    const result = await transform(plugin, code, "/test-load.tsx");
+    expect(result).not.toBeNull();
+
+    // Extract the virtual module import from the transformed output
+    const importMatch = result!.code.match(/import "([^"]+)"/);
+    expect(importMatch).not.toBeNull();
+
+    const load = plugin.load as Function;
+    // In dev mode the import uses .js extension; the load function maps it to .css key
+    const virtualId = "\0" + importMatch![1];
+    const loaded = load(virtualId);
+    expect(loaded).toContain("document.createElement('style')");
+    expect(loaded).toContain("import.meta.hot");
+  });
+
+  it("should return raw CSS in build mode with virtual output", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "build" });
+
+    const code = `import { styled } from '@alex.radulescu/styled-static';
+const Button = styled.button\`padding: 1rem;\`;`;
+    const result = await transform(plugin, code, "/test-load-build.tsx");
+    expect(result).not.toBeNull();
+
+    const importMatch = result!.code.match(/import "([^"]+)"/);
+    expect(importMatch).not.toBeNull();
+
+    const load = plugin.load as Function;
+    const virtualId = "\0" + importMatch![1];
+    const loaded = load(virtualId);
+    // Build mode virtual: returns raw CSS
+    expect(loaded).toContain("padding: 1rem;");
+    // Should NOT contain JS injection
+    expect(loaded).not.toContain("document.createElement");
+  });
+
+  it("should return empty string in build mode with file output", async () => {
+    const plugin = styledStatic({ cssOutput: "file" });
+    (plugin.configResolved as Function)?.({ command: "build" });
+
+    const code = `import { styled } from '@alex.radulescu/styled-static';
+const Button = styled.button\`padding: 1rem;\`;`;
+    const result = await transform(plugin, code, "/test-load-file.tsx");
+    expect(result).not.toBeNull();
+
+    const importMatch = result!.code.match(/import "([^"]+)"/);
+    expect(importMatch).not.toBeNull();
+
+    const load = plugin.load as Function;
+    const virtualId = "\0" + importMatch![1];
+    const loaded = load(virtualId);
+    expect(loaded).toBe("");
+  });
+
+  it("should handle CSS module with no matching entry gracefully", () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "build" });
+
+    const load = plugin.load as Function;
+    // Load a virtual module ID that was never registered via transform
+    const loaded = load("\0virtual:styled-static/nonexistent/0.css");
+    // Should return empty CSS (the fallback)
+    expect(loaded).toBe("");
+  });
+});
+
+// =============================================================================
+// Resolve ID Hook Tests
+// =============================================================================
+
+describe("resolveId hook", () => {
+  it("should resolve virtual:styled-static/ IDs", () => {
+    const plugin = styledStatic();
+    const resolveId = plugin.resolveId as Function;
+    const result = resolveId("virtual:styled-static/test/0.css");
+    expect(result).toBe("\0virtual:styled-static/test/0.css");
+  });
+
+  it("should pass through already-prefixed IDs", () => {
+    const plugin = styledStatic();
+    const resolveId = plugin.resolveId as Function;
+    const result = resolveId("\0virtual:styled-static/test/0.css");
+    expect(result).toBe("\0virtual:styled-static/test/0.css");
+  });
+
+  it("should return null for non-styled-static IDs", () => {
+    const plugin = styledStatic();
+    const resolveId = plugin.resolveId as Function;
+    const result = resolveId("some-other-module");
+    expect(result).toBeNull();
+  });
+});
+
+// =============================================================================
+// HMR (handleHotUpdate) Hook Tests
+// =============================================================================
+
+describe("handleHotUpdate hook", () => {
+  it("should invalidate virtual modules for changed source files", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    // Transform a file to populate CSS modules
+    const code = `import { styled } from '@alex.radulescu/styled-static';
+const Button = styled.button\`padding: 1rem;\`;`;
+    await transform(plugin, code, "/src/Button.tsx");
+
+    const mockMod = { id: "mock-module" };
+    const invalidateModule = vi.fn();
+    const getModuleById = vi.fn().mockReturnValue(mockMod);
+    const mockServer = {
+      moduleGraph: { getModuleById, invalidateModule },
+    };
+
+    const handleHotUpdate = plugin.handleHotUpdate as Function;
+    handleHotUpdate({ file: "/src/Button.tsx", server: mockServer });
+
+    // Should have looked up and invalidated the module
+    expect(getModuleById).toHaveBeenCalled();
+    expect(invalidateModule).toHaveBeenCalledWith(mockMod);
+  });
+
+  it("should not invalidate modules for non-matching source files", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    const code = `import { styled } from '@alex.radulescu/styled-static';
+const Button = styled.button\`padding: 1rem;\`;`;
+    await transform(plugin, code, "/src/Button.tsx");
+
+    const getModuleById = vi.fn();
+    const mockServer = {
+      moduleGraph: { getModuleById, invalidateModule: vi.fn() },
+    };
+
+    const handleHotUpdate = plugin.handleHotUpdate as Function;
+    // Different file that doesn't match
+    handleHotUpdate({ file: "/src/Other.tsx", server: mockServer });
+
+    // Should not find any matching modules
+    expect(getModuleById).not.toHaveBeenCalled();
+  });
+
+  it("should ignore non-JS/TS files", () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    const getModuleById = vi.fn();
+    const mockServer = {
+      moduleGraph: { getModuleById, invalidateModule: vi.fn() },
+    };
+
+    const handleHotUpdate = plugin.handleHotUpdate as Function;
+    handleHotUpdate({ file: "/src/styles.css", server: mockServer });
+
+    expect(getModuleById).not.toHaveBeenCalled();
+  });
+
+  it("should handle module not found in graph", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    const code = `import { styled } from '@alex.radulescu/styled-static';
+const Button = styled.button\`padding: 1rem;\`;`;
+    await transform(plugin, code, "/src/Button.tsx");
+
+    const invalidateModule = vi.fn();
+    const getModuleById = vi.fn().mockReturnValue(null); // Module not in graph
+    const mockServer = {
+      moduleGraph: { getModuleById, invalidateModule },
+    };
+
+    const handleHotUpdate = plugin.handleHotUpdate as Function;
+    handleHotUpdate({ file: "/src/Button.tsx", server: mockServer });
+
+    expect(getModuleById).toHaveBeenCalled();
+    // Should not try to invalidate null
+    expect(invalidateModule).not.toHaveBeenCalled();
+  });
+});
+
+// =============================================================================
+// generateBundle Hook Tests
+// =============================================================================
+
+describe("generateBundle hook", () => {
+  it("should emit CSS files in file output mode", async () => {
+    const plugin = styledStatic({ cssOutput: "file" });
+    (plugin.configResolved as Function)?.({ command: "build" });
+
+    const code = `import { styled } from '@alex.radulescu/styled-static';
+const Button = styled.button\`padding: 1rem;\`;`;
+    await transform(plugin, code, "/src/components/Button.tsx");
+
+    const emitFile = vi.fn();
+    const generateBundle = plugin.generateBundle as Function;
+    const mockBundle: Record<string, any> = {
+      "components/Button.js": {
+        type: "chunk",
+        moduleIds: ["/src/components/Button.tsx"],
+        code: 'import "virtual:styled-static/something";\nconsole.log("test");',
+      },
+    };
+    generateBundle.call({ emitFile }, {}, mockBundle);
+
+    expect(emitFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "asset",
+        fileName: "components/Button.css",
+      })
+    );
+    // The chunk code should be rewritten to have relative CSS import
+    expect(mockBundle["components/Button.js"].code).toContain(
+      'import "./Button.css"'
+    );
+  });
+
+  it("should skip chunks with no CSS", async () => {
+    const plugin = styledStatic({ cssOutput: "file" });
+    (plugin.configResolved as Function)?.({ command: "build" });
+
+    const emitFile = vi.fn();
+    const generateBundle = plugin.generateBundle as Function;
+    const mockBundle: Record<string, any> = {
+      "utils/helpers.js": {
+        type: "chunk",
+        moduleIds: ["/src/utils/helpers.ts"],
+        code: 'console.log("no css here");',
+      },
+    };
+    generateBundle.call({ emitFile }, {}, mockBundle);
+
+    expect(emitFile).not.toHaveBeenCalled();
+  });
+
+  it("should skip non-chunk entries in bundle", async () => {
+    const plugin = styledStatic({ cssOutput: "file" });
+    (plugin.configResolved as Function)?.({ command: "build" });
+
+    const emitFile = vi.fn();
+    const generateBundle = plugin.generateBundle as Function;
+    const mockBundle: Record<string, any> = {
+      "styles.css": {
+        type: "asset",
+        source: "body { margin: 0; }",
+      },
+    };
+    generateBundle.call({ emitFile }, {}, mockBundle);
+
+    expect(emitFile).not.toHaveBeenCalled();
+  });
+
+  it("should be a no-op in virtual output mode", () => {
+    const plugin = styledStatic(); // default: virtual
+    (plugin.configResolved as Function)?.({ command: "build" });
+
+    const emitFile = vi.fn();
+    const generateBundle = plugin.generateBundle as Function;
+    generateBundle.call({ emitFile }, {}, {});
+
+    expect(emitFile).not.toHaveBeenCalled();
+  });
+});
+
+// =============================================================================
+// cssOutput Configuration Tests
+// =============================================================================
+
+describe("cssOutput configuration", () => {
+  it("should default to virtual for non-library builds", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "build" });
+
+    const code = `import { styled } from '@alex.radulescu/styled-static';
+const Button = styled.button\`padding: 1rem;\`;`;
+    const result = await transform(plugin, code, "/test-virtual.tsx");
+    expect(result).not.toBeNull();
+    // In virtual mode, CSS imports point to virtual modules
+    expect(result!.code).toContain("virtual:styled-static/");
+  });
+
+  it("should auto-detect file mode for library builds", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({
+      command: "build",
+      build: { lib: { entry: "src/index.ts" } },
+    });
+
+    // generateBundle should emit files in this mode
+    const code = `import { styled } from '@alex.radulescu/styled-static';
+const Button = styled.button\`padding: 1rem;\`;`;
+    await transform(plugin, code, "/src/lib.tsx");
+
+    const emitFile = vi.fn();
+    const generateBundle = plugin.generateBundle as Function;
+    const mockBundle: Record<string, any> = {
+      "lib.js": {
+        type: "chunk",
+        moduleIds: ["/src/lib.tsx"],
+        code: 'import "virtual:styled-static/something";',
+      },
+    };
+    generateBundle.call({ emitFile }, {}, mockBundle);
+    expect(emitFile).toHaveBeenCalled();
+  });
+
+  it("should use explicit virtual mode when configured", async () => {
+    const plugin = styledStatic({ cssOutput: "virtual" });
+    (plugin.configResolved as Function)?.({ command: "build" });
+
+    const code = `import { styled } from '@alex.radulescu/styled-static';
+const Button = styled.button\`padding: 1rem;\`;`;
+    const result = await transform(plugin, code, "/test-explicit-virtual.tsx");
+    expect(result).not.toBeNull();
+  });
+
+  it("should use explicit file mode when configured", async () => {
+    const plugin = styledStatic({ cssOutput: "file" });
+    (plugin.configResolved as Function)?.({ command: "build" });
+
+    const code = `import { styled } from '@alex.radulescu/styled-static';
+const Button = styled.button\`padding: 1rem;\`;`;
+    const result = await transform(plugin, code, "/test-explicit-file.tsx");
+    expect(result).not.toBeNull();
+  });
+});
+
+// =============================================================================
+// Hash Remainder Byte Tests
+// =============================================================================
+
+describe("hash remainder bytes", () => {
+  it("should handle string with 3 remainder bytes (length 7)", async () => {
+    const { hash } = await import("./hash");
+    // 7 chars: 4 processed in main loop, 3 remaining
+    const result = hash("abcdefg");
+    expect(typeof result).toBe("string");
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  it("should handle string with 2 remainder bytes (length 6)", async () => {
+    const { hash } = await import("./hash");
+    // 6 chars: 4 processed in main loop, 2 remaining
+    const result = hash("abcdef");
+    expect(typeof result).toBe("string");
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  it("should handle string with 1 remainder byte (length 5)", async () => {
+    const { hash } = await import("./hash");
+    // 5 chars: 4 processed in main loop, 1 remaining
+    const result = hash("abcde");
+    expect(typeof result).toBe("string");
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  it("should handle string with 0 remainder bytes (length 4)", async () => {
+    const { hash } = await import("./hash");
+    // 4 chars: exactly 4 processed, 0 remaining
+    const result = hash("abcd");
+    expect(typeof result).toBe("string");
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  it("should produce different hashes for different remainder lengths", async () => {
+    const { hash } = await import("./hash");
+    const h4 = hash("abcd");
+    const h5 = hash("abcde");
+    const h6 = hash("abcdef");
+    const h7 = hash("abcdefg");
+    // All should be unique
+    const unique = new Set([h4, h5, h6, h7]);
+    expect(unique.size).toBe(4);
+  });
+});
+
+// =============================================================================
+// Local Import Path Resolution Tests
+// =============================================================================
+
+describe("local import path resolution", () => {
+  it("should resolve runtime path for ./index imports", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    const code = `import { styled } from './index';
+const Button = styled.button\`padding: 1rem;\`;`;
+    const result = await transform(plugin, code, "/src/test-local.tsx");
+    expect(result).not.toBeNull();
+    expect(result!.code).toContain('from "./runtime"');
+  });
+
+  it("should resolve runtime path for ../index imports", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    const code = `import { styled } from '../index';
+const Button = styled.button\`padding: 1rem;\`;`;
+    const result = await transform(plugin, code, "/src/sub/test-local.tsx");
+    expect(result).not.toBeNull();
+    expect(result!.code).toContain('from "../runtime"');
+  });
+});
+
+// =============================================================================
+// Debug Mode Tests
+// =============================================================================
+
+describe("debug mode", () => {
+  it("should log debug messages when debug is enabled", async () => {
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const plugin = styledStatic({ debug: true });
+    (plugin.configResolved as Function)?.({
+      command: "serve",
+      build: {},
+    });
+
+    const code = `import { styled } from '@alex.radulescu/styled-static';
+const Button = styled.button\`padding: 1rem;\`;`;
+    await transform(plugin, code, "/src/Debug.tsx");
+
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[styled-static]"),
+      expect.anything()
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it("should log when no templates or variants found after parsing imports", async () => {
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const plugin = styledStatic({ debug: true });
+    (plugin.configResolved as Function)?.({ command: "serve", build: {} });
+
+    // Import cx (not styled/css) — has the import but no templates/variants
+    const code = `import { cx } from '@alex.radulescu/styled-static';
+const cls = cx("a", "b");`;
+    const result = await transform(plugin, code, "/src/NoTemplates.tsx");
+
+    // Should return null since cx doesn't need transformation
+    expect(result).toBeNull();
+    // Should have logged that no imports were found
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "[styled-static] No imports found, skipping"
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it("should log when parse error occurs", async () => {
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const plugin = styledStatic({ debug: true });
+    (plugin.configResolved as Function)?.({ command: "serve", build: {} });
+
+    // Invalid JS that references styled-static
+    const code = `import { styled } from '@alex.radulescu/styled-static';
+const ??? = invalid syntax here;`;
+    const result = await transform(plugin, code, "/src/BadFile.tsx");
+    expect(result).toBeNull();
+
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "[styled-static] AST parse error:",
+      expect.anything()
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it("should log CSS output mode during configResolved", async () => {
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const plugin = styledStatic({ debug: true });
+    (plugin.configResolved as Function)?.({ command: "build", build: {} });
+
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[styled-static] CSS output mode:")
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it("should log generateBundle emit with debug enabled", async () => {
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const plugin = styledStatic({ debug: true, cssOutput: "file" });
+    (plugin.configResolved as Function)?.({ command: "build", build: {} });
+
+    const code = `import { styled } from '@alex.radulescu/styled-static';
+const Button = styled.button\`padding: 1rem;\`;`;
+    await transform(plugin, code, "/src/comp/Dbg.tsx");
+
+    const emitFile = vi.fn();
+    const generateBundle = plugin.generateBundle as Function;
+    generateBundle.call({ emitFile }, {}, {
+      "comp/Dbg.js": {
+        type: "chunk",
+        moduleIds: ["/src/comp/Dbg.tsx"],
+        code: 'import "virtual:styled-static/something";',
+      },
+    });
+
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[styled-static] Emitted CSS file:")
+    );
+    consoleSpy.mockRestore();
+  });
+});
+
+// =============================================================================
+// Edge Cases: Import-but-no-use & Parse Errors
+// =============================================================================
+
+describe("edge cases for transform skip paths", () => {
+  it("should skip when file imports only non-API exports like cx", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    // cx is exported but not transformed by the plugin
+    const code = `import { cx } from '@alex.radulescu/styled-static';
+const cls = cx("a", "b");`;
+    const result = await transform(plugin, code, "/src/CxOnly.tsx");
+    expect(result).toBeNull();
+  });
+
+  it("should skip when file has styled-static import but uses none of the APIs", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    // Import styled but never use it in a tagged template
+    const code = `import { styled } from '@alex.radulescu/styled-static';
+console.log(styled);`;
+    const result = await transform(plugin, code, "/src/Unused.tsx");
+    expect(result).toBeNull();
+  });
+
+  it("should handle AST parse errors gracefully", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    // Contains styled-static string so it passes the quick check,
+    // but has syntax that acorn can't parse
+    const code = `import { styled } from '@alex.radulescu/styled-static';
+const 123invalid = "bad";`;
+    const result = await transform(plugin, code, "/src/Bad.tsx");
+    expect(result).toBeNull();
+  });
+});
+
+// =============================================================================
+// Variants in Prod Mode (build)
+// =============================================================================
+
+describe("variants in build mode", () => {
+  it("should use hash-based class names for styledVariants in build mode", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "build" });
+
+    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
+const Button = styledVariants({
+  component: 'button',
+  css: \`padding: 1rem;\`,
+  variants: {
+    color: {
+      primary: \`background: blue;\`,
+      danger: \`background: red;\`,
+    },
+  },
+});`;
+    const result = await transform(plugin, code, "/src/ProdVariant.tsx");
+    expect(result).not.toBeNull();
+    // In prod mode, should use hash-based names, not variable name
+    expect(result!.code).not.toContain("ProdVariant");
+    expect(result!.code).toContain("ss-");
+  });
+
+  it("should use hash-based class names for cssVariants in build mode", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "build" });
+
+    const code = `import { cssVariants } from '@alex.radulescu/styled-static';
+const buttonCss = cssVariants({
+  css: \`padding: 1rem;\`,
+  variants: {
+    size: {
+      sm: \`font-size: 0.875rem;\`,
+      lg: \`font-size: 1.25rem;\`,
+    },
+  },
+});`;
+    const result = await transform(plugin, code, "/src/ProdCssVar.tsx");
+    expect(result).not.toBeNull();
+    expect(result!.code).toContain("ss-");
+  });
+});
+
+// =============================================================================
+// CompoundVariants with Template Literal CSS
+// =============================================================================
+
+describe("compoundVariants with template literal CSS", () => {
+  it("should handle compoundVariants with plain template literal CSS", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
+const Button = styledVariants({
+  component: 'button',
+  css: \`padding: 1rem;\`,
+  variants: {
+    size: {
+      sm: \`font-size: 0.875rem;\`,
+      lg: \`font-size: 1.25rem;\`,
+    },
+    intent: {
+      primary: \`background: blue;\`,
+      danger: \`background: red;\`,
+    },
+  },
+  compoundVariants: [
+    { size: 'lg', intent: 'danger', css: \`font-weight: bold;\` },
+  ],
+});`;
+    const result = await transform(plugin, code, "/src/CompoundTpl.tsx");
+    expect(result).not.toBeNull();
+    // Should generate compound variant CSS
+    expect(result!.code).toContain("createElement");
+  });
+});
+
+// =============================================================================
+// Variant Edge Cases (branch coverage)
+// =============================================================================
+
+describe("variant branch coverage", () => {
+  it("should handle cssVariants with no variant keys (base only)", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    const code = `import { cssVariants } from '@alex.radulescu/styled-static';
+const baseCss = cssVariants({
+  css: \`padding: 1rem;\`,
+  variants: {},
+});`;
+    const result = await transform(plugin, code, "/src/BaseOnly.tsx");
+    expect(result).not.toBeNull();
+    // Should generate a function with just the base class, no variant logic
+    expect(result!.code).toContain("(variants)");
+    expect(result!.code).toContain("return c;");
+  });
+
+  it("should handle styledVariants with string literal CSS values", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
+const Button = styledVariants({
+  component: 'button',
+  css: 'padding: 1rem;',
+  variants: {
+    color: {
+      primary: 'background: blue;',
+      danger: 'background: red;',
+    },
+  },
+});`;
+    const result = await transform(plugin, code, "/src/StringLiterals.tsx");
+    expect(result).not.toBeNull();
+    expect(result!.code).toContain("createElement");
+  });
+
+  it("should handle cssVariants with string literal base CSS", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    const code = `import { cssVariants } from '@alex.radulescu/styled-static';
+const btnCss = cssVariants({
+  css: 'display: flex;',
+  variants: {
+    size: {
+      sm: 'font-size: 12px;',
+    },
+  },
+});`;
+    const result = await transform(plugin, code, "/src/StrCssVar.tsx");
+    expect(result).not.toBeNull();
+  });
+
+  it("should handle styledVariants with no base CSS", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
+const Button = styledVariants({
+  component: 'button',
+  variants: {
+    color: {
+      primary: \`background: blue;\`,
+    },
+  },
+});`;
+    const result = await transform(plugin, code, "/src/NoBase.tsx");
+    expect(result).not.toBeNull();
+    expect(result!.code).toContain("createElement");
+  });
+
+  it("should handle styledVariants with defaultVariants and > 4 values (hoisted map)", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
+const Button = styledVariants({
+  component: 'button',
+  css: \`padding: 1rem;\`,
+  variants: {
+    color: {
+      red: \`color: red;\`,
+      blue: \`color: blue;\`,
+      green: \`color: green;\`,
+      yellow: \`color: yellow;\`,
+      purple: \`color: purple;\`,
+    },
+  },
+  defaultVariants: {
+    color: 'blue',
+  },
+});`;
+    const result = await transform(plugin, code, "/src/HoistedDefaults.tsx");
+    expect(result).not.toBeNull();
+    // Should have hoisted map
+    expect(result!.code).toContain("_vm");
+    // Should have default value in destructuring
+    expect(result!.code).toContain('color = "blue"');
+  });
+
+  it("should handle styledVariants extending a component", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    const code = `import { styled, styledVariants } from '@alex.radulescu/styled-static';
+const Base = styled.div\`display: flex;\`;
+const Variant = styledVariants({
+  component: Base,
+  css: \`padding: 1rem;\`,
+  variants: {
+    size: {
+      sm: \`font-size: 12px;\`,
+      lg: \`font-size: 18px;\`,
+    },
+  },
+});`;
+    const result = await transform(plugin, code, "/src/ExtendVariant.tsx");
+    expect(result).not.toBeNull();
+    // Should reference Base.className
+    expect(result!.code).toContain("Base.className");
+  });
+
+  it("should handle compoundVariants with string literal CSS", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
+const Button = styledVariants({
+  component: 'button',
+  css: \`padding: 1rem;\`,
+  variants: {
+    size: {
+      sm: \`font-size: 12px;\`,
+      lg: \`font-size: 18px;\`,
+    },
+    intent: {
+      primary: \`background: blue;\`,
+      danger: \`background: red;\`,
+    },
+  },
+  compoundVariants: [
+    { size: 'lg', intent: 'danger', css: 'font-weight: bold;' },
+  ],
+});`;
+    const result = await transform(plugin, code, "/src/CompoundStr.tsx");
+    expect(result).not.toBeNull();
+  });
+
+  it("should handle cssVariants with compoundVariants", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    const code = `import { cssVariants } from '@alex.radulescu/styled-static';
+const btnCss = cssVariants({
+  css: \`padding: 1rem;\`,
+  variants: {
+    size: {
+      sm: \`font-size: 12px;\`,
+      lg: \`font-size: 18px;\`,
+    },
+    intent: {
+      primary: \`background: blue;\`,
+      danger: \`background: red;\`,
+    },
+  },
+  compoundVariants: [
+    { size: 'lg', intent: 'danger', css: \`font-weight: bold;\` },
+  ],
+});`;
+    const result = await transform(plugin, code, "/src/CssCompound.tsx");
+    expect(result).not.toBeNull();
+    // Should use variants.size style reference in cssVariants
+    expect(result!.code).toContain("variants.");
+  });
+});
+
+// =============================================================================
+// Load Hook Edge Cases (branch coverage)
+// =============================================================================
+
+describe("load hook edge cases", () => {
+  it("should handle dev mode load for nonexistent CSS module (no sourceFile)", () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+    const load = plugin.load as Function;
+
+    // Load a virtual module that doesn't exist in cssModules map
+    const loaded = load("\0virtual:styled-static/nonexistent/0.js");
+    // Should return JS injection code with empty CSS and no sourceURL
+    expect(loaded).toContain("document.createElement('style')");
+    // No sourceURL since sourceFile is ""
+    expect(loaded).not.toContain("sourceURL");
+  });
+});
+
+// =============================================================================
+// Transform Import/Skip Edge Cases (branch coverage)
+// =============================================================================
+
+describe("transform import edge cases", () => {
+  it("should return null when styled-static is imported but only non-API names used", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    // Import styled but use it as regular identifier, not template tag
+    const code = `import { styled } from '@alex.radulescu/styled-static';
+const x = styled;
+export default x;`;
+    const result = await transform(plugin, code, "/src/NoUse.tsx");
+    // Found styled import, found templates: 0, variants: 0, withComponent: 0 → null
+    expect(result).toBeNull();
+  });
+
+  it("should handle defaultVariants with non-string values (skips them)", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
+const Button = styledVariants({
+  component: 'button',
+  css: \`padding: 1rem;\`,
+  variants: {
+    size: {
+      sm: \`font-size: 12px;\`,
+      lg: \`font-size: 18px;\`,
+    },
+  },
+  defaultVariants: {
+    size: 'sm',
+  },
+});`;
+    const result = await transform(plugin, code, "/src/Defaults.tsx");
+    expect(result).not.toBeNull();
+    expect(result!.code).toContain('size = "sm"');
+  });
+
+  it("should handle variant config with tagged css template for base", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    const code = `import { styledVariants, css } from '@alex.radulescu/styled-static';
+const Button = styledVariants({
+  component: 'button',
+  css: css\`padding: 1rem;\`,
+  variants: {
+    color: {
+      primary: css\`background: blue;\`,
+    },
+  },
+});`;
+    const result = await transform(plugin, code, "/src/CssTagged.tsx");
+    expect(result).not.toBeNull();
+  });
+
+  it("should handle cssVariants with tagged css templates", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    const code = `import { cssVariants, css } from '@alex.radulescu/styled-static';
+const btnCss = cssVariants({
+  css: css\`padding: 1rem;\`,
+  variants: {
+    color: {
+      primary: css\`background: blue;\`,
+    },
+  },
+});`;
+    const result = await transform(plugin, code, "/src/CssTaggedVar.tsx");
+    expect(result).not.toBeNull();
+  });
+
+  it("should handle compoundVariants with tagged css template", async () => {
+    const plugin = styledStatic();
+    (plugin.configResolved as Function)?.({ command: "serve" });
+
+    const code = `import { styledVariants, css } from '@alex.radulescu/styled-static';
+const Button = styledVariants({
+  component: 'button',
+  css: css\`padding: 1rem;\`,
+  variants: {
+    size: {
+      sm: css\`font-size: 12px;\`,
+      lg: css\`font-size: 18px;\`,
+    },
+    intent: {
+      primary: css\`background: blue;\`,
+      danger: css\`background: red;\`,
+    },
+  },
+  compoundVariants: [
+    { size: 'lg', intent: 'danger', css: css\`font-weight: bold;\` },
+  ],
+});`;
+    const result = await transform(plugin, code, "/src/CompoundTagged.tsx");
+    expect(result).not.toBeNull();
+  });
+});

@@ -1,6 +1,6 @@
 {
   "name": "@alex.radulescu/styled-static",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "description": "Near-zero-runtime styled components for React 19+ with Vite. CSS extracted at build time, minimal runtime.",
   "type": "module",
   "private": false,
@@ -33,32 +33,35 @@
     "build:sizes": "bun scripts/sizes.ts",
     "dev": "vite",
     "dev:watch": "tsc --watch",
-    "test": "vitest",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepublishOnly": "npm run build"
   },
+  "engines": {
+    "bun": ">=1.3.8"
+  },
   "peerDependencies": {
-    "vite": "^5.0.0 || ^6.0.0",
+    "vite": "^5.0.0 || ^6.0.0 || ^7.0.0",
     "react": "^19.0.0"
   },
   "dependencies": {},
   "devDependencies": {
-    "@trivago/prettier-plugin-sort-imports": "^6.0.0",
+    "@trivago/prettier-plugin-sort-imports": "^6.0.2",
     "@types/node": "^22.10.1",
-    "@types/react": "^19.0.1",
-    "@types/react-dom": "^19.0.2",
-    "@vitejs/plugin-react": "^4.3.4",
-    "@vitest/browser": "^4.0.16",
-    "@vitest/coverage-v8": "2.1.8",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.4",
+    "@vitest/coverage-v8": "^4.0.18",
     "acorn": "^8.15.0",
-    "jsdom": "^27.3.0",
-    "prettier": "^3.7.4",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "jsdom": "^28.0.0",
+    "prettier": "^3.8.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "typescript": "^5.7.2",
-    "vite": "^6.0.3",
-    "vitest": "^2.1.8"
+    "vite": "^7.3.1",
+    "vitest": "^4.0.18"
   },
   "keywords": [
     "styled-components",
