@@ -22,6 +22,7 @@ import clsx from "clsx";
 import { tv } from "tailwind-variants";
 import { getTheme, initTheme, onSystemThemeChange, setTheme } from "./theme";
 import { CodeBlock } from "./sections/shared";
+import { KeyframeStyles } from "./sections/keyframes-demo";
 
 // Lazy-loaded sections for code splitting
 const ApiSection = lazy(() =>
@@ -736,6 +737,7 @@ export function App() {
 
   return (
     <Layout>
+      <KeyframeStyles />
       <MobileHeader>
         <HeaderTitle>styled-static</HeaderTitle>
         <BurgerButton
@@ -969,7 +971,7 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
               </CalloutContent>
             </div>
 
-            <Paragraph style={{ marginTop: "1rem", color: "var(--color-text-secondary)" }}>
+            <Paragraph className="mt-4 text-[var(--color-text-secondary)]">
               Each constraint removes complexity—no CSS parsing, no
               forwardRef, one great integration.
             </Paragraph>
@@ -1003,7 +1005,7 @@ export default defineConfig({
               </CalloutContent>
             </div>
 
-            <Paragraph style={{ marginTop: "1.5rem" }}>
+            <Paragraph className="mt-6">
               <strong>Optional: Lightning CSS</strong> for autoprefixing and
               faster CSS processing:
             </Paragraph>

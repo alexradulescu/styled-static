@@ -1,1 +1,11 @@
 @layer reset, base, tokens, recipes, utilities;
+
+@keyframes ss-docs-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ss-docs-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}

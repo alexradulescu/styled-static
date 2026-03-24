@@ -21,6 +21,7 @@ import {
 import { styled, css, GlobalStyles } from "restyle";
 import { initTheme, getTheme, setTheme, onSystemThemeChange } from "./theme";
 import { CodeBlock, cx } from "./sections/shared";
+import { KeyframeStyles } from "./sections/keyframes-demo";
 
 // Lazy-loaded sections for code splitting
 const ApiSection = lazy(() =>
@@ -416,6 +417,16 @@ const InlineCode = styled("code", {
 // Callout (inline for Getting Started)
 // =============================================================================
 
+// Section-specific helpers (replicate inline css from docs/App.tsx)
+const paragraphMutedCss = css({
+  marginTop: "1rem",
+  color: "var(--color-text-secondary)",
+});
+
+const paragraphSpacedCss = css({
+  marginTop: "1.5rem",
+});
+
 const calloutBaseCss = css({
   display: "flex",
   gap: "0.875rem",
@@ -668,6 +679,10 @@ export function App() {
   // Active nav css
   const [activeNavClass, ActiveNavStyles] = activeNavCss;
 
+  // Paragraph helper css tuples
+  const [paragraphMutedClass, ParagraphMutedStyles] = paragraphMutedCss;
+  const [paragraphSpacedClass, ParagraphSpacedStyles] = paragraphSpacedCss;
+
   // Theme toggle using theme helpers
   const toggleTheme = () => {
     const current = getTheme();
@@ -770,6 +785,9 @@ export function App() {
 
   return (
     <>
+      <KeyframeStyles />
+      <ParagraphMutedStyles />
+      <ParagraphSpacedStyles />
       <GlobalStyles>
         {{
           ":root": {
@@ -1053,7 +1071,7 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
                 virtual modules. No Webpack/Rollup.
               </AppCallout>
 
-              <Paragraph style={{ marginTop: "1rem", color: "var(--color-text-secondary)" }}>
+              <Paragraph className={paragraphMutedClass}>
                 Each constraint removes complexity—no CSS parsing, no
                 forwardRef, one great integration.
               </Paragraph>
@@ -1082,7 +1100,7 @@ export default defineConfig({
                 plugin in the plugins array.
               </AppCallout>
 
-              <Paragraph style={{ marginTop: "1.5rem" }}>
+              <Paragraph className={paragraphSpacedClass}>
                 <strong>Optional: Lightning CSS</strong> for autoprefixing and
                 faster CSS processing:
               </Paragraph>

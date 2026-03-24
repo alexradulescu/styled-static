@@ -7,6 +7,8 @@ import { useState } from "react";
 import { styled, css } from "restyle";
 import {
   AlertTriangle,
+  badgeCss,
+  BigPrimaryButton,
   Breadcrumb,
   Button,
   ButtonGroup,
@@ -19,9 +21,13 @@ import {
   InlineCode,
   Lightbulb,
   Paragraph,
+  PasswordInput,
+  PulsingDot,
   Section,
   SectionTitle,
+  Spinner,
   StyledButton,
+  SubmitButton,
   SubsectionTitle,
   highlightCss,
   cx,
@@ -34,15 +40,192 @@ const ApiWrapper = styled("div", {
   "--api-section-loaded": "1",
 });
 
+// Layout primitives for demo areas
+const DemoSpacer = styled("div", {
+  marginTop: "0.75rem",
+});
+
+const FlexRow = styled("div", {
+  display: "flex",
+  alignItems: "center",
+  gap: "0.75rem",
+});
+
+const AnimLabel = styled("span", {
+  fontSize: "0.875rem",
+  color: "var(--color-text-secondary)",
+});
+
+const AttrsColumn = styled("div", {
+  display: "flex",
+  flexDirection: "column",
+  gap: "0.75rem",
+  maxWidth: "320px",
+});
+
+const AttrsLabel = styled("div", {
+  fontSize: "0.75rem",
+  color: "var(--color-text-muted)",
+  marginBottom: "0.25rem",
+});
+
+const VarsGrid = styled("div", {
+  fontSize: "0.875rem",
+  display: "flex",
+  flexDirection: "column",
+  gap: "0.5rem",
+});
+
+const VarsRow = styled("div", {
+  display: "flex",
+  alignItems: "center",
+  gap: "0.5rem",
+});
+
+const VarName = styled("span", {
+  color: "var(--color-primary)",
+  fontWeight: 600,
+  fontFamily: '"Fira Code", "Monaco", monospace',
+  fontSize: "0.8125rem",
+});
+
+const VarSwatch = styled("div", {
+  width: "24px",
+  height: "24px",
+  background: "var(--color-primary)",
+  borderRadius: "4px",
+  border: "1px solid var(--color-border)",
+});
+
+const VarDesc = styled("span", {
+  color: "var(--color-text-secondary)",
+});
+
+// cx demo classes
+const boldCss = css({
+  fontWeight: 700,
+});
+
+const roundedCss = css({
+  borderRadius: "9999px",
+});
+
+const coloredCss = css({
+  background: "#8b5cf6",
+  "&:hover": {
+    background: "#7c3aed",
+  },
+});
+
+// Variant demo button (manual variant function matching the docs' styledVariants demo)
+const variantDemoBaseCss = css({
+  padding: "0.5rem 1rem",
+  fontSize: "0.875rem",
+  fontWeight: 500,
+  fontFamily: "inherit",
+  border: "none",
+  borderRadius: "6px",
+  cursor: "pointer",
+  transition: "all 0.2s ease",
+});
+
+const variantDemoPrimaryCss = css({
+  background: "#10b981",
+  color: "white",
+  "&:hover": {
+    background: "#059669",
+  },
+});
+
+const variantDemoSecondaryCss = css({
+  background: "#e5e7eb",
+  color: "#1a1a1a",
+  "&:hover": {
+    background: "#d1d5db",
+  },
+});
+
+const variantDemoDangerCss = css({
+  background: "#ef4444",
+  color: "white",
+  "&:hover": {
+    background: "#dc2626",
+  },
+});
+
+const variantDemoSmCss = css({
+  fontSize: "0.8125rem",
+  padding: "0.375rem 0.75rem",
+});
+
+const variantDemoLgCss = css({
+  fontSize: "1.125rem",
+  padding: "0.75rem 1.5rem",
+});
+
+const variantDemoCompoundDangerLgCss = css({
+  fontWeight: 900,
+  textTransform: "uppercase",
+});
+
+const variantDemoVariantMap = {
+  primary: variantDemoPrimaryCss,
+  secondary: variantDemoSecondaryCss,
+  danger: variantDemoDangerCss,
+};
+
+const variantDemoSizeMap = {
+  sm: variantDemoSmCss,
+  lg: variantDemoLgCss,
+};
+
+function VariantDemoButton({
+  variant = "primary",
+  size = "sm",
+  className,
+  ...props
+}: {
+  variant?: "primary" | "secondary" | "danger";
+  size?: "sm" | "lg";
+} & React.ComponentProps<"button">) {
+  const [baseClass, BaseStyles] = variantDemoBaseCss;
+  const [varClass, VarStyles] = variantDemoVariantMap[variant];
+  const [szClass, SzStyles] = variantDemoSizeMap[size];
+  const isCompound = variant === "danger" && size === "lg";
+  const [compClass, CompStyles] = variantDemoCompoundDangerLgCss;
+  return (
+    <>
+      <button
+        className={cx(baseClass, varClass, szClass, isCompound && compClass, className)}
+        {...props}
+      />
+      <BaseStyles />
+      <VarStyles />
+      <SzStyles />
+      {isCompound && <CompStyles />}
+    </>
+  );
+}
+
 export function ApiSection() {
   const [isHighlighted, setIsHighlighted] = useState(false);
+  const [cxDemo, setCxDemo] = useState({ bold: false, rounded: false, colored: false });
 
   // Get the highlight class and its Styles component
   const [highlightClass, HighlightStyles] = highlightCss;
 
+  // cx demo class tuples
+  const [boldClass, BoldStyles] = boldCss;
+  const [roundedClass, RoundedStyles] = roundedCss;
+  const [coloredClass, ColoredStyles] = coloredCss;
+
   return (
     <ApiWrapper>
       <HighlightStyles />
+      <BoldStyles />
+      <RoundedStyles />
+      <ColoredStyles />
+
       {/* styled */}
       <Section id="styled">
         <Breadcrumb>API</Breadcrumb>
@@ -92,12 +275,20 @@ const Button = styled.button\`
 const BoldButton = styled(Button)\`
   font-weight: 600;
   text-transform: uppercase;
+\`;
+
+// Multi-level: extends BoldButton
+const BigPrimary = styled(BoldButton)\`
+  font-size: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: #2563eb;
 \`;`}</CodeBlock>
         <DemoArea>
           <DemoLabel>Result</DemoLabel>
           <ButtonGroup>
-            <StyledButton>Base Button</StyledButton>
-            <ExtendedButton>Extended Button</ExtendedButton>
+            <StyledButton>Base</StyledButton>
+            <ExtendedButton>Extended</ExtendedButton>
+            <BigPrimaryButton>Big Primary</BigPrimaryButton>
           </ButtonGroup>
         </DemoArea>
       </Section>
@@ -158,6 +349,43 @@ cx('btn', isActive && activeClass)
 
 // Falsy values are filtered
 cx('a', null, undefined, false, 'b') // → 'a b'`}</CodeBlock>
+        <DemoArea>
+          <DemoLabel>Result</DemoLabel>
+          <ButtonGroup>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCxDemo((s) => ({ ...s, bold: !s.bold }))}
+            >
+              {cxDemo.bold ? "- Bold" : "+ Bold"}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCxDemo((s) => ({ ...s, rounded: !s.rounded }))}
+            >
+              {cxDemo.rounded ? "- Rounded" : "+ Rounded"}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCxDemo((s) => ({ ...s, colored: !s.colored }))}
+            >
+              {cxDemo.colored ? "- Purple" : "+ Purple"}
+            </Button>
+          </ButtonGroup>
+          <DemoSpacer>
+            <StyledButton
+              className={cx(
+                cxDemo.bold && boldClass,
+                cxDemo.rounded && roundedClass,
+                cxDemo.colored && coloredClass
+              )}
+            >
+              Dynamic Classes
+            </StyledButton>
+          </DemoSpacer>
+        </DemoArea>
       </Section>
 
       {/* keyframes */}
@@ -165,28 +393,34 @@ cx('a', null, undefined, false, 'b') // → 'a b'`}</CodeBlock>
         <Breadcrumb>API</Breadcrumb>
         <SectionTitle>keyframes</SectionTitle>
         <Paragraph>
-          Create scoped keyframe animations. The animation name is hashed to
-          avoid conflicts between components.
+          Define keyframe animations via{" "}
+          <InlineCode>createGlobalStyle</InlineCode> and reference them by name
+          in styled components. The{" "}
+          <InlineCode>keyframes</InlineCode> helper generates a hashed name —
+          see the note below about interpolation support.
         </Paragraph>
-        <CodeBlock>{`import { styled, keyframes } from '@alex.radulescu/styled-static';
+        <CodeBlock>{`import { createGlobalStyle, styled } from '@alex.radulescu/styled-static';
 
-const spin = keyframes\`
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+// Define named @keyframes via createGlobalStyle (extracted at build time)
+const GlobalAnimations = createGlobalStyle\`
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
 \`;
 
-const pulse = keyframes\`
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-\`;
-
+// Reference animation by name in styled components
 const Spinner = styled.div\`
   width: 24px;
   height: 24px;
   border: 2px solid #3b82f6;
   border-top-color: transparent;
   border-radius: 50%;
-  animation: \${spin} 1s linear infinite;
+  animation: spin 1s linear infinite;
 \`;
 
 const PulsingDot = styled.div\`
@@ -194,12 +428,33 @@ const PulsingDot = styled.div\`
   height: 8px;
   background: #10b981;
   border-radius: 50%;
-  animation: \${pulse} 2s ease-in-out infinite;
-\`;`}</CodeBlock>
-        <Callout type="note" icon={<Info size={20} />}>
-          At build time, keyframes CSS is extracted to a static file and the
-          animation name is hashed (e.g., <InlineCode>ss-abc123</InlineCode>).
-          References in styled components are replaced with the hashed name.
+  animation: pulse 2s ease-in-out infinite;
+\`;
+
+// Render GlobalAnimations once at app root
+<GlobalAnimations />
+<App />`}</CodeBlock>
+        <DemoArea>
+          <DemoLabel>Result</DemoLabel>
+          <ButtonGroup>
+            <FlexRow>
+              <Spinner />
+              <AnimLabel>Spinner (spin)</AnimLabel>
+            </FlexRow>
+            <FlexRow>
+              <PulsingDot />
+              <AnimLabel>Pulsing dot (pulse)</AnimLabel>
+            </FlexRow>
+          </ButtonGroup>
+        </DemoArea>
+        <Callout type="warning" icon={<AlertTriangle size={20} />}>
+          <InlineCode>{`\${keyframeVar}`}</InlineCode> interpolation inside{" "}
+          <InlineCode>styled</InlineCode> templates is not supported — the CSS
+          extractor captures raw source text and the variable reference would
+          end up literally in the CSS. Define named{" "}
+          <InlineCode>@keyframes</InlineCode> via{" "}
+          <InlineCode>createGlobalStyle</InlineCode> and reference them by
+          string name instead.
         </Callout>
       </Section>
 
@@ -236,6 +491,23 @@ const SubmitButton = styled.button.attrs({
 
 <SubmitButton>Send</SubmitButton>
 // Renders: <button type="submit" aria-label="Submit form" class="ss-xyz789">Send</button>`}</CodeBlock>
+        <DemoArea>
+          <DemoLabel>Result</DemoLabel>
+          <AttrsColumn>
+            <div>
+              <AttrsLabel>
+                PasswordInput (type=&quot;password&quot; via attrs)
+              </AttrsLabel>
+              <PasswordInput placeholder="Enter password" />
+            </div>
+            <div>
+              <AttrsLabel>
+                SubmitButton (type=&quot;submit&quot;, aria-label via attrs)
+              </AttrsLabel>
+              <SubmitButton>Submit Form</SubmitButton>
+            </div>
+          </AttrsColumn>
+        </DemoArea>
         <Callout type="warning" icon={<AlertTriangle size={20} />}>
           Unlike styled-components, attrs in styled-static must be static
           objects (no functions). For dynamic attributes, use regular props on
@@ -319,6 +591,34 @@ const Button = styledVariants({
           </ButtonGroup>
         </DemoArea>
 
+        <SubsectionTitle>Default & Compound Variants</SubsectionTitle>
+        <Paragraph>
+          Use <InlineCode>defaultVariants</InlineCode> to set fallback values
+          when props are omitted. Use <InlineCode>compoundVariants</InlineCode>{" "}
+          to apply extra styles when multiple variant conditions match.
+        </Paragraph>
+        <DemoArea>
+          <DemoLabel>Default variants (no props = primary + sm)</DemoLabel>
+          <ButtonGroup>
+            <VariantDemoButton>Default (primary sm)</VariantDemoButton>
+            <VariantDemoButton variant="secondary">
+              Secondary (sm default)
+            </VariantDemoButton>
+            <VariantDemoButton size="lg">Primary (lg default)</VariantDemoButton>
+          </ButtonGroup>
+        </DemoArea>
+        <DemoArea>
+          <DemoLabel>Compound: danger + lg = bold uppercase</DemoLabel>
+          <ButtonGroup>
+            <VariantDemoButton variant="danger" size="sm">
+              Danger SM
+            </VariantDemoButton>
+            <VariantDemoButton variant="danger" size="lg">
+              Danger LG (compound)
+            </VariantDemoButton>
+          </ButtonGroup>
+        </DemoArea>
+
         <SubsectionTitle>cssVariants</SubsectionTitle>
         <CodeBlock>{`import { cssVariants, css, cx } from '@alex.radulescu/styled-static';
 
@@ -344,6 +644,10 @@ const badgeCss = cssVariants({
 <span className={cx(badgeCss({ variant: 'info' }), isActive && activeClass)}>
   Info
 </span>`}</CodeBlock>
+        <DemoArea>
+          <DemoLabel>Result</DemoLabel>
+          <BadgeDemoRow />
+        </DemoArea>
       </Section>
 
       {/* Global Styles */}
@@ -380,7 +684,44 @@ const GlobalStyle = createGlobalStyle\`
           The component renders nothing at runtime. All CSS is extracted and
           injected via imports.
         </Callout>
+        <DemoArea>
+          <DemoLabel>Active on this page</DemoLabel>
+          <VarsGrid>
+            <VarsRow>
+              <VarName>--color-primary</VarName>
+              <VarSwatch />
+              <VarDesc>Set via createGlobalStyle on :root</VarDesc>
+            </VarsRow>
+            <VarsRow>
+              <VarName>box-sizing</VarName>
+              <VarDesc>border-box applied to all elements via * selector</VarDesc>
+            </VarsRow>
+            <VarsRow>
+              <VarName>body</VarName>
+              <VarDesc>margin: 0, font-family: Inter, system-ui</VarDesc>
+            </VarsRow>
+          </VarsGrid>
+        </DemoArea>
       </Section>
     </ApiWrapper>
+  );
+}
+
+// Extracted component to keep badge demo self-contained (needs to render Styles)
+function BadgeDemoRow() {
+  const [infoClass, InfoStyles] = badgeCss({ variant: "info" });
+  const [successClass, SuccessStyles] = badgeCss({ variant: "success" });
+  const [warningClass, WarningStyles] = badgeCss({ variant: "warning" });
+  return (
+    <>
+      <ButtonGroup>
+        <span className={infoClass}>Info</span>
+        <span className={successClass}>Success</span>
+        <span className={warningClass}>Warning</span>
+      </ButtonGroup>
+      <InfoStyles />
+      <SuccessStyles />
+      <WarningStyles />
+    </>
   );
 }

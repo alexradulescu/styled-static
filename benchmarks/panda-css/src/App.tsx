@@ -21,6 +21,7 @@ import {
 import { css, cx, cva } from "../styled-system/css";
 import { getTheme, initTheme, onSystemThemeChange, setTheme } from "./theme";
 import { CodeBlock } from "./sections/shared";
+import { KeyframeStyles } from "./sections/keyframes-demo";
 
 // Lazy-loaded sections for code splitting
 const ApiSection = lazy(() =>
@@ -412,6 +413,16 @@ const inlineCodeStyle = css({
   borderRadius: "4px",
 });
 
+// Section-specific helpers
+const paragraphMutedStyle = css({
+  marginTop: "1rem",
+  color: "var(--color-text-secondary)",
+});
+
+const paragraphSpacedStyle = css({
+  marginTop: "1.5rem",
+});
+
 // =============================================================================
 // Callout (inline for Getting Started)
 // =============================================================================
@@ -726,6 +737,8 @@ export function App() {
   const closeSidebar = () => setSidebarOpen(false);
 
   return (
+    <>
+    <KeyframeStyles />
     <div className={layoutStyle}>
       <header className={mobileHeaderStyle}>
         <span className={headerTitleStyle}>styled-static</span>
@@ -966,7 +979,7 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
               </div>
             </div>
 
-            <p className={paragraphStyle} style={{ marginTop: "1rem", color: "var(--color-text-secondary)" }}>
+            <p className={cx(paragraphStyle, paragraphMutedStyle)}>
               Each constraint removes complexity—no CSS parsing, no
               forwardRef, one great integration.
             </p>
@@ -1000,7 +1013,7 @@ export default defineConfig({
               </div>
             </div>
 
-            <p className={paragraphStyle} style={{ marginTop: "1.5rem" }}>
+            <p className={cx(paragraphStyle, paragraphSpacedStyle)}>
               <strong>Optional: Lightning CSS</strong> for autoprefixing and
               faster CSS processing:
             </p>
@@ -1057,5 +1070,6 @@ export default defineConfig({
         </div>
       </main>
     </div>
+    </>
   );
 }

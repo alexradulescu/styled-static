@@ -224,6 +224,131 @@ export function Counter({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 // =============================================================================
+// Multi-Level Extension Demo
+// =============================================================================
+
+export function BigPrimaryButton({ className, ...props }: React.ComponentProps<"button">) {
+  return (
+    <button
+      className={clsx(
+        "py-2 px-4 text-sm font-[inherit]",
+        "bg-[var(--color-primary)] text-white",
+        "border-none rounded-md cursor-pointer",
+        "hover:bg-[var(--color-primary-hover)]",
+        "font-semibold uppercase tracking-[0.05em]",
+        "text-base py-3 px-6 bg-[#2563eb] hover:bg-[#1d4ed8]",
+        className
+      )}
+      {...props}
+    />
+  );
+}
+
+// =============================================================================
+// withComponent Demo
+// =============================================================================
+
+export function AnchorButton({ className, ...props }: React.ComponentProps<"a">) {
+  return (
+    <a
+      className={clsx(
+        "py-2 px-4 text-sm font-[inherit]",
+        "bg-[var(--color-primary)] text-white",
+        "border-none rounded-md cursor-pointer",
+        "hover:bg-[var(--color-primary-hover)]",
+        "no-underline inline-flex items-center",
+        className
+      )}
+      {...props}
+    />
+  );
+}
+
+// =============================================================================
+// CSS Nesting Demo Card
+// =============================================================================
+
+export function NestingCard({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      className={clsx(
+        "nesting-card",
+        "p-5 bg-[var(--color-bg)]",
+        "border border-[var(--color-border)] rounded-[var(--radius)]",
+        "transition-all duration-200 relative",
+        "hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] hover:border-[var(--color-primary)]",
+        "max-[640px]:p-3",
+        "[&_h3]:m-0 [&_h3]:mb-2 [&_h3]:text-base [&_h3]:font-semibold",
+        "[&_p]:m-0 [&_p]:text-sm [&_p]:text-[var(--color-text-secondary)]",
+        className
+      )}
+      {...props}
+    />
+  );
+}
+
+// =============================================================================
+// Attrs Demo Components
+// =============================================================================
+
+export function PasswordInput({ className, ...props }: React.ComponentProps<"input">) {
+  return (
+    <input
+      type="password"
+      className={clsx(
+        "py-2 px-4 text-sm font-[inherit]",
+        "border border-[var(--color-border)] rounded-md",
+        "bg-[var(--color-bg)] text-[var(--color-text)]",
+        "outline-none w-full",
+        "transition-[border-color] duration-150",
+        "focus:border-[var(--color-primary)]",
+        "placeholder:text-[var(--color-text-muted)]",
+        className
+      )}
+      {...props}
+    />
+  );
+}
+
+export function SubmitButton({ className, ...props }: React.ComponentProps<"button">) {
+  return (
+    <button
+      type="submit"
+      aria-label="Submit form"
+      className={clsx(
+        "py-2 px-4 text-sm font-medium font-[inherit]",
+        "bg-[#3b82f6] text-white",
+        "border-none rounded-md cursor-pointer",
+        "transition-[background] duration-200",
+        "hover:bg-[#2563eb]",
+        className
+      )}
+      {...props}
+    />
+  );
+}
+
+// =============================================================================
+// cssVariants Badge Demo
+// =============================================================================
+
+const badgeVariants = {
+  info: "bg-[#e0f2fe] text-[#0369a1] dark:bg-[#0c4a6e] dark:text-[#7dd3fc]",
+  success: "bg-[#dcfce7] text-[#166534] dark:bg-[#052e16] dark:text-[#86efac]",
+  warning: "bg-[#fef3c7] text-[#92400e] dark:bg-[#451a03] dark:text-[#fcd34d]",
+};
+
+export function badgeCss({ variant }: { variant: "info" | "success" | "warning" }) {
+  return clsx(
+    "inline-flex items-center px-[0.625rem] py-1 rounded-full text-xs font-medium leading-[1.4]",
+    badgeVariants[variant]
+  );
+}
+
+// Keyframes demo components live in a separate file.
+export { Spinner, PulsingDot } from "./keyframes-demo";
+
+// =============================================================================
 // Code Block
 // =============================================================================
 

@@ -131,3 +131,39 @@ body {
 [data-theme="light"] .sidebar-light-shadow {
   box-shadow: 1px 0 3px rgba(0, 0, 0, 0.02);
 }
+
+/* NestingCard pseudo-element "hover me" label */
+.nesting-card::after {
+  content: "hover me";
+  position: absolute;
+  top: 0.5rem;
+  right: 0.75rem;
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: opacity 0.2s ease;
+}
+
+.nesting-card:hover::after {
+  opacity: 0;
+}
+
+/* Keyframe animations for docs demos */
+@keyframes ss-docs-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ss-docs-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-ss-spin {
+  animation: ss-docs-spin 1s linear infinite;
+}
+
+.animate-ss-pulse {
+  animation: ss-docs-pulse 2s ease-in-out infinite;
+}

@@ -252,6 +252,45 @@ export function ExtendedButton(props: React.ComponentProps<typeof StyledButton>)
   );
 }
 
+// BigPrimaryButton: extends ExtendedButton with additional styles
+const bigPrimaryExtraCss = css({
+  fontSize: "1rem",
+  padding: "0.75rem 1.5rem",
+  background: "#2563eb",
+  "&:hover": {
+    background: "#1d4ed8",
+  },
+});
+
+export function BigPrimaryButton(props: React.ComponentProps<typeof StyledButton>) {
+  const [extCls, ExtStyles] = extendedCss;
+  const [bigCls, BigStyles] = bigPrimaryExtraCss;
+  return (
+    <>
+      <StyledButton {...props} className={cx(extCls, bigCls, props.className)} />
+      <ExtStyles />
+      <BigStyles />
+    </>
+  );
+}
+
+// AnchorButton: renders an <a> with StyledButton styles (polymorphism demo)
+// Exposes a static className for composition like StyledButton.className in the docs
+// css() is evaluated at module scope, so the className is available immediately
+const [_anchorBtnClass] = styledButtonCss;
+export const AnchorButton = Object.assign(
+  function AnchorButtonFn({ className, ...props }: React.ComponentProps<"a">) {
+    const [btnCls, BtnStyles] = styledButtonCss;
+    return (
+      <>
+        <a className={cx(btnCls, className)} {...props} />
+        <BtnStyles />
+      </>
+    );
+  },
+  { className: _anchorBtnClass }
+);
+
 export const highlightCss = css({
   boxShadow: "0 0 0 3px var(--color-primary)",
 });
@@ -264,6 +303,177 @@ export const Counter = styled("div", {
   fontWeight: 600,
   fontVariantNumeric: "tabular-nums",
 });
+
+// =============================================================================
+// Attrs Demo Components
+// =============================================================================
+
+// PasswordInput: wrapper component with hardcoded type="password" (Restyle has no .attrs())
+const passwordInputCss = css({
+  padding: "0.5rem 1rem",
+  fontSize: "0.875rem",
+  fontFamily: "inherit",
+  border: "1px solid var(--color-border)",
+  borderRadius: "6px",
+  background: "var(--color-bg)",
+  color: "var(--color-text)",
+  outline: "none",
+  width: "100%",
+  transition: "border-color var(--transition)",
+  "&:focus": {
+    borderColor: "var(--color-primary)",
+  },
+  "&::placeholder": {
+    color: "var(--color-text-muted)",
+  },
+});
+
+export function PasswordInput({ className, ...props }: React.ComponentProps<"input">) {
+  const [cls, Styles] = passwordInputCss;
+  return (
+    <>
+      <input type="password" className={cx(cls, className)} {...props} />
+      <Styles />
+    </>
+  );
+}
+
+// SubmitButton: wrapper component with hardcoded type="submit" and aria-label
+const submitButtonCss = css({
+  padding: "0.5rem 1rem",
+  fontSize: "0.875rem",
+  fontWeight: 500,
+  fontFamily: "inherit",
+  background: "#3b82f6",
+  color: "white",
+  border: "none",
+  borderRadius: "6px",
+  cursor: "pointer",
+  transition: "background 0.2s ease",
+  "&:hover": {
+    background: "#2563eb",
+  },
+});
+
+export function SubmitButton({ className, ...props }: React.ComponentProps<"button">) {
+  const [cls, Styles] = submitButtonCss;
+  return (
+    <>
+      <button type="submit" aria-label="Submit form" className={cx(cls, className)} {...props} />
+      <Styles />
+    </>
+  );
+}
+
+// =============================================================================
+// cssVariants Badge Demo
+// =============================================================================
+
+const badgeBaseCss = css({
+  display: "inline-flex",
+  alignItems: "center",
+  padding: "0.25rem 0.625rem",
+  borderRadius: "9999px",
+  fontSize: "0.75rem",
+  fontWeight: 500,
+  lineHeight: 1.4,
+});
+
+const badgeInfoCss = css({
+  background: "#e0f2fe",
+  color: "#0369a1",
+  '[data-theme="dark"] &': {
+    background: "#0c4a6e",
+    color: "#7dd3fc",
+  },
+});
+
+const badgeSuccessCss = css({
+  background: "#dcfce7",
+  color: "#166534",
+  '[data-theme="dark"] &': {
+    background: "#052e16",
+    color: "#86efac",
+  },
+});
+
+const badgeWarningCss = css({
+  background: "#fef3c7",
+  color: "#92400e",
+  '[data-theme="dark"] &': {
+    background: "#451a03",
+    color: "#fcd34d",
+  },
+});
+
+const badgeVariantMap = {
+  info: badgeInfoCss,
+  success: badgeSuccessCss,
+  warning: badgeWarningCss,
+};
+
+export function badgeCss(opts: { variant: "info" | "success" | "warning" }): [string, React.FC] {
+  const [baseClass, BaseStyles] = badgeBaseCss;
+  const [varClass, VarStyles] = badgeVariantMap[opts.variant];
+  const combined = cx(baseClass, varClass);
+  const CombinedStyles = () => (
+    <>
+      <BaseStyles />
+      <VarStyles />
+    </>
+  );
+  return [combined, CombinedStyles];
+}
+
+// =============================================================================
+// CSS Nesting Demo Card
+// =============================================================================
+
+export const NestingCard = styled("div", {
+  padding: "1.25rem",
+  background: "var(--color-bg)",
+  border: "1px solid var(--color-border)",
+  borderRadius: "var(--radius)",
+  transition: "all 0.2s ease",
+  position: "relative",
+  "&:hover": {
+    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
+    borderColor: "var(--color-primary)",
+  },
+  "& h3": {
+    margin: "0 0 0.5rem",
+    fontSize: "1rem",
+    fontWeight: 600,
+  },
+  "& p": {
+    margin: 0,
+    fontSize: "0.875rem",
+    color: "var(--color-text-secondary)",
+  },
+  "@media (max-width: 640px)": {
+    padding: "0.75rem",
+  },
+  "&::after": {
+    content: '"hover me"',
+    position: "absolute",
+    top: "0.5rem",
+    right: "0.75rem",
+    fontSize: "0.6875rem",
+    color: "var(--color-text-muted)",
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+    transition: "opacity 0.2s ease",
+  },
+  "&:hover::after": {
+    opacity: 0,
+  },
+});
+
+// =============================================================================
+// Keyframes re-exports
+// =============================================================================
+
+export { Spinner, PulsingDot } from "./keyframes-demo";
 
 // =============================================================================
 // Code Block

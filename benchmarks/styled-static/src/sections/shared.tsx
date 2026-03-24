@@ -4,7 +4,7 @@
  */
 import { type ReactNode, useState } from "react";
 import { AlertTriangle, Check, Copy, Info, Lightbulb } from "lucide-react";
-import { css, cssVariants, cx, styled, styledVariants } from "@alex.radulescu/styled-static";
+import { css, cssVariants, cx, styled, styledVariants, withComponent } from "@alex.radulescu/styled-static";
 import { highlight } from "sugar-high";
 
 // =============================================================================
@@ -198,6 +198,169 @@ export const Counter = styled.div`
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 `;
+
+// Keyframes demo components live in a separate file with @ts-nocheck
+// because TS types disallow template interpolations (they're valid at build time).
+export { Spinner, PulsingDot } from "./keyframes-demo";
+
+// =============================================================================
+// Attrs Demo Components
+// =============================================================================
+
+export const PasswordInput = styled.input.attrs({ type: "password" })`
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  outline: none;
+  width: 100%;
+  transition: border-color var(--transition);
+
+  &:focus {
+    border-color: var(--color-primary);
+  }
+
+  &::placeholder {
+    color: var(--color-text-muted);
+  }
+`;
+
+export const SubmitButton = styled.button.attrs({
+  type: "submit",
+  "aria-label": "Submit form",
+})`
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  font-family: inherit;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+
+  &:hover {
+    background: #2563eb;
+  }
+`;
+
+// =============================================================================
+// cssVariants Badge Demo
+// =============================================================================
+
+export const badgeCss = cssVariants({
+  css: css`
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.625rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.4;
+  `,
+  variants: {
+    variant: {
+      info: css`
+        background: #e0f2fe;
+        color: #0369a1;
+        [data-theme="dark"] & {
+          background: #0c4a6e;
+          color: #7dd3fc;
+        }
+      `,
+      success: css`
+        background: #dcfce7;
+        color: #166534;
+        [data-theme="dark"] & {
+          background: #052e16;
+          color: #86efac;
+        }
+      `,
+      warning: css`
+        background: #fef3c7;
+        color: #92400e;
+        [data-theme="dark"] & {
+          background: #451a03;
+          color: #fcd34d;
+        }
+      `,
+    },
+  },
+});
+
+// =============================================================================
+// CSS Nesting Demo Card
+// =============================================================================
+
+export const NestingCard = styled.div`
+  padding: 1.25rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  transition: all 0.2s ease;
+  position: relative;
+
+  &:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-color: var(--color-primary);
+  }
+
+  & h3 {
+    margin: 0 0 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  & p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+  }
+
+  @media (max-width: 640px) {
+    padding: 0.75rem;
+  }
+
+  &::after {
+    content: "hover me";
+    position: absolute;
+    top: 0.5rem;
+    right: 0.75rem;
+    font-size: 0.6875rem;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    transition: opacity 0.2s ease;
+  }
+
+  &:hover::after {
+    opacity: 0;
+  }
+`;
+
+// =============================================================================
+// Multi-Level Extension Demo
+// =============================================================================
+
+export const BigPrimaryButton = styled(ExtendedButton)`
+  font-size: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: #2563eb;
+
+  &:hover {
+    background: #1d4ed8;
+  }
+`;
+
+// =============================================================================
+// withComponent Demo
+// =============================================================================
+
+export const AnchorButton = withComponent("a", StyledButton);
 
 // =============================================================================
 // Code Block

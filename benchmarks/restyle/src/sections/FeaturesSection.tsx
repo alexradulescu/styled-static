@@ -6,6 +6,7 @@
 import { styled } from "restyle";
 import { Moon, Sun } from "lucide-react";
 import {
+  AnchorButton,
   Breadcrumb,
   Button,
   ButtonGroup,
@@ -15,6 +16,7 @@ import {
   DemoLabel,
   InlineCode,
   Lightbulb,
+  NestingCard,
   Paragraph,
   Section,
   SectionTitle,
@@ -31,15 +33,15 @@ const FeaturesWrapper = styled("div", {
 });
 
 // Demo component that renders StyledButton css on an anchor (Restyle doesn't expose .className)
-function PolymorphismDemo() {
+function ClassNameDemo() {
   const [btnCls, BtnStyles] = styledButtonCss;
   return (
     <DemoArea>
-      <DemoLabel>Result</DemoLabel>
+      <DemoLabel>.className access</DemoLabel>
       <ButtonGroup>
         <StyledButton>Button</StyledButton>
         <a className={btnCls} href="#polymorphism">
-          Anchor (via className)
+          Anchor (via .className)
         </a>
       </ButtonGroup>
       <BtnStyles />
@@ -85,7 +87,16 @@ const LinkButton = withComponent(Link, Button);
 <LinkButton to="/path">
   Router link styled as button
 </LinkButton>`}</CodeBlock>
-        <PolymorphismDemo />
+        <ClassNameDemo />
+        <DemoArea>
+          <DemoLabel>withComponent(&apos;a&apos;, StyledButton)</DemoLabel>
+          <ButtonGroup>
+            <StyledButton>Original Button</StyledButton>
+            <AnchorButton href="#polymorphism">
+              Anchor (via withComponent)
+            </AnchorButton>
+          </ButtonGroup>
+        </DemoArea>
       </Section>
 
       {/* CSS Nesting */}
@@ -123,6 +134,17 @@ const LinkButton = withComponent(Link, Button);
     position: absolute;
   }
 \`;`}</CodeBlock>
+        <DemoArea>
+          <DemoLabel>Result (hover the card)</DemoLabel>
+          <NestingCard>
+            <h3>Nested CSS Card</h3>
+            <p>
+              Hover to see box-shadow and border color change. The
+              &ldquo;hover me&rdquo; label uses a pseudo-element (::after)
+              and fades on hover.
+            </p>
+          </NestingCard>
+        </DemoArea>
         <Callout type="tip" icon={<Lightbulb size={20} />}>
           Native CSS nesting means zero build-time processing. Your CSS is
           passed directly to the browser.

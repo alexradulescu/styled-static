@@ -7,6 +7,7 @@
 import styled from "@emotion/styled";
 import { Moon, Sun } from "lucide-react";
 import {
+  AnchorButton,
   Breadcrumb,
   Button,
   ButtonGroup,
@@ -16,6 +17,7 @@ import {
   DemoLabel,
   InlineCode,
   Lightbulb,
+  NestingCard,
   Paragraph,
   Section,
   SectionTitle,
@@ -45,10 +47,9 @@ export function FeaturesSection({ theme, toggleTheme }: FeaturesSectionProps) {
         <Breadcrumb>Features</Breadcrumb>
         <SectionTitle>Polymorphism & Composition</SectionTitle>
         <Paragraph>
-          Every styled component exposes a static{" "}
-          <InlineCode>.className</InlineCode> property for manual composition.
-          For rendering one component with another's styles, use{" "}
-          <InlineCode>withComponent</InlineCode>.
+          Emotion styled components support the <InlineCode>as</InlineCode> prop
+          at runtime for polymorphic rendering. For creating a pre-bound anchor
+          variant, use <InlineCode>.withComponent()</InlineCode>.
         </Paragraph>
         <CodeBlock>{`const Button = styled.button\`
   padding: 0.5rem 1rem;
@@ -56,28 +57,34 @@ export function FeaturesSection({ theme, toggleTheme }: FeaturesSectionProps) {
   color: white;
 \`;
 
-// Access className for manual composition
-<a className={Button.className} href="/link">
-  Link with button styles
-</a>
+// Runtime polymorphism via 'as' prop
+<Button as="a" href="/link">
+  Anchor with button styles
+</Button>
 
-// Use withComponent for polymorphic rendering
-import { Link } from 'react-router-dom';
-import { withComponent } from '@alex.radulescu/styled-static';
+// Pre-bound component via .withComponent()
+const AnchorButton = Button.withComponent('a');
 
-const LinkButton = withComponent(Link, Button);
-
-<LinkButton to="/path">
-  Router link styled as button
-</LinkButton>`}</CodeBlock>
+<AnchorButton href="/path">
+  Anchor button
+</AnchorButton>`}</CodeBlock>
         <DemoArea>
-          <DemoLabel>Result</DemoLabel>
+          <DemoLabel>as prop (runtime polymorphism)</DemoLabel>
           <ButtonGroup>
             <StyledButton>Button</StyledButton>
             {/* @ts-expect-error Emotion as prop changes element type at runtime */}
             <StyledButton as="a" href="#polymorphism">
               Anchor (via as prop)
             </StyledButton>
+          </ButtonGroup>
+        </DemoArea>
+        <DemoArea>
+          <DemoLabel>StyledButton.withComponent(&apos;a&apos;)</DemoLabel>
+          <ButtonGroup>
+            <StyledButton>Original Button</StyledButton>
+            <AnchorButton href="#polymorphism">
+              Anchor (via withComponent)
+            </AnchorButton>
           </ButtonGroup>
         </DemoArea>
       </Section>
@@ -117,6 +124,17 @@ const LinkButton = withComponent(Link, Button);
     position: absolute;
   }
 \`;`}</CodeBlock>
+        <DemoArea>
+          <DemoLabel>Result (hover the card)</DemoLabel>
+          <NestingCard>
+            <h3>Nested CSS Card</h3>
+            <p>
+              Hover to see box-shadow and border color change. The
+              &ldquo;hover me&rdquo; label uses a pseudo-element (::after)
+              and fades on hover.
+            </p>
+          </NestingCard>
+        </DemoArea>
         <Callout type="tip" icon={<Lightbulb size={20} />}>
           Native CSS nesting means zero build-time processing. Your CSS is
           passed directly to the browser.

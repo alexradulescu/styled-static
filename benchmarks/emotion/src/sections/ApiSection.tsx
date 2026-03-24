@@ -6,9 +6,11 @@
  */
 import { useState } from "react";
 import styled from "@emotion/styled";
-import { cx } from "@emotion/css";
+import { css, cx } from "@emotion/css";
 import {
   AlertTriangle,
+  badgeCss,
+  BigPrimaryButton,
   Breadcrumb,
   Button,
   ButtonGroup,
@@ -21,9 +23,13 @@ import {
   InlineCode,
   Lightbulb,
   Paragraph,
+  PasswordInput,
+  PulsingDot,
   Section,
   SectionTitle,
+  Spinner,
   StyledButton,
+  SubmitButton,
   SubsectionTitle,
   highlightClass,
 } from "./shared";
@@ -37,8 +43,164 @@ const ApiWrapper = styled.div`
   --api-section-loaded: 1;
 `;
 
+// Layout primitives for demo areas
+const DemoSpacer = styled.div`
+  margin-top: 0.75rem;
+`;
+
+const FlexRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+`;
+
+const AnimLabel = styled.span`
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+`;
+
+const AttrsColumn = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 320px;
+`;
+
+const AttrsLabel = styled.div`
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-bottom: 0.25rem;
+`;
+
+const VarsGrid = styled.div`
+  font-size: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+`;
+
+const VarsRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+`;
+
+const VarName = styled.span`
+  color: var(--color-primary);
+  font-weight: 600;
+  font-family: "Fira Code", "Monaco", monospace;
+  font-size: 0.8125rem;
+`;
+
+const VarSwatch = styled.div`
+  width: 24px;
+  height: 24px;
+  background: var(--color-primary);
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+`;
+
+const VarDesc = styled.span`
+  color: var(--color-text-secondary);
+`;
+
+// cx demo classes
+const boldClass = css`
+  font-weight: 700;
+`;
+const roundedClass = css`
+  border-radius: 9999px;
+`;
+const coloredClass = css`
+  background: #8b5cf6;
+  &:hover {
+    background: #7c3aed;
+  }
+`;
+
+// Variant demo button — Emotion: base styled component + variant function via cx
+const VariantDemoButtonBase = styled.button`
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  font-family: inherit;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+`;
+
+const variantDemoVariants = {
+  primary: css`
+    background: #10b981;
+    color: white;
+    &:hover {
+      background: #059669;
+    }
+  `,
+  secondary: css`
+    background: #e5e7eb;
+    color: #1a1a1a;
+    &:hover {
+      background: #d1d5db;
+    }
+  `,
+  danger: css`
+    background: #ef4444;
+    color: white;
+    &:hover {
+      background: #dc2626;
+    }
+  `,
+};
+
+const variantDemoSizes = {
+  sm: css`
+    font-size: 0.8125rem;
+    padding: 0.375rem 0.75rem;
+  `,
+  lg: css`
+    font-size: 1.125rem;
+    padding: 0.75rem 1.5rem;
+  `,
+};
+
+const variantDemoCompound = css`
+  font-weight: 900;
+  text-transform: uppercase;
+`;
+
+function VariantDemoButton({
+  variant = "primary",
+  size = "sm",
+  className,
+  children,
+  ...props
+}: {
+  variant?: "primary" | "secondary" | "danger";
+  size?: "sm" | "lg";
+  className?: string;
+  children?: React.ReactNode;
+} & React.ComponentProps<"button">) {
+  const isCompound = variant === "danger" && size === "lg";
+  return (
+    <VariantDemoButtonBase
+      className={cx(
+        variantDemoVariants[variant],
+        variantDemoSizes[size],
+        isCompound && variantDemoCompound,
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </VariantDemoButtonBase>
+  );
+}
+
 export function ApiSection() {
   const [isHighlighted, setIsHighlighted] = useState(false);
+  const [cxDemo, setCxDemo] = useState({ bold: false, rounded: false, colored: false });
 
   return (
     <ApiWrapper>
@@ -91,12 +253,20 @@ const Button = styled.button\`
 const BoldButton = styled(Button)\`
   font-weight: 600;
   text-transform: uppercase;
+\`;
+
+// Multi-level: extends BoldButton
+const BigPrimary = styled(BoldButton)\`
+  font-size: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: #2563eb;
 \`;`}</CodeBlock>
         <DemoArea>
           <DemoLabel>Result</DemoLabel>
           <ButtonGroup>
-            <StyledButton>Base Button</StyledButton>
-            <ExtendedButton>Extended Button</ExtendedButton>
+            <StyledButton>Base</StyledButton>
+            <ExtendedButton>Extended</ExtendedButton>
+            <BigPrimaryButton>Big Primary</BigPrimaryButton>
           </ButtonGroup>
         </DemoArea>
       </Section>
@@ -157,6 +327,43 @@ cx('btn', isActive && activeClass)
 
 // Falsy values are filtered
 cx('a', null, undefined, false, 'b') // → 'a b'`}</CodeBlock>
+        <DemoArea>
+          <DemoLabel>Result</DemoLabel>
+          <ButtonGroup>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCxDemo((s) => ({ ...s, bold: !s.bold }))}
+            >
+              {cxDemo.bold ? "- Bold" : "+ Bold"}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCxDemo((s) => ({ ...s, rounded: !s.rounded }))}
+            >
+              {cxDemo.rounded ? "- Rounded" : "+ Rounded"}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCxDemo((s) => ({ ...s, colored: !s.colored }))}
+            >
+              {cxDemo.colored ? "- Purple" : "+ Purple"}
+            </Button>
+          </ButtonGroup>
+          <DemoSpacer>
+            <StyledButton
+              className={cx(
+                cxDemo.bold && boldClass,
+                cxDemo.rounded && roundedClass,
+                cxDemo.colored && coloredClass
+              )}
+            >
+              Dynamic Classes
+            </StyledButton>
+          </DemoSpacer>
+        </DemoArea>
       </Section>
 
       {/* keyframes */}
@@ -164,10 +371,13 @@ cx('a', null, undefined, false, 'b') // → 'a b'`}</CodeBlock>
         <Breadcrumb>API</Breadcrumb>
         <SectionTitle>keyframes</SectionTitle>
         <Paragraph>
-          Create scoped keyframe animations. The animation name is hashed to
-          avoid conflicts between components.
+          Create scoped keyframe animations using the{" "}
+          <InlineCode>keyframes</InlineCode> helper from{" "}
+          <InlineCode>@emotion/react</InlineCode>. The animation name is hashed
+          to avoid conflicts between components.
         </Paragraph>
-        <CodeBlock>{`import { styled, keyframes } from '@alex.radulescu/styled-static';
+        <CodeBlock>{`import { keyframes } from '@emotion/react';
+import styled from '@emotion/styled';
 
 const spin = keyframes\`
   from { transform: rotate(0deg); }
@@ -182,23 +392,35 @@ const pulse = keyframes\`
 const Spinner = styled.div\`
   width: 24px;
   height: 24px;
-  border: 2px solid #3b82f6;
+  border: 3px solid var(--color-primary);
   border-top-color: transparent;
   border-radius: 50%;
   animation: \${spin} 1s linear infinite;
 \`;
 
 const PulsingDot = styled.div\`
-  width: 8px;
-  height: 8px;
-  background: #10b981;
+  width: 12px;
+  height: 12px;
+  background: var(--color-primary);
   border-radius: 50%;
   animation: \${pulse} 2s ease-in-out infinite;
 \`;`}</CodeBlock>
+        <DemoArea>
+          <DemoLabel>Result</DemoLabel>
+          <ButtonGroup>
+            <FlexRow>
+              <Spinner />
+              <AnimLabel>Spinner (spin)</AnimLabel>
+            </FlexRow>
+            <FlexRow>
+              <PulsingDot />
+              <AnimLabel>Pulsing dot (pulse)</AnimLabel>
+            </FlexRow>
+          </ButtonGroup>
+        </DemoArea>
         <Callout type="note" icon={<Info size={20} />}>
-          At build time, keyframes CSS is extracted to a static file and the
-          animation name is hashed (e.g., <InlineCode>ss-abc123</InlineCode>).
-          References in styled components are replaced with the hashed name.
+          Emotion interpolates the keyframe object directly into the template
+          literal, replacing it with a hashed animation name at runtime.
         </Callout>
       </Section>
 
@@ -207,38 +429,57 @@ const PulsingDot = styled.div\`
         <Breadcrumb>API</Breadcrumb>
         <SectionTitle>attrs</SectionTitle>
         <Paragraph>
-          Set default HTML attributes on styled components using the{" "}
-          <InlineCode>.attrs()</InlineCode> method.
+          Emotion does not have a built-in <InlineCode>.attrs()</InlineCode>{" "}
+          method. Default HTML attributes are set via wrapper components with
+          hardcoded props.
         </Paragraph>
-        <CodeBlock>{`import { styled } from '@alex.radulescu/styled-static';
+        <CodeBlock>{`// Emotion: use a wrapper component with hardcoded defaults
+function PasswordInput({ className, ...props }) {
+  return (
+    <input
+      type="password"
+      className={cx(passwordInputCss, className)}
+      {...props}
+    />
+  );
+}
 
-// Set default type for input
-const PasswordInput = styled.input.attrs({ type: 'password' })\`
-  padding: 0.5rem 1rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 4px;
-\`;
+function SubmitButton({ className, children, ...props }) {
+  return (
+    <button
+      type="submit"
+      aria-label="Submit form"
+      className={cx(submitButtonCss, className)}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+}
 
-// Set multiple default attributes
-const SubmitButton = styled.button.attrs({
-  type: 'submit',
-  'aria-label': 'Submit form',
-})\`
-  padding: 0.5rem 1rem;
-  background: #3b82f6;
-  color: white;
-\`;
-
-// Usage - default attrs are applied, can be overridden
+// Usage - default attrs are baked in
 <PasswordInput placeholder="Enter password" />
-// Renders: <input type="password" placeholder="Enter password" class="ss-abc123" />
-
-<SubmitButton>Send</SubmitButton>
-// Renders: <button type="submit" aria-label="Submit form" class="ss-xyz789">Send</button>`}</CodeBlock>
+<SubmitButton>Send</SubmitButton>`}</CodeBlock>
+        <DemoArea>
+          <DemoLabel>Result</DemoLabel>
+          <AttrsColumn>
+            <div>
+              <AttrsLabel>
+                PasswordInput (type=&quot;password&quot; via wrapper)
+              </AttrsLabel>
+              <PasswordInput placeholder="Enter password" />
+            </div>
+            <div>
+              <AttrsLabel>
+                SubmitButton (type=&quot;submit&quot;, aria-label via wrapper)
+              </AttrsLabel>
+              <SubmitButton>Submit Form</SubmitButton>
+            </div>
+          </AttrsColumn>
+        </DemoArea>
         <Callout type="warning" icon={<AlertTriangle size={20} />}>
-          Unlike styled-components, attrs in styled-static must be static
-          objects (no functions). For dynamic attributes, use regular props on
-          your component.
+          Unlike styled-components, Emotion has no <InlineCode>.attrs()</InlineCode> API.
+          Use wrapper components or spread default props manually.
         </Callout>
       </Section>
 
@@ -247,56 +488,43 @@ const SubmitButton = styled.button.attrs({
         <Breadcrumb>API</Breadcrumb>
         <SectionTitle>Variants API</SectionTitle>
         <Paragraph>
-          For type-safe variant handling, use{" "}
-          <InlineCode>styledVariants</InlineCode> to create components with
-          variant props, or <InlineCode>cssVariants</InlineCode> to get class
-          functions.
+          Emotion has no built-in variants API. Use plain objects of{" "}
+          <InlineCode>css`...`</InlineCode> strings combined with{" "}
+          <InlineCode>cx()</InlineCode> for component variant props, and the
+          same pattern for class variants.
         </Paragraph>
         <Callout type="tip" icon={<Lightbulb size={20} />}>
           Wrap CSS strings in <InlineCode>css`...`</InlineCode> to get IDE
           syntax highlighting from the styled-components VSCode extension.
         </Callout>
         <SubsectionTitle>styledVariants</SubsectionTitle>
-        <CodeBlock>{`import { styledVariants, css } from '@alex.radulescu/styled-static';
+        <CodeBlock>{`import { css, cx } from '@emotion/css';
+import styled from '@emotion/styled';
 
-// With css\`\` for syntax highlighting (recommended)
-const Button = styledVariants({
-  component: 'button',
-  css: css\`
-    padding: 0.5rem 1rem;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-  \`,
-  variants: {
-    variant: {
-      primary: css\`background: #10b981; color: white;\`,
-      secondary: css\`background: #e5e7eb; color: #1a1a1a;\`,
-      danger: css\`background: #ef4444; color: white;\`,
-    },
-    size: {
-      sm: css\`font-size: 0.875rem;\`,
-      lg: css\`font-size: 1.125rem;\`,
-    },
-  },
-  // Default values (applied when prop is undefined)
-  defaultVariants: {
-    variant: 'primary',
-    size: 'sm',
-  },
-  // Compound variants (styles when multiple conditions match)
-  compoundVariants: [
-    {
-      variant: 'danger',
-      size: 'lg',
-      css: css\`font-weight: 900; text-transform: uppercase;\`,
-    },
-  ],
-});
+const buttonVariants = {
+  primary: css\`background: #10b981; color: white;\`,
+  secondary: css\`background: #e5e7eb; color: #1a1a1a;\`,
+  danger: css\`background: #ef4444; color: white;\`,
+};
 
-// Usage - defaults are applied automatically
+const buttonSizes = {
+  sm: css\`font-size: 0.875rem;\`,
+  lg: css\`font-size: 1.125rem;\`,
+};
+
+// Apply via cx in a wrapper component
+function Button({ variant = 'primary', size = 'sm', ...props }) {
+  return (
+    <ButtonBase
+      className={cx(buttonVariants[variant], buttonSizes[size])}
+      {...props}
+    />
+  );
+}
+
+// Usage - defaults applied via default params
 <Button>Click</Button>  // variant="primary", size="sm"
-<Button size="lg" variant="danger">Delete</Button>  // Gets compound styles`}</CodeBlock>
+<Button size="lg" variant="danger">Delete</Button>`}</CodeBlock>
         <DemoArea>
           <DemoLabel>Result</DemoLabel>
           <ButtonGroup>
@@ -318,23 +546,50 @@ const Button = styledVariants({
           </ButtonGroup>
         </DemoArea>
 
-        <SubsectionTitle>cssVariants</SubsectionTitle>
-        <CodeBlock>{`import { cssVariants, css, cx } from '@alex.radulescu/styled-static';
+        <SubsectionTitle>Default & Compound Variants</SubsectionTitle>
+        <Paragraph>
+          Use JavaScript default parameters for fallback values when props are
+          omitted. Compound styles are applied with additional{" "}
+          <InlineCode>cx()</InlineCode> conditions.
+        </Paragraph>
+        <DemoArea>
+          <DemoLabel>Default variants (no props = primary + sm)</DemoLabel>
+          <ButtonGroup>
+            <VariantDemoButton>Default (primary sm)</VariantDemoButton>
+            <VariantDemoButton variant="secondary">
+              Secondary (sm default)
+            </VariantDemoButton>
+            <VariantDemoButton size="lg">Primary (lg default)</VariantDemoButton>
+          </ButtonGroup>
+        </DemoArea>
+        <DemoArea>
+          <DemoLabel>Compound: danger + lg = bold uppercase</DemoLabel>
+          <ButtonGroup>
+            <VariantDemoButton variant="danger" size="sm">
+              Danger SM
+            </VariantDemoButton>
+            <VariantDemoButton variant="danger" size="lg">
+              Danger LG (compound)
+            </VariantDemoButton>
+          </ButtonGroup>
+        </DemoArea>
 
-// With css\`\` for syntax highlighting (recommended)
-const badgeCss = cssVariants({
-  css: css\`
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
-  \`,
-  variants: {
-    variant: {
-      info: css\`background: #e0f2fe; color: #0369a1;\`,
-      success: css\`background: #dcfce7; color: #166534;\`,
-    },
-  },
-});
+        <SubsectionTitle>cssVariants</SubsectionTitle>
+        <CodeBlock>{`import { css, cx } from '@emotion/css';
+
+// Plain objects of css\`\` strings
+const badgeBase = css\`
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+\`;
+
+const badgeVariants = {
+  info: css\`background: #e0f2fe; color: #0369a1;\`,
+  success: css\`background: #dcfce7; color: #166534;\`,
+};
+
+const badgeCss = ({ variant }) => cx(badgeBase, badgeVariants[variant]);
 
 // Returns class string
 <span className={badgeCss({ variant: 'info' })}>Info</span>
@@ -343,6 +598,14 @@ const badgeCss = cssVariants({
 <span className={cx(badgeCss({ variant: 'info' }), isActive && activeClass)}>
   Info
 </span>`}</CodeBlock>
+        <DemoArea>
+          <DemoLabel>Result</DemoLabel>
+          <ButtonGroup>
+            <span className={badgeCss({ variant: "info" })}>Info</span>
+            <span className={badgeCss({ variant: "success" })}>Success</span>
+            <span className={badgeCss({ variant: "warning" })}>Warning</span>
+          </ButtonGroup>
+        </DemoArea>
       </Section>
 
       {/* Global Styles */}
@@ -350,12 +613,13 @@ const badgeCss = cssVariants({
         <Breadcrumb>API</Breadcrumb>
         <SectionTitle>Global Styles</SectionTitle>
         <Paragraph>
-          Use <InlineCode>createGlobalStyle</InlineCode> for global CSS like
-          resets, CSS variables, or base styles.
+          Use <InlineCode>Global</InlineCode> from{" "}
+          <InlineCode>@emotion/react</InlineCode> for global CSS like resets,
+          CSS variables, or base styles.
         </Paragraph>
-        <CodeBlock>{`import { createGlobalStyle } from '@alex.radulescu/styled-static';
+        <CodeBlock>{`import { Global, css } from '@emotion/react';
 
-const GlobalStyle = createGlobalStyle\`
+const globalStyles = css\`
   :root {
     --color-primary: #10b981;
     --color-text: #1a1a1a;
@@ -373,12 +637,30 @@ const GlobalStyle = createGlobalStyle\`
 \`;
 
 // Render once at app root
-<GlobalStyle />
+<Global styles={globalStyles} />
 <App />`}</CodeBlock>
         <Callout type="note" icon={<Info size={20} />}>
-          The component renders nothing at runtime. All CSS is extracted and
-          injected via imports.
+          Unlike styled-static's <InlineCode>createGlobalStyle</InlineCode>,
+          Emotion's <InlineCode>Global</InlineCode> injects styles at runtime.
         </Callout>
+        <DemoArea>
+          <DemoLabel>Active on this page</DemoLabel>
+          <VarsGrid>
+            <VarsRow>
+              <VarName>--color-primary</VarName>
+              <VarSwatch />
+              <VarDesc>Set via Global styles on :root</VarDesc>
+            </VarsRow>
+            <VarsRow>
+              <VarName>box-sizing</VarName>
+              <VarDesc>border-box applied to all elements via * selector</VarDesc>
+            </VarsRow>
+            <VarsRow>
+              <VarName>body</VarName>
+              <VarDesc>margin: 0, font-family: Inter, system-ui</VarDesc>
+            </VarsRow>
+          </VarsGrid>
+        </DemoArea>
       </Section>
     </ApiWrapper>
   );

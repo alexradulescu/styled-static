@@ -298,6 +298,186 @@ export function Counter({ children, className, ...props }: React.ComponentProps<
   );
 }
 
+// Keyframes demo components live in a separate file
+export { Spinner, PulsingDot } from "./keyframes-demo";
+
+// =============================================================================
+// Attrs Demo Components
+// =============================================================================
+
+const passwordInputStyle = css({
+  padding: "0.5rem 1rem",
+  fontSize: "0.875rem",
+  fontFamily: "inherit",
+  border: "1px solid var(--color-border)",
+  borderRadius: "6px",
+  background: "var(--color-bg)",
+  color: "var(--color-text)",
+  outline: "none",
+  width: "100%",
+  transition: "border-color var(--transition)",
+  "&:focus": {
+    borderColor: "var(--color-primary)",
+  },
+  "&::placeholder": {
+    color: "var(--color-text-muted)",
+  },
+});
+
+export function PasswordInput({ className, ...props }: React.ComponentProps<"input">) {
+  return <input type="password" className={cx(passwordInputStyle, className)} {...props} />;
+}
+
+const submitButtonStyle = css({
+  padding: "0.5rem 1rem",
+  fontSize: "0.875rem",
+  fontWeight: 500,
+  fontFamily: "inherit",
+  background: "#3b82f6",
+  color: "white",
+  border: "none",
+  borderRadius: "6px",
+  cursor: "pointer",
+  transition: "background 0.2s ease",
+  "&:hover": {
+    background: "#2563eb",
+  },
+});
+
+export function SubmitButton({ className, ...props }: React.ComponentProps<"button">) {
+  return <button type="submit" aria-label="Submit form" className={cx(submitButtonStyle, className)} {...props} />;
+}
+
+// =============================================================================
+// cva Badge Demo
+// =============================================================================
+
+const badgeCvaFn = cva({
+  base: {
+    display: "inline-flex",
+    alignItems: "center",
+    padding: "0.25rem 0.625rem",
+    borderRadius: "9999px",
+    fontSize: "0.75rem",
+    fontWeight: 500,
+    lineHeight: 1.4,
+  },
+  variants: {
+    variant: {
+      info: {
+        background: "#e0f2fe",
+        color: "#0369a1",
+        _dark: {
+          background: "#0c4a6e",
+          color: "#7dd3fc",
+        },
+      },
+      success: {
+        background: "#dcfce7",
+        color: "#166534",
+        _dark: {
+          background: "#052e16",
+          color: "#86efac",
+        },
+      },
+      warning: {
+        background: "#fef3c7",
+        color: "#92400e",
+        _dark: {
+          background: "#451a03",
+          color: "#fcd34d",
+        },
+      },
+    },
+  },
+});
+
+export const badgeCss = badgeCvaFn;
+
+// =============================================================================
+// CSS Nesting Demo Card
+// =============================================================================
+
+const nestingCardStyle = css({
+  padding: "1.25rem",
+  background: "var(--color-bg)",
+  border: "1px solid var(--color-border)",
+  borderRadius: "var(--radius)",
+  transition: "all 0.2s ease",
+  position: "relative",
+  "&:hover": {
+    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
+    borderColor: "var(--color-primary)",
+  },
+  "& h3": {
+    margin: "0 0 0.5rem",
+    fontSize: "1rem",
+    fontWeight: 600,
+  },
+  "& p": {
+    margin: 0,
+    fontSize: "0.875rem",
+    color: "var(--color-text-secondary)",
+  },
+  "@media (max-width: 640px)": {
+    padding: "0.75rem",
+  },
+  "&::after": {
+    content: '"hover me"',
+    position: "absolute",
+    top: "0.5rem",
+    right: "0.75rem",
+    fontSize: "0.6875rem",
+    color: "var(--color-text-muted)",
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+    transition: "opacity 0.2s ease",
+  },
+  "&:hover::after": {
+    opacity: 0,
+  },
+});
+
+export function NestingCard({ children, className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div className={cx(nestingCardStyle, className)} {...props}>
+      {children}
+    </div>
+  );
+}
+
+// =============================================================================
+// Multi-Level Extension Demo
+// =============================================================================
+
+const bigPrimaryButtonStyle = css({
+  fontSize: "1rem",
+  padding: "0.75rem 1.5rem",
+  background: "#2563eb",
+  "&:hover": {
+    background: "#1d4ed8",
+  },
+});
+
+export function BigPrimaryButton({ className, ...props }: React.ComponentProps<"button">) {
+  return (
+    <button
+      className={cx(styledButtonStyle, extendedButtonStyle, bigPrimaryButtonStyle, className)}
+      {...props}
+    />
+  );
+}
+
+// =============================================================================
+// withComponent Demo (AnchorButton)
+// =============================================================================
+
+function AnchorButtonBase({ className, ...props }: React.ComponentProps<"a">) {
+  return <a className={cx(styledButtonStyle, className)} {...props} />;
+}
+
+export const AnchorButton = Object.assign(AnchorButtonBase, { className: styledButtonStyle });
+
 // =============================================================================
 // Code Block
 // =============================================================================

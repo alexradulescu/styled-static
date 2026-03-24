@@ -5,6 +5,7 @@
 import { Moon, Sun } from "lucide-react";
 import { css } from "../../styled-system/css";
 import {
+  AnchorButton,
   Breadcrumb,
   Button,
   ButtonGroup,
@@ -14,6 +15,7 @@ import {
   DemoLabel,
   InlineCode,
   Lightbulb,
+  NestingCard,
   Paragraph,
   Section,
   SectionTitle,
@@ -21,10 +23,11 @@ import {
   SubsectionTitle,
 } from "./shared";
 
-// Section-specific styled component (tests CSS code splitting)
+// Section-specific style (tests CSS code splitting)
 const featuresWrapperStyle = css({
   opacity: 1,
   transition: "opacity 0.25s ease-out",
+  "--features-section-loaded": "1",
 });
 
 interface FeaturesSectionProps {
@@ -66,12 +69,21 @@ const LinkButton = withComponent(Link, Button);
   Router link styled as button
 </LinkButton>`}</CodeBlock>
         <DemoArea>
-          <DemoLabel>Result</DemoLabel>
+          <DemoLabel>.className access</DemoLabel>
           <ButtonGroup>
             <StyledButton>Button</StyledButton>
             <a className={StyledButton.className} href="#polymorphism">
-              Anchor (via className)
+              Anchor (via .className)
             </a>
+          </ButtonGroup>
+        </DemoArea>
+        <DemoArea>
+          <DemoLabel>withComponent(&apos;a&apos;, StyledButton)</DemoLabel>
+          <ButtonGroup>
+            <StyledButton>Original Button</StyledButton>
+            <AnchorButton href="#polymorphism">
+              Anchor (via withComponent)
+            </AnchorButton>
           </ButtonGroup>
         </DemoArea>
       </Section>
@@ -111,6 +123,17 @@ const LinkButton = withComponent(Link, Button);
     position: absolute;
   }
 \`;`}</CodeBlock>
+        <DemoArea>
+          <DemoLabel>Result (hover the card)</DemoLabel>
+          <NestingCard>
+            <h3>Nested CSS Card</h3>
+            <p>
+              Hover to see box-shadow and border color change. The
+              &ldquo;hover me&rdquo; label uses a pseudo-element (::after)
+              and fades on hover.
+            </p>
+          </NestingCard>
+        </DemoArea>
         <Callout type="tip" icon={<Lightbulb size={20} />}>
           Native CSS nesting means zero build-time processing. Your CSS is
           passed directly to the browser.

@@ -15,10 +15,70 @@ import {
   SubsectionTitle,
 } from "./shared";
 
-// Section-specific styled component (tests CSS code splitting)
+// Section-specific style (tests CSS code splitting)
 const howItWorksWrapperStyle = css({
   opacity: 1,
   transition: "opacity 0.35s ease-out",
+  "--how-it-works-section-loaded": "1",
+});
+
+const benefitsListStyle = css({
+  marginLeft: "1.5rem",
+  color: "var(--color-text-secondary)",
+});
+
+const legendParagraphStyle = css({
+  fontSize: "0.875rem",
+  color: "var(--color-text-secondary)",
+  margin: "0 0 1rem",
+});
+
+const compareTableWrapStyle = css({
+  overflowX: "auto",
+  margin: "1rem 0 1.5rem",
+  border: "1px solid var(--color-border)",
+  borderRadius: "var(--radius)",
+});
+
+const compareTableStyle = css({
+  width: "100%",
+  borderCollapse: "collapse",
+  fontSize: "0.875rem",
+});
+
+const compareHeaderRowStyle = css({
+  background: "var(--color-bg-sidebar)",
+  borderBottom: "1px solid var(--color-border)",
+});
+
+const compareHeaderCellStyle = css({
+  padding: "0.75rem",
+  textAlign: "left",
+});
+
+const compareRowStyle = css({
+  borderBottom: "1px solid var(--color-border-subtle)",
+  "&:last-child": {
+    borderBottom: "none",
+  },
+});
+
+const compareCellStyle = css({
+  padding: "0.75rem",
+});
+
+const compareCellBestStyle = css({
+  padding: "0.75rem",
+  color: "var(--color-primary)",
+});
+
+const restyleLinkStyle = css({
+  color: "var(--color-text)",
+});
+
+const configListStyle = css({
+  marginLeft: "1.5rem",
+  color: "var(--color-text-secondary)",
 });
 
 export function HowItWorksSection() {
@@ -93,13 +153,11 @@ const Button = Object.assign(
 }`}</CodeBlock>
 
         <Paragraph>This approach has several benefits:</Paragraph>
-        <ul
-          style={{ marginLeft: "1.5rem", color: "var(--color-text-secondary)" }}
-        >
-          <li>&#x2705; CSS is deduplicated and optimized by Vite</li>
-          <li>&#x2705; Supports code splitting (CSS loads with component)</li>
-          <li>&#x2705; Works with Vite's HMR (hot module replacement)</li>
-          <li>&#x2705; Can be extracted to a single CSS file for production</li>
+        <ul className={benefitsListStyle}>
+          <li>✅ CSS is deduplicated and optimized by Vite</li>
+          <li>✅ Supports code splitting (CSS loads with component)</li>
+          <li>✅ Works with Vite's HMR (hot module replacement)</li>
+          <li>✅ Can be extracted to a single CSS file for production</li>
         </ul>
       </Section>
 
@@ -159,148 +217,128 @@ const GlobalStyles = () => null;`}</CodeBlock>
       <Section id="comparison">
         <Breadcrumb>Internals</Breadcrumb>
         <SubsectionTitle>Library Comparison</SubsectionTitle>
-        <Paragraph
-          style={{ fontSize: "0.875rem", color: "var(--color-text-secondary)" }}
-        >
-          <strong>Legend:</strong> &#x2713; Yes | &#x25D0; Partial | &#x2717; No
-        </Paragraph>
+        <p className={legendParagraphStyle}>
+          <strong>Legend:</strong> ✓ Yes | ◐ Partial | ✗ No
+        </p>
 
-        <div
-          style={{
-            overflowX: "auto",
-            margin: "1rem 0 1.5rem",
-            border: "1px solid var(--color-border)",
-            borderRadius: "var(--radius)",
-          }}
-        >
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: "0.875rem",
-            }}
-          >
+        <div className={compareTableWrapStyle}>
+          <table className={compareTableStyle}>
             <thead>
-              <tr
-                style={{
-                  background: "var(--color-bg-sidebar)",
-                  borderBottom: "1px solid var(--color-border)",
-                }}
-              >
-                <th style={{ padding: "0.75rem", textAlign: "left" }}></th>
-                <th style={{ padding: "0.75rem", textAlign: "left" }}>styled-static</th>
-                <th style={{ padding: "0.75rem", textAlign: "left" }}>Emotion</th>
-                <th style={{ padding: "0.75rem", textAlign: "left" }}>Linaria</th>
-                <th style={{ padding: "0.75rem", textAlign: "left" }}>
-                  <a href="https://restyle.dev" target="_blank" rel="noopener noreferrer" style={{ color: "var(--color-text)" }}>Restyle</a>
+              <tr className={compareHeaderRowStyle}>
+                <th className={compareHeaderCellStyle}></th>
+                <th className={compareHeaderCellStyle}>styled-static</th>
+                <th className={compareHeaderCellStyle}>Emotion</th>
+                <th className={compareHeaderCellStyle}>Linaria</th>
+                <th className={compareHeaderCellStyle}>
+                  <a href="https://restyle.dev" target="_blank" rel="noopener noreferrer" className={restyleLinkStyle}>Restyle</a>
                 </th>
-                <th style={{ padding: "0.75rem", textAlign: "left" }}>Panda CSS</th>
+                <th className={compareHeaderCellStyle}>Panda CSS</th>
               </tr>
             </thead>
             <tbody>
-              <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
-                <td style={{ padding: "0.75rem" }}>Runtime</td>
-                <td style={{ padding: "0.75rem", color: "var(--color-primary)" }}><strong>~50 B</strong></td>
-                <td style={{ padding: "0.75rem" }}>~11 KB</td>
-                <td style={{ padding: "0.75rem" }}>~1.5 KB</td>
-                <td style={{ padding: "0.75rem" }}>~2.2 KB</td>
-                <td style={{ padding: "0.75rem" }}>0 B</td>
+              <tr className={compareRowStyle}>
+                <td className={compareCellStyle}>Runtime</td>
+                <td className={compareCellBestStyle}><strong>~50 B</strong></td>
+                <td className={compareCellStyle}>~11 KB</td>
+                <td className={compareCellStyle}>~1.5 KB</td>
+                <td className={compareCellStyle}>~2.2 KB</td>
+                <td className={compareCellStyle}>0 B</td>
               </tr>
-              <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
-                <td style={{ padding: "0.75rem" }}>Dependencies</td>
-                <td style={{ padding: "0.75rem", color: "var(--color-primary)" }}>0</td>
-                <td style={{ padding: "0.75rem" }}>5+</td>
-                <td style={{ padding: "0.75rem" }}>10+</td>
-                <td style={{ padding: "0.75rem" }}>0</td>
-                <td style={{ padding: "0.75rem" }}>5+</td>
+              <tr className={compareRowStyle}>
+                <td className={compareCellStyle}>Dependencies</td>
+                <td className={compareCellBestStyle}>0</td>
+                <td className={compareCellStyle}>5+</td>
+                <td className={compareCellStyle}>10+</td>
+                <td className={compareCellStyle}>0</td>
+                <td className={compareCellStyle}>5+</td>
               </tr>
-              <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
-                <td style={{ padding: "0.75rem" }}>React</td>
-                <td style={{ padding: "0.75rem" }}>19+</td>
-                <td style={{ padding: "0.75rem" }}>16+</td>
-                <td style={{ padding: "0.75rem" }}>16+</td>
-                <td style={{ padding: "0.75rem" }}>19+</td>
-                <td style={{ padding: "0.75rem" }}>16+</td>
+              <tr className={compareRowStyle}>
+                <td className={compareCellStyle}>React</td>
+                <td className={compareCellStyle}>19+</td>
+                <td className={compareCellStyle}>16+</td>
+                <td className={compareCellStyle}>16+</td>
+                <td className={compareCellStyle}>19+</td>
+                <td className={compareCellStyle}>16+</td>
               </tr>
-              <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
-                <td style={{ padding: "0.75rem" }}>Bundler</td>
-                <td style={{ padding: "0.75rem" }}>Vite</td>
-                <td style={{ padding: "0.75rem" }}>Any</td>
-                <td style={{ padding: "0.75rem" }}>Many</td>
-                <td style={{ padding: "0.75rem" }}>Any</td>
-                <td style={{ padding: "0.75rem" }}>Any</td>
+              <tr className={compareRowStyle}>
+                <td className={compareCellStyle}>Bundler</td>
+                <td className={compareCellStyle}>Vite</td>
+                <td className={compareCellStyle}>Any</td>
+                <td className={compareCellStyle}>Many</td>
+                <td className={compareCellStyle}>Any</td>
+                <td className={compareCellStyle}>Any</td>
               </tr>
-              <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
-                <td style={{ padding: "0.75rem" }}><InlineCode>styled.el</InlineCode></td>
-                <td style={{ padding: "0.75rem" }}>&#x2713;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2713;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2713;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2713;</td>
-                <td style={{ padding: "0.75rem" }}>&#x25D0;</td>
+              <tr className={compareRowStyle}>
+                <td className={compareCellStyle}><InlineCode>styled.el</InlineCode></td>
+                <td className={compareCellStyle}>✓</td>
+                <td className={compareCellStyle}>✓</td>
+                <td className={compareCellStyle}>✓</td>
+                <td className={compareCellStyle}>✓</td>
+                <td className={compareCellStyle}>◐</td>
               </tr>
-              <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
-                <td style={{ padding: "0.75rem" }}><InlineCode>styled(Comp)</InlineCode></td>
-                <td style={{ padding: "0.75rem" }}>&#x2713;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2713;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2713;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2713;</td>
-                <td style={{ padding: "0.75rem" }}>&#x25D0;</td>
+              <tr className={compareRowStyle}>
+                <td className={compareCellStyle}><InlineCode>styled(Comp)</InlineCode></td>
+                <td className={compareCellStyle}>✓</td>
+                <td className={compareCellStyle}>✓</td>
+                <td className={compareCellStyle}>✓</td>
+                <td className={compareCellStyle}>✓</td>
+                <td className={compareCellStyle}>◐</td>
               </tr>
-              <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
-                <td style={{ padding: "0.75rem" }}>Variants</td>
-                <td style={{ padding: "0.75rem" }}>&#x2713;</td>
-                <td style={{ padding: "0.75rem" }}>&#x25D0;</td>
-                <td style={{ padding: "0.75rem" }}>&#x25D0;</td>
-                <td style={{ padding: "0.75rem" }}>&#x25D0;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2713;</td>
+              <tr className={compareRowStyle}>
+                <td className={compareCellStyle}>Variants</td>
+                <td className={compareCellStyle}>✓</td>
+                <td className={compareCellStyle}>◐</td>
+                <td className={compareCellStyle}>◐</td>
+                <td className={compareCellStyle}>◐</td>
+                <td className={compareCellStyle}>✓</td>
               </tr>
-              <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
-                <td style={{ padding: "0.75rem" }}><InlineCode>css</InlineCode> helper</td>
-                <td style={{ padding: "0.75rem" }}>&#x2713;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2713;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2713;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2713;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2713;</td>
+              <tr className={compareRowStyle}>
+                <td className={compareCellStyle}><InlineCode>css</InlineCode> helper</td>
+                <td className={compareCellStyle}>✓</td>
+                <td className={compareCellStyle}>✓</td>
+                <td className={compareCellStyle}>✓</td>
+                <td className={compareCellStyle}>✓</td>
+                <td className={compareCellStyle}>✓</td>
               </tr>
-              <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
-                <td style={{ padding: "0.75rem" }}><InlineCode>css</InlineCode> inline prop</td>
-                <td style={{ padding: "0.75rem" }}>&#x2717;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2713;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2717;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2713;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2713;</td>
+              <tr className={compareRowStyle}>
+                <td className={compareCellStyle}><InlineCode>css</InlineCode> inline prop</td>
+                <td className={compareCellStyle}>✗</td>
+                <td className={compareCellStyle}>✓</td>
+                <td className={compareCellStyle}>✗</td>
+                <td className={compareCellStyle}>✓</td>
+                <td className={compareCellStyle}>✓</td>
               </tr>
-              <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
-                <td style={{ padding: "0.75rem" }}>Runtime interpolation</td>
-                <td style={{ padding: "0.75rem" }}>&#x2717;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2713;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2717;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2713;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2717;</td>
+              <tr className={compareRowStyle}>
+                <td className={compareCellStyle}>Runtime interpolation</td>
+                <td className={compareCellStyle}>✗</td>
+                <td className={compareCellStyle}>✓</td>
+                <td className={compareCellStyle}>✗</td>
+                <td className={compareCellStyle}>✓</td>
+                <td className={compareCellStyle}>✗</td>
               </tr>
-              <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
-                <td style={{ padding: "0.75rem" }}>Default variants</td>
-                <td style={{ padding: "0.75rem" }}>&#x2713;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2717;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2717;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2717;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2713;</td>
+              <tr className={compareRowStyle}>
+                <td className={compareCellStyle}>Default variants</td>
+                <td className={compareCellStyle}>✓</td>
+                <td className={compareCellStyle}>✗</td>
+                <td className={compareCellStyle}>✗</td>
+                <td className={compareCellStyle}>✗</td>
+                <td className={compareCellStyle}>✓</td>
               </tr>
-              <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
-                <td style={{ padding: "0.75rem" }}>Compound variants</td>
-                <td style={{ padding: "0.75rem" }}>&#x2713;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2717;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2717;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2717;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2713;</td>
+              <tr className={compareRowStyle}>
+                <td className={compareCellStyle}>Compound variants</td>
+                <td className={compareCellStyle}>✓</td>
+                <td className={compareCellStyle}>✗</td>
+                <td className={compareCellStyle}>✗</td>
+                <td className={compareCellStyle}>✗</td>
+                <td className={compareCellStyle}>✓</td>
               </tr>
-              <tr>
-                <td style={{ padding: "0.75rem" }}><InlineCode>.className</InlineCode> access</td>
-                <td style={{ padding: "0.75rem" }}>&#x2713;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2717;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2717;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2717;</td>
-                <td style={{ padding: "0.75rem" }}>&#x2717;</td>
+              <tr className={compareRowStyle}>
+                <td className={compareCellStyle}><InlineCode>.className</InlineCode> access</td>
+                <td className={compareCellStyle}>✓</td>
+                <td className={compareCellStyle}>✗</td>
+                <td className={compareCellStyle}>✗</td>
+                <td className={compareCellStyle}>✗</td>
+                <td className={compareCellStyle}>✗</td>
               </tr>
             </tbody>
           </table>
@@ -423,9 +461,7 @@ styledStatic({
           The <InlineCode>cssOutput</InlineCode> option controls how CSS is
           emitted during builds:
         </Paragraph>
-        <ul
-          style={{ marginLeft: "1.5rem", color: "var(--color-text-secondary)" }}
-        >
+        <ul className={configListStyle}>
           <li>
             <strong>'auto'</strong> (default) — Uses 'file' for library builds,
             'virtual' for apps
