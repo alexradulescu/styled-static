@@ -3,9 +3,11 @@
  * Contains: styled, extension, css, cx, keyframes, attrs, variants, global
  */
 import { useState } from "react";
-import { cx, styled } from "@alex.radulescu/styled-static";
+import { css, cx, styledVariants, styled } from "@alex.radulescu/styled-static";
 import {
   AlertTriangle,
+  badgeCss,
+  BigPrimaryButton,
   Breadcrumb,
   Button,
   ButtonGroup,
@@ -18,9 +20,13 @@ import {
   InlineCode,
   Lightbulb,
   Paragraph,
+  PasswordInput,
+  PulsingDot,
   Section,
   SectionTitle,
+  Spinner,
   StyledButton,
+  SubmitButton,
   SubsectionTitle,
   highlightClass,
 } from "./shared";
@@ -34,8 +40,151 @@ const ApiWrapper = styled.div`
   --api-section-loaded: 1;
 `;
 
+// Layout primitives for demo areas
+const DemoSpacer = styled.div`
+  margin-top: 0.75rem;
+`;
+
+const FlexRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+`;
+
+const AnimLabel = styled.span`
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+`;
+
+const AttrsColumn = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 320px;
+`;
+
+const AttrsLabel = styled.div`
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-bottom: 0.25rem;
+`;
+
+const VarsGrid = styled.div`
+  font-size: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+`;
+
+const VarsRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+`;
+
+const VarName = styled.span`
+  color: var(--color-primary);
+  font-weight: 600;
+  font-family: "Fira Code", "Monaco", monospace;
+  font-size: 0.8125rem;
+`;
+
+const VarSwatch = styled.div`
+  width: 24px;
+  height: 24px;
+  background: var(--color-primary);
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+`;
+
+const VarDesc = styled.span`
+  color: var(--color-text-secondary);
+`;
+
+// cx demo classes
+const boldClass = css`
+  font-weight: 700;
+`;
+const roundedClass = css`
+  border-radius: 9999px;
+`;
+const coloredClass = css`
+  background: #8b5cf6;
+  &:hover {
+    background: #7c3aed;
+  }
+`;
+
+// Compound/default variants demo
+// Type assertion needed because TS excess property check has issues
+// with defaultVariants/compoundVariants in intersection types.
+// The Vite plugin handles these correctly at build time.
+const VariantDemoButton = styledVariants({
+  component: "button",
+  css: css`
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    font-family: inherit;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  `,
+  variants: {
+    variant: {
+      primary: css`
+        background: #10b981;
+        color: white;
+        &:hover {
+          background: #059669;
+        }
+      `,
+      secondary: css`
+        background: #e5e7eb;
+        color: #1a1a1a;
+        &:hover {
+          background: #d1d5db;
+        }
+      `,
+      danger: css`
+        background: #ef4444;
+        color: white;
+        &:hover {
+          background: #dc2626;
+        }
+      `,
+    },
+    size: {
+      sm: css`
+        font-size: 0.8125rem;
+        padding: 0.375rem 0.75rem;
+      `,
+      lg: css`
+        font-size: 1.125rem;
+        padding: 0.75rem 1.5rem;
+      `,
+    },
+  },
+  defaultVariants: {
+    variant: "primary",
+    size: "sm",
+  },
+  compoundVariants: [
+    {
+      variant: "danger",
+      size: "lg",
+      css: css`
+        font-weight: 900;
+        text-transform: uppercase;
+      `,
+    },
+  ],
+} as Parameters<typeof styledVariants>[0]);
+
 export function ApiSection() {
   const [isHighlighted, setIsHighlighted] = useState(false);
+  const [cxDemo, setCxDemo] = useState({ bold: false, rounded: false, colored: false });
 
   return (
     <ApiWrapper>
@@ -88,12 +237,20 @@ const Button = styled.button\`
 const BoldButton = styled(Button)\`
   font-weight: 600;
   text-transform: uppercase;
+\`;
+
+// Multi-level: extends BoldButton
+const BigPrimary = styled(BoldButton)\`
+  font-size: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: #2563eb;
 \`;`}</CodeBlock>
         <DemoArea>
           <DemoLabel>Result</DemoLabel>
           <ButtonGroup>
-            <StyledButton>Base Button</StyledButton>
-            <ExtendedButton>Extended Button</ExtendedButton>
+            <StyledButton>Base</StyledButton>
+            <ExtendedButton>Extended</ExtendedButton>
+            <BigPrimaryButton>Big Primary</BigPrimaryButton>
           </ButtonGroup>
         </DemoArea>
       </Section>
@@ -154,6 +311,43 @@ cx('btn', isActive && activeClass)
 
 // Falsy values are filtered
 cx('a', null, undefined, false, 'b') // → 'a b'`}</CodeBlock>
+        <DemoArea>
+          <DemoLabel>Result</DemoLabel>
+          <ButtonGroup>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCxDemo((s) => ({ ...s, bold: !s.bold }))}
+            >
+              {cxDemo.bold ? "- Bold" : "+ Bold"}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCxDemo((s) => ({ ...s, rounded: !s.rounded }))}
+            >
+              {cxDemo.rounded ? "- Rounded" : "+ Rounded"}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCxDemo((s) => ({ ...s, colored: !s.colored }))}
+            >
+              {cxDemo.colored ? "- Purple" : "+ Purple"}
+            </Button>
+          </ButtonGroup>
+          <DemoSpacer>
+            <StyledButton
+              className={cx(
+                cxDemo.bold && boldClass,
+                cxDemo.rounded && roundedClass,
+                cxDemo.colored && coloredClass
+              )}
+            >
+              Dynamic Classes
+            </StyledButton>
+          </DemoSpacer>
+        </DemoArea>
       </Section>
 
       {/* keyframes */}
@@ -161,28 +355,34 @@ cx('a', null, undefined, false, 'b') // → 'a b'`}</CodeBlock>
         <Breadcrumb>API</Breadcrumb>
         <SectionTitle>keyframes</SectionTitle>
         <Paragraph>
-          Create scoped keyframe animations. The animation name is hashed to
-          avoid conflicts between components.
+          Define keyframe animations via{" "}
+          <InlineCode>createGlobalStyle</InlineCode> and reference them by name
+          in styled components. The{" "}
+          <InlineCode>keyframes</InlineCode> helper generates a hashed name —
+          see the note below about interpolation support.
         </Paragraph>
-        <CodeBlock>{`import { styled, keyframes } from '@alex.radulescu/styled-static';
+        <CodeBlock>{`import { createGlobalStyle, styled } from '@alex.radulescu/styled-static';
 
-const spin = keyframes\`
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+// Define named @keyframes via createGlobalStyle (extracted at build time)
+const GlobalAnimations = createGlobalStyle\`
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
 \`;
 
-const pulse = keyframes\`
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-\`;
-
+// Reference animation by name in styled components
 const Spinner = styled.div\`
   width: 24px;
   height: 24px;
   border: 2px solid #3b82f6;
   border-top-color: transparent;
   border-radius: 50%;
-  animation: \${spin} 1s linear infinite;
+  animation: spin 1s linear infinite;
 \`;
 
 const PulsingDot = styled.div\`
@@ -190,12 +390,33 @@ const PulsingDot = styled.div\`
   height: 8px;
   background: #10b981;
   border-radius: 50%;
-  animation: \${pulse} 2s ease-in-out infinite;
-\`;`}</CodeBlock>
-        <Callout type="note" icon={<Info size={20} />}>
-          At build time, keyframes CSS is extracted to a static file and the
-          animation name is hashed (e.g., <InlineCode>ss-abc123</InlineCode>).
-          References in styled components are replaced with the hashed name.
+  animation: pulse 2s ease-in-out infinite;
+\`;
+
+// Render GlobalAnimations once at app root
+<GlobalAnimations />
+<App />`}</CodeBlock>
+        <DemoArea>
+          <DemoLabel>Result</DemoLabel>
+          <ButtonGroup>
+            <FlexRow>
+              <Spinner />
+              <AnimLabel>Spinner (spin)</AnimLabel>
+            </FlexRow>
+            <FlexRow>
+              <PulsingDot />
+              <AnimLabel>Pulsing dot (pulse)</AnimLabel>
+            </FlexRow>
+          </ButtonGroup>
+        </DemoArea>
+        <Callout type="warning" icon={<AlertTriangle size={20} />}>
+          <InlineCode>{`\${keyframeVar}`}</InlineCode> interpolation inside{" "}
+          <InlineCode>styled</InlineCode> templates is not supported — the CSS
+          extractor captures raw source text and the variable reference would
+          end up literally in the CSS. Define named{" "}
+          <InlineCode>@keyframes</InlineCode> via{" "}
+          <InlineCode>createGlobalStyle</InlineCode> and reference them by
+          string name instead.
         </Callout>
       </Section>
 
@@ -232,6 +453,23 @@ const SubmitButton = styled.button.attrs({
 
 <SubmitButton>Send</SubmitButton>
 // Renders: <button type="submit" aria-label="Submit form" class="ss-xyz789">Send</button>`}</CodeBlock>
+        <DemoArea>
+          <DemoLabel>Result</DemoLabel>
+          <AttrsColumn>
+            <div>
+              <AttrsLabel>
+                PasswordInput (type=&quot;password&quot; via attrs)
+              </AttrsLabel>
+              <PasswordInput placeholder="Enter password" />
+            </div>
+            <div>
+              <AttrsLabel>
+                SubmitButton (type=&quot;submit&quot;, aria-label via attrs)
+              </AttrsLabel>
+              <SubmitButton>Submit Form</SubmitButton>
+            </div>
+          </AttrsColumn>
+        </DemoArea>
         <Callout type="warning" icon={<AlertTriangle size={20} />}>
           Unlike styled-components, attrs in styled-static must be static
           objects (no functions). For dynamic attributes, use regular props on
@@ -315,6 +553,34 @@ const Button = styledVariants({
           </ButtonGroup>
         </DemoArea>
 
+        <SubsectionTitle>Default & Compound Variants</SubsectionTitle>
+        <Paragraph>
+          Use <InlineCode>defaultVariants</InlineCode> to set fallback values
+          when props are omitted. Use <InlineCode>compoundVariants</InlineCode>{" "}
+          to apply extra styles when multiple variant conditions match.
+        </Paragraph>
+        <DemoArea>
+          <DemoLabel>Default variants (no props = primary + sm)</DemoLabel>
+          <ButtonGroup>
+            <VariantDemoButton>Default (primary sm)</VariantDemoButton>
+            <VariantDemoButton variant="secondary">
+              Secondary (sm default)
+            </VariantDemoButton>
+            <VariantDemoButton size="lg">Primary (lg default)</VariantDemoButton>
+          </ButtonGroup>
+        </DemoArea>
+        <DemoArea>
+          <DemoLabel>Compound: danger + lg = bold uppercase</DemoLabel>
+          <ButtonGroup>
+            <VariantDemoButton variant="danger" size="sm">
+              Danger SM
+            </VariantDemoButton>
+            <VariantDemoButton variant="danger" size="lg">
+              Danger LG (compound)
+            </VariantDemoButton>
+          </ButtonGroup>
+        </DemoArea>
+
         <SubsectionTitle>cssVariants</SubsectionTitle>
         <CodeBlock>{`import { cssVariants, css, cx } from '@alex.radulescu/styled-static';
 
@@ -340,6 +606,14 @@ const badgeCss = cssVariants({
 <span className={cx(badgeCss({ variant: 'info' }), isActive && activeClass)}>
   Info
 </span>`}</CodeBlock>
+        <DemoArea>
+          <DemoLabel>Result</DemoLabel>
+          <ButtonGroup>
+            <span className={badgeCss({ variant: "info" })}>Info</span>
+            <span className={badgeCss({ variant: "success" })}>Success</span>
+            <span className={badgeCss({ variant: "warning" })}>Warning</span>
+          </ButtonGroup>
+        </DemoArea>
       </Section>
 
       {/* Global Styles */}
@@ -376,6 +650,24 @@ const GlobalStyle = createGlobalStyle\`
           The component renders nothing at runtime. All CSS is extracted and
           injected via imports.
         </Callout>
+        <DemoArea>
+          <DemoLabel>Active on this page</DemoLabel>
+          <VarsGrid>
+            <VarsRow>
+              <VarName>--color-primary</VarName>
+              <VarSwatch />
+              <VarDesc>Set via createGlobalStyle on :root</VarDesc>
+            </VarsRow>
+            <VarsRow>
+              <VarName>box-sizing</VarName>
+              <VarDesc>border-box applied to all elements via * selector</VarDesc>
+            </VarsRow>
+            <VarsRow>
+              <VarName>body</VarName>
+              <VarDesc>margin: 0, font-family: Inter, system-ui</VarDesc>
+            </VarsRow>
+          </VarsGrid>
+        </DemoArea>
       </Section>
     </ApiWrapper>
   );

@@ -29,6 +29,7 @@ import {
   styled,
 } from "@alex.radulescu/styled-static";
 import { CodeBlock } from "./sections/shared";
+import { KeyframeStyles } from "./sections/keyframes-demo";
 
 // Lazy-loaded sections for code splitting
 const ApiSection = lazy(() =>
@@ -557,6 +558,16 @@ const InlineCode = styled.code`
   border-radius: 4px;
 `;
 
+// Section-specific helpers
+const paragraphMuted = css`
+  margin-top: 1rem;
+  color: var(--color-text-secondary);
+`;
+
+const paragraphSpaced = css`
+  margin-top: 1.5rem;
+`;
+
 // =============================================================================
 // Callout (inline for Getting Started)
 // =============================================================================
@@ -879,6 +890,7 @@ export function App() {
   return (
     <>
       <GlobalStyle />
+      <KeyframeStyles />
       <Layout>
         <MobileHeader>
           <HeaderTitle>styled-static</HeaderTitle>
@@ -1116,7 +1128,7 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
                 </CalloutContent>
               </div>
 
-              <Paragraph style={{ marginTop: "1rem", color: "var(--color-text-secondary)" }}>
+              <Paragraph className={paragraphMuted}>
                 Each constraint removes complexity—no CSS parsing, no
                 forwardRef, one great integration.
               </Paragraph>
@@ -1150,7 +1162,7 @@ export default defineConfig({
                 </CalloutContent>
               </div>
 
-              <Paragraph style={{ marginTop: "1.5rem" }}>
+              <Paragraph className={paragraphSpaced}>
                 <strong>Optional: Lightning CSS</strong> for autoprefixing and
                 faster CSS processing:
               </Paragraph>

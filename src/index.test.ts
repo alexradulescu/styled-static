@@ -9,6 +9,7 @@ import {
   styledVariants,
   withComponent,
 } from "./index";
+import { m } from "./runtime/index";
 
 describe("runtime error guards (untransformed calls)", () => {
   it("styled proxy get should throw config error", () => {
@@ -94,5 +95,32 @@ describe("cx utility", () => {
 
   it("should handle all falsy values", () => {
     expect(cx(false, null, undefined)).toBe("");
+  });
+
+  it("should filter empty string", () => {
+    expect(cx("a", "", "b")).toBe("a b");
+  });
+});
+
+describe("m (runtime className merge)", () => {
+  it("returns base when user class is undefined", () => {
+    expect(m("ss-btn", undefined)).toBe("ss-btn");
+  });
+
+  it("merges base and user class", () => {
+    expect(m("ss-btn", "custom")).toBe("ss-btn custom");
+  });
+
+  it("returns base when user class is empty string (falsy)", () => {
+    expect(m("ss-btn", "")).toBe("ss-btn");
+  });
+
+  it("merges multi-class base with user class", () => {
+    expect(m("ss-btn ss-primary", "active")).toBe("ss-btn ss-primary active");
+  });
+
+  it("user class appended last (allows override via CSS cascade)", () => {
+    const result = m("ss-base", "override");
+    expect(result.indexOf("ss-base")).toBeLessThan(result.indexOf("override"));
   });
 });
