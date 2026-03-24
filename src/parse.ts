@@ -84,6 +84,31 @@ export interface FoundVariant {
 }
 
 // ============================================================================
+// AST Walking
+// ============================================================================
+
+/**
+ * Walk all variable declarators at the top level of the module,
+ * including those inside `export` declarations.
+ */
+function walkVariableDeclarations(
+  ast: ESTree.Program,
+  processor: (node: ESTree.VariableDeclaration) => void
+): void {
+  for (const node of ast.body) {
+    if (node.type === "VariableDeclaration") {
+      processor(node);
+    }
+    if (
+      node.type === "ExportNamedDeclaration" &&
+      node.declaration?.type === "VariableDeclaration"
+    ) {
+      processor(node.declaration);
+    }
+  }
+}
+
+// ============================================================================
 // CSS Extraction
 // ============================================================================
 
@@ -125,10 +150,7 @@ export function extractCssFromValueNode(
     const tagged = node as ESTree.TaggedTemplateExpression & {
       quasi: ESTree.TemplateLiteral & { start: number; end: number };
     };
-    if (
-      tagged.tag.type === "Identifier" &&
-      tagged.tag.name === cssImportName
-    ) {
+    if (tagged.tag.type === "Identifier" && tagged.tag.name === cssImportName) {
       return code.slice(tagged.quasi.start + 1, tagged.quasi.end - 1);
     }
   }
@@ -196,7 +218,7 @@ export function findTaggedTemplates(
 ): FoundTemplate[] {
   const results: FoundTemplate[] = [];
 
-  function processVariableDeclaration(node: ESTree.VariableDeclaration) {
+  walkVariableDeclarations(ast, (node) => {
     for (const decl of node.declarations) {
       if (
         decl.init?.type === "TaggedTemplateExpression" &&
@@ -208,20 +230,7 @@ export function findTaggedTemplates(
         if (found) results.push(found);
       }
     }
-  }
-
-  for (const node of ast.body) {
-    if (node.type === "VariableDeclaration") {
-      processVariableDeclaration(node);
-    }
-
-    if (
-      node.type === "ExportNamedDeclaration" &&
-      node.declaration?.type === "VariableDeclaration"
-    ) {
-      processVariableDeclaration(node.declaration);
-    }
-  }
+  });
 
   return results;
 }
@@ -342,7 +351,7 @@ export function findVariantCalls(
 ): FoundVariant[] {
   const results: FoundVariant[] = [];
 
-  function processVariableDeclaration(node: ESTree.VariableDeclaration) {
+  walkVariableDeclarations(ast, (node) => {
     for (const decl of node.declarations) {
       if (
         decl.init?.type === "CallExpression" &&
@@ -357,20 +366,7 @@ export function findVariantCalls(
         if (found) results.push(found);
       }
     }
-  }
-
-  for (const node of ast.body) {
-    if (node.type === "VariableDeclaration") {
-      processVariableDeclaration(node);
-    }
-
-    if (
-      node.type === "ExportNamedDeclaration" &&
-      node.declaration?.type === "VariableDeclaration"
-    ) {
-      processVariableDeclaration(node.declaration);
-    }
-  }
+  });
 
   return results;
 }
@@ -428,7 +424,11 @@ function classifyVariantCall(
 
     // css: `...` or css: css`...`
     if (propName === "css") {
-      baseCss = extractCssFromValueNode(prop.value as ESTree.Expression, code, imports.css);
+      baseCss = extractCssFromValueNode(
+        prop.value as ESTree.Expression,
+        code,
+        imports.css
+      );
     }
 
     // variants: { color: { primary: `...` }, size: { sm: `...` } }
@@ -583,7 +583,7 @@ export function findWithComponentCalls(
 ): FoundWithComponent[] {
   const results: FoundWithComponent[] = [];
 
-  function processVariableDeclaration(node: ESTree.VariableDeclaration) {
+  walkVariableDeclarations(ast, (node) => {
     for (const decl of node.declarations) {
       if (
         decl.init?.type === "CallExpression" &&
@@ -628,20 +628,7 @@ export function findWithComponentCalls(
         }
       }
     }
-  }
-
-  for (const node of ast.body) {
-    if (node.type === "VariableDeclaration") {
-      processVariableDeclaration(node);
-    }
-
-    if (
-      node.type === "ExportNamedDeclaration" &&
-      node.declaration?.type === "VariableDeclaration"
-    ) {
-      processVariableDeclaration(node.declaration);
-    }
-  }
+  });
 
   return results;
 }

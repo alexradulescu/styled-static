@@ -52,7 +52,10 @@ export function generateReplacement(
     case "styledExtend":
       // template.baseComponent comes from AST (Identifier node) so it is a valid
       // JS identifier by construction, but assert for defense-in-depth.
-      if (!template.baseComponent || !isValidIdentifier(template.baseComponent)) {
+      if (
+        !template.baseComponent ||
+        !isValidIdentifier(template.baseComponent)
+      ) {
         /* unreachable: unreachable: AST Identifier nodes are always valid identifiers */
         throw new Error(
           `[styled-static] Invalid base component name: ${template.baseComponent}`
@@ -179,28 +182,31 @@ export function generateVariantReplacement(
 
     if (isHtmlTag) {
       if (!variant.component || !/^[a-z][a-z0-9]*$/.test(variant.component)) {
-        /* unreachable: unreachable: component is a lowercase-validated AST value */
+        /* unreachable: component is a lowercase-validated AST value */
         throw new Error(
           `[styled-static] Invalid HTML tag name: ${variant.component}`
         );
       }
-      const tag = safeStringLiteral(variant.component);
-      return {
-        code: `Object.assign((${propsDestructure}) => { let c = ${cls}; ${variantLogic}return createElement(${tag}, {...p, className: m(c, className)}); }, { className: ${cls} })`,
-        hoisted,
-      };
     } else {
       if (!variant.component || !isValidIdentifier(variant.component)) {
-        /* unreachable: unreachable: component comes from AST Identifier node, always valid */
+        /* unreachable: component comes from AST Identifier node, always valid */
         throw new Error(
           `[styled-static] Invalid component name: ${variant.component}`
         );
       }
-      return {
-        code: `Object.assign((${propsDestructure}) => { let c = ${cls}; ${variantLogic}return createElement(${variant.component}, {...p, className: m(c, className)}); }, { className: ${variant.component}.className + " " + ${cls} })`,
-        hoisted,
-      };
     }
+
+    const componentRef = isHtmlTag
+      ? safeStringLiteral(variant.component!)
+      : variant.component!;
+    const classNameValue = isHtmlTag
+      ? cls
+      : `${variant.component}.className + " " + ${cls}`;
+
+    return {
+      code: `Object.assign((${propsDestructure}) => { let c = ${cls}; ${variantLogic}return createElement(${componentRef}, {...p, className: m(c, className)}); }, { className: ${classNameValue} })`,
+      hoisted,
+    };
   }
 
   // cssVariants: returns a function that generates class string

@@ -417,7 +417,7 @@ export default css;
           const fileBase = getFileBaseName(id);
           baseClass = `${classPrefix}-${v.variableName}-${fileBase}`;
         } else {
-          const baseHash = hash(v.baseCss || "").slice(0, 6);
+          const baseHash = hash(v.baseCss || "").slice(0, isDev ? 6 : 8);
           baseClass = `${classPrefix}-${baseHash}`;
         }
 
