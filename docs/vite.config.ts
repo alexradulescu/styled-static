@@ -12,10 +12,7 @@ export default defineConfig({
   resolve: {
     alias: {
       // Map styled-static imports to local source for development
-      "styled-static/runtime": path.resolve(
-        __dirname,
-        "../src/runtime/index.ts"
-      ),
+      "styled-static/runtime": path.resolve(__dirname, "../src/runtime/index.ts"),
       "styled-static": path.resolve(__dirname, "../src/index.ts"),
     },
   },

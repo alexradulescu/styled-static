@@ -25,17 +25,17 @@ import { KeyframeStyles } from "./sections/keyframes-demo";
 
 // Lazy-loaded sections for code splitting
 const ApiSection = lazy(() =>
-  import("./sections/ApiSection").then((m) => ({ default: m.ApiSection }))
+  import("./sections/ApiSection").then((m) => ({ default: m.ApiSection })),
 );
 const FeaturesSection = lazy(() =>
   import("./sections/FeaturesSection").then((m) => ({
     default: m.FeaturesSection,
-  }))
+  })),
 );
 const HowItWorksSection = lazy(() =>
   import("./sections/HowItWorksSection").then((m) => ({
     default: m.HowItWorksSection,
-  }))
+  })),
 );
 
 // =============================================================================
@@ -354,7 +354,8 @@ const HeroBanner = styled("div", {
     left: 0,
     right: 0,
     bottom: 0,
-    background: "linear-gradient(135deg, transparent 40%, rgba(16, 185, 129, 0.08) 40%, rgba(16, 185, 129, 0.08) 60%, transparent 60%), linear-gradient(225deg, transparent 30%, rgba(16, 185, 129, 0.05) 30%, rgba(16, 185, 129, 0.05) 50%, transparent 50%)",
+    background:
+      "linear-gradient(135deg, transparent 40%, rgba(16, 185, 129, 0.08) 40%, rgba(16, 185, 129, 0.08) 60%, transparent 60%), linear-gradient(225deg, transparent 30%, rgba(16, 185, 129, 0.05) 30%, rgba(16, 185, 129, 0.05) 50%, transparent 50%)",
   },
   "&::after": {
     content: "''",
@@ -363,7 +364,8 @@ const HeroBanner = styled("div", {
     right: "10%",
     width: "200px",
     height: "200px",
-    background: "linear-gradient(45deg, transparent 45%, rgba(16, 185, 129, 0.12) 45%, rgba(16, 185, 129, 0.12) 55%, transparent 55%)",
+    background:
+      "linear-gradient(45deg, transparent 45%, rgba(16, 185, 129, 0.12) 45%, rgba(16, 185, 129, 0.12) 55%, transparent 55%)",
     transform: "rotate(15deg)",
   },
   "@media (max-width: 767px)": {
@@ -634,7 +636,16 @@ const sections: SectionInfo[] = [
     id: "comparison",
     title: "Library Comparison",
     group: "Internals",
-    keywords: ["comparison", "bundle", "size", "emotion", "linaria", "panda", "css-in-js", "alternatives"],
+    keywords: [
+      "comparison",
+      "bundle",
+      "size",
+      "emotion",
+      "linaria",
+      "panda",
+      "css-in-js",
+      "alternatives",
+    ],
   },
 ];
 
@@ -729,7 +740,7 @@ export function App() {
           }
         });
       },
-      { rootMargin: "-20% 0px -70% 0px" }
+      { rootMargin: "-20% 0px -70% 0px" },
     );
 
     const observeSections = () => {
@@ -764,9 +775,7 @@ export function App() {
     ? sections.filter(
         (s) =>
           s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          s.keywords.some((k) =>
-            k.toLowerCase().includes(searchQuery.toLowerCase())
-          )
+          s.keywords.some((k) => k.toLowerCase().includes(searchQuery.toLowerCase())),
       )
     : sections;
 
@@ -778,7 +787,7 @@ export function App() {
       acc[group].push(section);
       return acc;
     },
-    {} as Record<string, SectionInfo[]>
+    {} as Record<string, SectionInfo[]>,
   );
 
   const closeSidebar = () => setSidebarOpen(false);
@@ -882,10 +891,7 @@ export function App() {
       <Layout>
         <MobileHeader>
           <HeaderTitle>styled-static</HeaderTitle>
-          <BurgerButton
-            onClick={() => setSidebarOpen((prev) => !prev)}
-            aria-label="Toggle menu"
-          >
+          <BurgerButton onClick={() => setSidebarOpen((prev) => !prev)} aria-label="Toggle menu">
             <span />
             <span />
           </BurgerButton>
@@ -958,8 +964,8 @@ export function App() {
             {/* Hero */}
             <PageTitle>styled-static</PageTitle>
             <PageSubtitle>
-              Near-zero-runtime CSS-in-JS for React 19+ with Vite. Write
-              styled-components syntax, get static CSS extracted at build time.
+              Near-zero-runtime CSS-in-JS for React 19+ with Vite. Write styled-components syntax,
+              get static CSS extracted at build time.
             </PageSubtitle>
             <HeroBanner />
 
@@ -972,8 +978,8 @@ export function App() {
               <Breadcrumb>Getting Started</Breadcrumb>
               <SectionTitle>Quick Overview</SectionTitle>
               <Paragraph>
-                All the APIs you need at a glance. styled-static provides 10
-                core functions that cover most CSS-in-JS use cases:
+                All the APIs you need at a glance. styled-static provides 10 core functions that
+                cover most CSS-in-JS use cases:
               </Paragraph>
               <CodeBlock>{`// Style elements
 const Button = styled.button\`padding: 0.5rem 1rem;\`;
@@ -1020,29 +1026,26 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
               <SectionTitle>Why styled-static?</SectionTitle>
 
               <AppCallout type="tip" icon={<Globe size={20} />}>
-                <strong>CSS evolved.</strong> Native nesting, CSS variables,
-                container queries—the gap between CSS and CSS-in-JS is smaller
-                than ever.
+                <strong>CSS evolved.</strong> Native nesting, CSS variables, container queries—the
+                gap between CSS and CSS-in-JS is smaller than ever.
               </AppCallout>
 
               <AppCallout type="note" icon={<HeartCrack size={20} />}>
-                <strong>CSS-in-JS fatigue.</strong> Most libraries are
-                obsolete, complex, or have large runtime overhead.
+                <strong>CSS-in-JS fatigue.</strong> Most libraries are obsolete, complex, or have
+                large runtime overhead.
               </AppCallout>
 
               <AppCallout type="tip" icon={<Sparkles size={20} />}>
-                <strong>Syntactic sugar over CSS modules.</strong> Better DX
-                for writing CSS, without runtime interpolation.
+                <strong>Syntactic sugar over CSS modules.</strong> Better DX for writing CSS,
+                without runtime interpolation.
               </AppCallout>
 
               <AppCallout type="warning" icon={<Shield size={20} />}>
-                <strong>Zero dependencies.</strong> Minimal attack surface.
-                Nothing to audit.
+                <strong>Zero dependencies.</strong> Minimal attack surface. Nothing to audit.
               </AppCallout>
 
               <AppCallout type="tip" icon={<Target size={20} />}>
-                <strong>Intentionally simple.</strong> 95% native browser + 5%
-                sprinkles.
+                <strong>Intentionally simple.</strong> 95% native browser + 5% sprinkles.
               </AppCallout>
 
               <AppCallout type="note" icon={<PartyPopper size={20} />}>
@@ -1057,23 +1060,23 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
 
               <AppCallout type="warning" icon={<Ban size={20} />}>
                 <strong>No runtime interpolation</strong> — Can't write{" "}
-                <InlineCode>{`\${props => props.color}`}</InlineCode>. Use
-                variants, CSS variables, or data attributes.
+                <InlineCode>{`\${props => props.color}`}</InlineCode>. Use variants, CSS variables,
+                or data attributes.
               </AppCallout>
 
               <AppCallout type="note" icon={<Atom size={20} />}>
-                <strong>React 19+ only</strong> — Uses automatic ref
-                forwarding (no <InlineCode>forwardRef</InlineCode>).
+                <strong>React 19+ only</strong> — Uses automatic ref forwarding (no{" "}
+                <InlineCode>forwardRef</InlineCode>).
               </AppCallout>
 
               <AppCallout type="note" icon={<Zap size={20} />}>
-                <strong>Vite only</strong> — Uses Vite's AST parser and
-                virtual modules. No Webpack/Rollup.
+                <strong>Vite only</strong> — Uses Vite's AST parser and virtual modules. No
+                Webpack/Rollup.
               </AppCallout>
 
               <Paragraph className={paragraphMutedClass}>
-                Each constraint removes complexity—no CSS parsing, no
-                forwardRef, one great integration.
+                Each constraint removes complexity—no CSS parsing, no forwardRef, one great
+                integration.
               </Paragraph>
             </Section>
 
@@ -1081,9 +1084,7 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
             <Section id="installation">
               <Breadcrumb>Getting Started</Breadcrumb>
               <SectionTitle>Installation</SectionTitle>
-              <Paragraph>
-                Install the package with your preferred package manager:
-              </Paragraph>
+              <Paragraph>Install the package with your preferred package manager:</Paragraph>
               <CodeBlock filename="terminal">{`npm install styled-static
 # or
 bun add styled-static`}</CodeBlock>
@@ -1096,13 +1097,13 @@ export default defineConfig({
   plugins: [styledStatic(), react()],
 });`}</CodeBlock>
               <AppCallout type="note" icon={<Info size={20} />}>
-                The plugin must be placed <strong>before</strong> the React
-                plugin in the plugins array.
+                The plugin must be placed <strong>before</strong> the React plugin in the plugins
+                array.
               </AppCallout>
 
               <Paragraph className={paragraphSpacedClass}>
-                <strong>Optional: Lightning CSS</strong> for autoprefixing and
-                faster CSS processing:
+                <strong>Optional: Lightning CSS</strong> for autoprefixing and faster CSS
+                processing:
               </Paragraph>
               <CodeBlock filename="terminal">{`npm install lightningcss`}</CodeBlock>
               <CodeBlock filename="vite.config.ts">{`import { defineConfig } from 'vite';
@@ -1114,39 +1115,29 @@ export default defineConfig({
   plugins: [styledStatic(), react()],
 });`}</CodeBlock>
               <AppCallout type="tip" icon={<Zap size={20} />}>
-                Lightning CSS provides automatic vendor prefixes, better
-                minification, and faster builds than PostCSS.
+                Lightning CSS provides automatic vendor prefixes, better minification, and faster
+                builds than PostCSS.
               </AppCallout>
             </Section>
 
             {/* ========================================== */}
             {/* API SECTION - Lazy loaded */}
             {/* ========================================== */}
-            <Suspense
-              fallback={<LoadingWrapper>Loading API docs...</LoadingWrapper>}
-            >
+            <Suspense fallback={<LoadingWrapper>Loading API docs...</LoadingWrapper>}>
               <ApiSection />
             </Suspense>
 
             {/* ========================================== */}
             {/* FEATURES SECTION - Lazy loaded */}
             {/* ========================================== */}
-            <Suspense
-              fallback={
-                <LoadingWrapper>Loading Features docs...</LoadingWrapper>
-              }
-            >
+            <Suspense fallback={<LoadingWrapper>Loading Features docs...</LoadingWrapper>}>
               <FeaturesSection theme={theme} toggleTheme={toggleTheme} />
             </Suspense>
 
             {/* ========================================== */}
             {/* HOW IT WORKS SECTION - Lazy loaded */}
             {/* ========================================== */}
-            <Suspense
-              fallback={
-                <LoadingWrapper>Loading How It Works docs...</LoadingWrapper>
-              }
-            >
+            <Suspense fallback={<LoadingWrapper>Loading How It Works docs...</LoadingWrapper>}>
               <HowItWorksSection />
             </Suspense>
           </Content>

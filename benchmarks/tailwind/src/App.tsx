@@ -26,17 +26,17 @@ import { KeyframeStyles } from "./sections/keyframes-demo";
 
 // Lazy-loaded sections for code splitting
 const ApiSection = lazy(() =>
-  import("./sections/ApiSection").then((m) => ({ default: m.ApiSection }))
+  import("./sections/ApiSection").then((m) => ({ default: m.ApiSection })),
 );
 const FeaturesSection = lazy(() =>
   import("./sections/FeaturesSection").then((m) => ({
     default: m.FeaturesSection,
-  }))
+  })),
 );
 const HowItWorksSection = lazy(() =>
   import("./sections/HowItWorksSection").then((m) => ({
     default: m.HowItWorksSection,
-  }))
+  })),
 );
 
 // =============================================================================
@@ -44,12 +44,7 @@ const HowItWorksSection = lazy(() =>
 // =============================================================================
 
 function Layout({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      className={clsx("flex min-h-screen overflow-x-hidden", className)}
-      {...props}
-    />
-  );
+  return <div className={clsx("flex min-h-screen overflow-x-hidden", className)} {...props} />;
 }
 
 function MobileHeader({ className, ...props }: React.ComponentProps<"header">) {
@@ -61,7 +56,7 @@ function MobileHeader({ className, ...props }: React.ComponentProps<"header">) {
         "px-3 items-center justify-between z-[150]",
         "transition-[background,border-color] duration-150 ease-linear",
         "max-[767px]:flex",
-        className
+        className,
       )}
       {...props}
     />
@@ -73,7 +68,7 @@ function BurgerButton({ className, ...props }: React.ComponentProps<"button">) {
     <button
       className={clsx(
         "bg-transparent border-none p-2 cursor-pointer flex flex-col gap-[5px]",
-        className
+        className,
       )}
       {...props}
     >
@@ -106,7 +101,7 @@ function Overlay({
         isVisible
           ? "max-[767px]:opacity-100 max-[767px]:pointer-events-auto"
           : "max-[767px]:opacity-0 max-[767px]:pointer-events-none",
-        className
+        className,
       )}
       {...props}
     />
@@ -128,10 +123,8 @@ function Sidebar({
         "transition-[background,border-color] duration-150 ease-linear",
         "max-[767px]:top-[var(--mobile-header-height)] max-[767px]:h-[calc(100vh-var(--mobile-header-height))]",
         "max-[767px]:transition-[background,border-color,transform] max-[767px]:duration-200",
-        isOpen
-          ? "max-[767px]:translate-x-0"
-          : "max-[767px]:-translate-x-full",
-        className
+        isOpen ? "max-[767px]:translate-x-0" : "max-[767px]:-translate-x-full",
+        className,
       )}
       {...props}
     />
@@ -141,10 +134,7 @@ function Sidebar({
 function SidebarHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
-      className={clsx(
-        "px-5 py-4 border-b border-[var(--color-border)]",
-        className
-      )}
+      className={clsx("px-5 py-4 border-b border-[var(--color-border)]", className)}
       {...props}
     />
   );
@@ -156,7 +146,7 @@ function Logo({ className, ...props }: React.ComponentProps<"a">) {
       className={clsx(
         "flex items-center gap-2 text-xl font-bold text-[var(--color-text)] no-underline",
         "hover:text-[var(--color-primary)]",
-        className
+        className,
       )}
       {...props}
     />
@@ -172,17 +162,14 @@ function SearchIcon({ className, ...props }: React.ComponentProps<"span">) {
     <span
       className={clsx(
         "absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)] pointer-events-none",
-        className
+        className,
       )}
       {...props}
     />
   );
 }
 
-function SearchField({
-  className,
-  ...props
-}: React.ComponentProps<"input">) {
+function SearchField({ className, ...props }: React.ComponentProps<"input">) {
   return (
     <input
       className={clsx(
@@ -192,7 +179,7 @@ function SearchField({
         "transition-[border-color,background] duration-150",
         "placeholder:text-[var(--color-text-secondary)]",
         "focus:border-[var(--color-primary)]",
-        className
+        className,
       )}
       {...props}
     />
@@ -207,7 +194,7 @@ function SearchHint({ className, ...props }: React.ComponentProps<"span">) {
         "text-xs text-[var(--color-text-secondary)]",
         "bg-[var(--color-bg-sidebar)] px-1.5 py-0.5 rounded border border-[var(--color-border)]",
         "pointer-events-none",
-        className
+        className,
       )}
       {...props}
     />
@@ -215,18 +202,11 @@ function SearchHint({ className, ...props }: React.ComponentProps<"span">) {
 }
 
 function NavSection({ className, ...props }: React.ComponentProps<"nav">) {
-  return (
-    <nav
-      className={clsx("flex-1 overflow-y-auto py-4", className)}
-      {...props}
-    />
-  );
+  return <nav className={clsx("flex-1 overflow-y-auto py-4", className)} {...props} />;
 }
 
 function NavGroup({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div className={clsx("px-3 mb-4", className)} {...props} />
-  );
+  return <div className={clsx("px-3 mb-4", className)} {...props} />;
 }
 
 function NavGroupTitle({ className, ...props }: React.ComponentProps<"div">) {
@@ -236,7 +216,7 @@ function NavGroupTitle({ className, ...props }: React.ComponentProps<"div">) {
         "flex items-center gap-2 px-2 pt-2 pb-1.5",
         "text-[0.6875rem] font-semibold text-[var(--color-text-muted)]",
         "uppercase tracking-[0.06em] mt-1",
-        className
+        className,
       )}
       {...props}
     />
@@ -245,13 +225,10 @@ function NavGroupTitle({ className, ...props }: React.ComponentProps<"div">) {
 
 const activeNavItemClass = clsx(
   "!bg-[var(--color-nav-active)] !text-[var(--color-primary)] !font-medium",
-  "!border-l-2 !border-l-[var(--color-primary)] !pl-[calc(0.75rem-2px)]"
+  "!border-l-2 !border-l-[var(--color-primary)] !pl-[calc(0.75rem-2px)]",
 );
 
-function NavItem({
-  className,
-  ...props
-}: React.ComponentProps<"a">) {
+function NavItem({ className, ...props }: React.ComponentProps<"a">) {
   return (
     <a
       className={clsx(
@@ -259,7 +236,7 @@ function NavItem({
         "no-underline rounded-md border-l-2 border-transparent",
         "transition-all duration-150",
         "hover:text-[var(--color-text)] hover:bg-[var(--color-border-subtle)]",
-        className
+        className,
       )}
       {...props}
     />
@@ -271,7 +248,7 @@ function SidebarFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       className={clsx(
         "p-4 border-t border-[var(--color-border)] flex items-center justify-between",
-        className
+        className,
       )}
       {...props}
     />
@@ -287,7 +264,7 @@ function ThemeToggle({ className, ...props }: React.ComponentProps<"button">) {
         "border border-[var(--color-border)] rounded-[var(--radius)] cursor-pointer",
         "transition-all duration-150",
         "hover:bg-[var(--color-border-subtle)] hover:text-[var(--color-text)] hover:border-[var(--color-text-secondary)]",
-        className
+        className,
       )}
       {...props}
     />
@@ -303,7 +280,7 @@ function IconLink({ className, ...props }: React.ComponentProps<"a">) {
         "border border-[var(--color-border)] rounded-[var(--radius)] cursor-pointer",
         "transition-all duration-150 no-underline",
         "hover:bg-[var(--color-border-subtle)] hover:text-[var(--color-text)] hover:border-[var(--color-text-secondary)]",
-        className
+        className,
       )}
       {...props}
     />
@@ -316,7 +293,7 @@ function Main({ className, ...props }: React.ComponentProps<"main">) {
       className={clsx(
         "flex-1 ml-[var(--sidebar-width)] min-h-screen min-w-0",
         "max-[767px]:ml-0 max-[767px]:mt-[var(--mobile-header-height)]",
-        className
+        className,
       )}
       {...props}
     />
@@ -329,7 +306,7 @@ function Content({ className, ...props }: React.ComponentProps<"div">) {
       className={clsx(
         "max-w-[var(--content-max-width)] mx-auto px-8 pt-12 pb-24",
         "max-[767px]:max-w-full max-[767px]:px-3 max-[767px]:pt-8 max-[767px]:pb-16",
-        className
+        className,
       )}
       {...props}
     />
@@ -346,7 +323,7 @@ function PageTitle({ className, ...props }: React.ComponentProps<"h1">) {
       className={clsx(
         "text-[2.5rem] font-bold mb-4 tracking-[-0.02em] mt-0",
         "max-[767px]:text-[1.75rem]",
-        className
+        className,
       )}
       {...props}
     />
@@ -358,7 +335,7 @@ function PageSubtitle({ className, ...props }: React.ComponentProps<"p">) {
     <p
       className={clsx(
         "text-lg text-[var(--color-text-secondary)] mb-6 leading-[1.6] mt-0",
-        className
+        className,
       )}
       {...props}
     />
@@ -373,7 +350,7 @@ function HeroBanner({ className, ...props }: React.ComponentProps<"div">) {
         "h-[140px] mb-12 rounded-[var(--radius-lg)] relative overflow-hidden",
         "bg-gradient-to-br from-[#0a0a0a] via-[#0f1f12] to-[#0a1a0d]",
         "max-[767px]:h-[100px] max-[767px]:mb-8 max-[767px]:rounded-[var(--radius)]",
-        className
+        className,
       )}
       {...props}
     />
@@ -386,7 +363,7 @@ function Section({ className, ...props }: React.ComponentProps<"section">) {
       className={clsx(
         "mb-16 scroll-mt-[calc(var(--header-height)+2rem)]",
         "max-[767px]:mb-12 max-[767px]:scroll-mt-[calc(var(--mobile-header-height)+1rem)]",
-        className
+        className,
       )}
       {...props}
     />
@@ -398,7 +375,7 @@ function Breadcrumb({ className, ...props }: React.ComponentProps<"span">) {
     <span
       className={clsx(
         "block text-[0.8125rem] font-medium text-[var(--color-primary)] mb-2",
-        className
+        className,
       )}
       {...props}
     />
@@ -411,23 +388,15 @@ function SectionTitle({ className, ...props }: React.ComponentProps<"h2">) {
       className={clsx(
         "text-[1.625rem] font-semibold mb-5 tracking-[-0.02em] mt-0",
         "max-[767px]:text-[1.375rem]",
-        className
+        className,
       )}
       {...props}
     />
   );
 }
 
-function Paragraph({
-  className,
-  ...props
-}: React.ComponentProps<"p">) {
-  return (
-    <p
-      className={clsx("mb-4 mt-0 text-[var(--color-text)]", className)}
-      {...props}
-    />
-  );
+function Paragraph({ className, ...props }: React.ComponentProps<"p">) {
+  return <p className={clsx("mb-4 mt-0 text-[var(--color-text)]", className)} {...props} />;
 }
 
 function InlineCode({ className, ...props }: React.ComponentProps<"code">) {
@@ -436,7 +405,7 @@ function InlineCode({ className, ...props }: React.ComponentProps<"code">) {
       className={clsx(
         "px-1.5 py-0.5 text-[0.875em] font-[Fira_Code,Monaco,monospace]",
         "bg-[var(--color-border)] rounded",
-        className
+        className,
       )}
       {...props}
     />
@@ -459,12 +428,7 @@ const callout = tv({
 });
 
 function CalloutIcon({ className, ...props }: React.ComponentProps<"span">) {
-  return (
-    <span
-      className={clsx("text-xl shrink-0", className)}
-      {...props}
-    />
-  );
+  return <span className={clsx("text-xl shrink-0", className)} {...props} />;
 }
 
 function CalloutContent({ className, ...props }: React.ComponentProps<"div">) {
@@ -480,7 +444,7 @@ function LoadingWrapper({ className, ...props }: React.ComponentProps<"div">) {
     <div
       className={clsx(
         "flex items-center justify-center px-8 py-16 text-[var(--color-text-secondary)]",
-        className
+        className,
       )}
       {...props}
     />
@@ -617,7 +581,16 @@ const sections: SectionInfo[] = [
     id: "comparison",
     title: "Library Comparison",
     group: "Internals",
-    keywords: ["comparison", "bundle", "size", "emotion", "linaria", "panda", "css-in-js", "alternatives"],
+    keywords: [
+      "comparison",
+      "bundle",
+      "size",
+      "emotion",
+      "linaria",
+      "panda",
+      "css-in-js",
+      "alternatives",
+    ],
   },
 ];
 
@@ -681,7 +654,7 @@ export function App() {
           }
         });
       },
-      { rootMargin: "-20% 0px -70% 0px" }
+      { rootMargin: "-20% 0px -70% 0px" },
     );
 
     const observeSections = () => {
@@ -716,9 +689,7 @@ export function App() {
     ? sections.filter(
         (s) =>
           s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          s.keywords.some((k) =>
-            k.toLowerCase().includes(searchQuery.toLowerCase())
-          )
+          s.keywords.some((k) => k.toLowerCase().includes(searchQuery.toLowerCase())),
       )
     : sections;
 
@@ -730,7 +701,7 @@ export function App() {
       acc[group].push(section);
       return acc;
     },
-    {} as Record<string, SectionInfo[]>
+    {} as Record<string, SectionInfo[]>,
   );
 
   const closeSidebar = () => setSidebarOpen(false);
@@ -740,10 +711,7 @@ export function App() {
       <KeyframeStyles />
       <MobileHeader>
         <HeaderTitle>styled-static</HeaderTitle>
-        <BurgerButton
-          onClick={() => setSidebarOpen((prev) => !prev)}
-          aria-label="Toggle menu"
-        />
+        <BurgerButton onClick={() => setSidebarOpen((prev) => !prev)} aria-label="Toggle menu" />
       </MobileHeader>
       <Overlay data-visible={sidebarOpen} onClick={closeSidebar} />
       <Sidebar data-open={sidebarOpen}>
@@ -813,8 +781,8 @@ export function App() {
           {/* Hero */}
           <PageTitle>styled-static</PageTitle>
           <PageSubtitle>
-            Near-zero-runtime CSS-in-JS for React 19+ with Vite. Write
-            styled-components syntax, get static CSS extracted at build time.
+            Near-zero-runtime CSS-in-JS for React 19+ with Vite. Write styled-components syntax, get
+            static CSS extracted at build time.
           </PageSubtitle>
           <HeroBanner />
 
@@ -827,8 +795,8 @@ export function App() {
             <Breadcrumb>Getting Started</Breadcrumb>
             <SectionTitle>Quick Overview</SectionTitle>
             <Paragraph>
-              All the APIs you need at a glance. styled-static provides 10
-              core functions that cover most CSS-in-JS use cases:
+              All the APIs you need at a glance. styled-static provides 10 core functions that cover
+              most CSS-in-JS use cases:
             </Paragraph>
             <CodeBlock>{`// Style elements
 const Button = styled.button\`padding: 0.5rem 1rem;\`;
@@ -879,9 +847,8 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
                 <Globe size={20} />
               </CalloutIcon>
               <CalloutContent>
-                <strong>CSS evolved.</strong> Native nesting, CSS variables,
-                container queries—the gap between CSS and CSS-in-JS is smaller
-                than ever.
+                <strong>CSS evolved.</strong> Native nesting, CSS variables, container queries—the
+                gap between CSS and CSS-in-JS is smaller than ever.
               </CalloutContent>
             </div>
 
@@ -890,8 +857,8 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
                 <HeartCrack size={20} />
               </CalloutIcon>
               <CalloutContent>
-                <strong>CSS-in-JS fatigue.</strong> Most libraries are
-                obsolete, complex, or have large runtime overhead.
+                <strong>CSS-in-JS fatigue.</strong> Most libraries are obsolete, complex, or have
+                large runtime overhead.
               </CalloutContent>
             </div>
 
@@ -900,8 +867,8 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
                 <Sparkles size={20} />
               </CalloutIcon>
               <CalloutContent>
-                <strong>Syntactic sugar over CSS modules.</strong> Better DX
-                for writing CSS, without runtime interpolation.
+                <strong>Syntactic sugar over CSS modules.</strong> Better DX for writing CSS,
+                without runtime interpolation.
               </CalloutContent>
             </div>
 
@@ -910,8 +877,7 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
                 <Shield size={20} />
               </CalloutIcon>
               <CalloutContent>
-                <strong>Zero dependencies.</strong> Minimal attack surface.
-                Nothing to audit.
+                <strong>Zero dependencies.</strong> Minimal attack surface. Nothing to audit.
               </CalloutContent>
             </div>
 
@@ -920,8 +886,7 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
                 <Target size={20} />
               </CalloutIcon>
               <CalloutContent>
-                <strong>Intentionally simple.</strong> 95% native browser + 5%
-                sprinkles.
+                <strong>Intentionally simple.</strong> 95% native browser + 5% sprinkles.
               </CalloutContent>
             </div>
 
@@ -946,8 +911,8 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
               </CalloutIcon>
               <CalloutContent>
                 <strong>No runtime interpolation</strong> — Can't write{" "}
-                <InlineCode>{`\${props => props.color}`}</InlineCode>. Use
-                variants, CSS variables, or data attributes.
+                <InlineCode>{`\${props => props.color}`}</InlineCode>. Use variants, CSS variables,
+                or data attributes.
               </CalloutContent>
             </div>
 
@@ -956,8 +921,8 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
                 <Atom size={20} />
               </CalloutIcon>
               <CalloutContent>
-                <strong>React 19+ only</strong> — Uses automatic ref
-                forwarding (no <InlineCode>forwardRef</InlineCode>).
+                <strong>React 19+ only</strong> — Uses automatic ref forwarding (no{" "}
+                <InlineCode>forwardRef</InlineCode>).
               </CalloutContent>
             </div>
 
@@ -966,14 +931,14 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
                 <Zap size={20} />
               </CalloutIcon>
               <CalloutContent>
-                <strong>Vite only</strong> — Uses Vite's AST parser and
-                virtual modules. No Webpack/Rollup.
+                <strong>Vite only</strong> — Uses Vite's AST parser and virtual modules. No
+                Webpack/Rollup.
               </CalloutContent>
             </div>
 
             <Paragraph className="mt-4 text-[var(--color-text-secondary)]">
-              Each constraint removes complexity—no CSS parsing, no
-              forwardRef, one great integration.
+              Each constraint removes complexity—no CSS parsing, no forwardRef, one great
+              integration.
             </Paragraph>
           </Section>
 
@@ -981,9 +946,7 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
           <Section id="installation">
             <Breadcrumb>Getting Started</Breadcrumb>
             <SectionTitle>Installation</SectionTitle>
-            <Paragraph>
-              Install the package with your preferred package manager:
-            </Paragraph>
+            <Paragraph>Install the package with your preferred package manager:</Paragraph>
             <CodeBlock filename="terminal">{`npm install styled-static
 # or
 bun add styled-static`}</CodeBlock>
@@ -1000,14 +963,13 @@ export default defineConfig({
                 <Info size={20} />
               </CalloutIcon>
               <CalloutContent>
-                The plugin must be placed <strong>before</strong> the React
-                plugin in the plugins array.
+                The plugin must be placed <strong>before</strong> the React plugin in the plugins
+                array.
               </CalloutContent>
             </div>
 
             <Paragraph className="mt-6">
-              <strong>Optional: Lightning CSS</strong> for autoprefixing and
-              faster CSS processing:
+              <strong>Optional: Lightning CSS</strong> for autoprefixing and faster CSS processing:
             </Paragraph>
             <CodeBlock filename="terminal">{`npm install lightningcss`}</CodeBlock>
             <CodeBlock filename="vite.config.ts">{`import { defineConfig } from 'vite';
@@ -1023,8 +985,8 @@ export default defineConfig({
                 <Zap size={20} />
               </CalloutIcon>
               <CalloutContent>
-                Lightning CSS provides automatic vendor prefixes, better
-                minification, and faster builds than PostCSS.
+                Lightning CSS provides automatic vendor prefixes, better minification, and faster
+                builds than PostCSS.
               </CalloutContent>
             </div>
           </Section>
@@ -1032,31 +994,21 @@ export default defineConfig({
           {/* ========================================== */}
           {/* API SECTION - Lazy loaded */}
           {/* ========================================== */}
-          <Suspense
-            fallback={<LoadingWrapper>Loading API docs...</LoadingWrapper>}
-          >
+          <Suspense fallback={<LoadingWrapper>Loading API docs...</LoadingWrapper>}>
             <ApiSection />
           </Suspense>
 
           {/* ========================================== */}
           {/* FEATURES SECTION - Lazy loaded */}
           {/* ========================================== */}
-          <Suspense
-            fallback={
-              <LoadingWrapper>Loading Features docs...</LoadingWrapper>
-            }
-          >
+          <Suspense fallback={<LoadingWrapper>Loading Features docs...</LoadingWrapper>}>
             <FeaturesSection theme={theme} toggleTheme={toggleTheme} />
           </Suspense>
 
           {/* ========================================== */}
           {/* HOW IT WORKS SECTION - Lazy loaded */}
           {/* ========================================== */}
-          <Suspense
-            fallback={
-              <LoadingWrapper>Loading How It Works docs...</LoadingWrapper>
-            }
-          >
+          <Suspense fallback={<LoadingWrapper>Loading How It Works docs...</LoadingWrapper>}>
             <HowItWorksSection />
           </Suspense>
         </Content>

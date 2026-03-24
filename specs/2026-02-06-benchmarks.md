@@ -1,4 +1,5 @@
 # Spec: CSS Framework Benchmark Suite
+
 **Date:** 2026-02-06
 **Target path:** `/specs/2026-02-06-benchmarks.md` (copy upon approval)
 
@@ -9,6 +10,7 @@
 Build a benchmark suite under `/benchmarks/` that replicates the **full docs site** (`/docs/`) in 5 CSS frameworks, then measures build time, output file sizes, and optionally Lighthouse scores. Each implementation is a self-contained Vite + React 19 app differing ONLY in the styling library.
 
 **Frameworks:**
+
 1. **styled-static** — baseline copy from `/docs/`
 2. **Emotion** — runtime CSS-in-JS (`@emotion/styled` + `@emotion/css`)
 3. **Tailwind CSS v4** — utility classes with `tailwind-variants` + `clsx`
@@ -32,6 +34,7 @@ benchmarks/
 ```
 
 Each sub-folder:
+
 ```
 <framework>/
 ├── index.html
@@ -62,6 +65,7 @@ Each sub-folder:
 - **tsconfig.json** — identical (except paths if needed)
 
 What changes per framework:
+
 - Styling library dependency in `package.json`
 - Import statements for styling APIs
 - How components are defined (template literals vs objects vs utility classes)
@@ -75,10 +79,12 @@ What changes per framework:
 ### App.tsx (~60 styled components/helpers)
 
 **Global styles** (`createGlobalStyle`):
+
 - CSS custom properties (`:root` and `[data-theme="dark"]`)
 - Reset styles (`box-sizing`, scrollbar, `html`, `body`, `::selection`)
 
 **Layout components** (all `styled.X`):
+
 - `Layout` — flex container, min-height: 100vh
 - `MobileHeader` — fixed header, hidden on desktop, shown at 767px breakpoint
 - `BurgerButton` — hamburger menu button with `span` children
@@ -102,6 +108,7 @@ What changes per framework:
 - `Content` — centered max-width container
 
 **Typography** (inline for Getting Started):
+
 - `PageTitle` — h1, 2.5rem
 - `PageSubtitle` — subtitle paragraph
 - `HeroBanner` — decorative gradient with `::before`/`::after` pseudo-elements
@@ -112,36 +119,43 @@ What changes per framework:
 - `InlineCode` — code with background
 
 **Callout** (inline):
+
 - `calloutStyles` — `cssVariants` with `note`/`tip`/`warning` variants (light+dark colors)
 - `CalloutIcon` — icon wrapper
 - `CalloutContent` — flex-1 content
 
 **Other:**
+
 - `activeNavItem` — `css` helper for active nav state
 - `LoadingWrapper` — centered loading placeholder
 
 ### shared.tsx (~20 styled components)
 
 **Typography** (exported):
+
 - `Section`, `Breadcrumb`, `SectionTitle`, `SubsectionTitle`, `Paragraph`, `InlineCode`
 
 **Demo area:**
+
 - `DemoArea` — bordered container with bg
 - `DemoLabel` — uppercase "Result" label
 - `ButtonGroup` — flex-wrap container
 
 **Button** (`styledVariants`):
+
 - Base: inline-flex, padding, font, border-radius, focus/disabled states
 - Variant: `primary` | `secondary` | `ghost`
 - Size: `sm` | `md` | `lg`
 
 **Demo buttons:**
+
 - `StyledButton` — basic styled button
 - `ExtendedButton` — `styled(StyledButton)` with font-weight + uppercase
 - `highlightClass` — `css` helper for box-shadow highlight
 - `Counter` — flex counter display
 
 **Code block:**
+
 - `CodeBlockWrapper` — rounded container with dark bg
 - `CodeBlockHeader` — flex header with dark bg
 - `TabLabel` — filename tab
@@ -150,6 +164,7 @@ What changes per framework:
 - `CodeBlock()` — function component using sugar-high
 
 **Callout:**
+
 - `calloutStyles` — `cssVariants` (note/tip/warning)
 - `CalloutIcon`, `CalloutContent`
 - `Callout()` — function component
@@ -157,6 +172,7 @@ What changes per framework:
 ### Section files (ApiSection, FeaturesSection, HowItWorksSection)
 
 Each has:
+
 - 1 section-specific wrapper (`styled.div` with unique CSS custom property)
 - Uses shared components from `shared.tsx`
 - Heavy use of `CodeBlock` with inline code strings
@@ -172,9 +188,12 @@ The styled-static package exports these pure DOM helpers. For non-styled-static 
 ```ts
 export function initTheme(): "light" | "dark" {
   const stored = localStorage.getItem("theme");
-  const theme = stored === "dark" || stored === "light"
-    ? stored
-    : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  const theme =
+    stored === "dark" || stored === "light"
+      ? stored
+      : window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light";
   document.documentElement.setAttribute("data-theme", theme);
   return theme;
 }
@@ -205,6 +224,7 @@ export function onSystemThemeChange(cb: (theme: "light" | "dark") => void): () =
 **Goal:** Create `/benchmarks/styled-static/` as the baseline and the `benchmark.sh` script.
 
 **Steps:**
+
 1. Create `/benchmarks/` directory
 2. Copy all files from `/docs/` into `/benchmarks/styled-static/`
 3. Modify `benchmarks/styled-static/vite.config.ts`:
@@ -228,6 +248,7 @@ export function onSystemThemeChange(cb: (theme: "light" | "dark") => void): () =
 **Goal:** Convert styled-static → Emotion. Closest API surface.
 
 **Dependencies:**
+
 ```json
 {
   "@emotion/react": "^11.13.0",
@@ -237,6 +258,7 @@ export function onSystemThemeChange(cb: (theme: "light" | "dark") => void): () =
 ```
 
 **vite.config.ts:**
+
 ```ts
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
@@ -249,18 +271,19 @@ export default defineConfig({
 
 **Conversion rules:**
 
-| styled-static API | Emotion equivalent |
-|---|---|
-| `import { styled } from "@alex.radulescu/styled-static"` | `import styled from "@emotion/styled"` |
-| `styled.button\`...\`` | `styled.button\`...\`` (identical syntax) |
-| `styled(Base)\`...\`` | `styled(Base)\`...\`` (identical) |
-| `import { css } from "..."` | `import { css } from "@emotion/css"` |
-| `css\`...\`` | `css\`...\`` (identical — returns className string) |
-| `cx(a, b)` | `import { cx } from "@emotion/css"` then `cx(a, b)` |
-| `createGlobalStyle\`...\`` | `import { Global, css } from "@emotion/react"` then `<Global styles={css\`...\`} />` |
-| `initTheme/setTheme/getTheme/onSystemThemeChange` | Import from local `./theme.ts` |
+| styled-static API                                        | Emotion equivalent                                                                   |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `import { styled } from "@alex.radulescu/styled-static"` | `import styled from "@emotion/styled"`                                               |
+| `styled.button\`...\``                                   | `styled.button\`...\`` (identical syntax)                                            |
+| `styled(Base)\`...\``                                    | `styled(Base)\`...\`` (identical)                                                    |
+| `import { css } from "..."`                              | `import { css } from "@emotion/css"`                                                 |
+| `css\`...\``                                             | `css\`...\`` (identical — returns className string)                                  |
+| `cx(a, b)`                                               | `import { cx } from "@emotion/css"` then `cx(a, b)`                                  |
+| `createGlobalStyle\`...\``                               | `import { Global, css } from "@emotion/react"` then `<Global styles={css\`...\`} />` |
+| `initTheme/setTheme/getTheme/onSystemThemeChange`        | Import from local `./theme.ts`                                                       |
 
 **`cssVariants` conversion** — implement as a function:
+
 ```tsx
 // Before
 const calloutStyles = cssVariants({
@@ -283,6 +306,7 @@ function calloutStyles({ type }: { type: "note" | "tip" | "warning" }) {
 ```
 
 **`styledVariants` conversion** — implement as styled component with props:
+
 ```tsx
 // Before
 const Button = styledVariants({
@@ -302,6 +326,7 @@ function Button({ variant, size, className, ...props }: { variant: string; size:
 ```
 
 **Key notes:**
+
 - Emotion is **runtime** — all CSS computed and injected at render time
 - Expect: **larger JS**, **minimal/no CSS files** in output
 - The `css` from `@emotion/css` (framework-agnostic) returns className strings like styled-static
@@ -315,6 +340,7 @@ function Button({ variant, size, className, ...props }: { variant: string; size:
 **Goal:** Convert styled components to idiomatic Tailwind utility classes with `tailwind-variants` for component abstraction.
 
 **Dependencies:**
+
 ```json
 {
   "tailwindcss": "^4.0.0",
@@ -325,6 +351,7 @@ function Button({ variant, size, className, ...props }: { variant: string; size:
 ```
 
 **vite.config.ts:**
+
 ```ts
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -336,6 +363,7 @@ export default defineConfig({
 ```
 
 **src/index.css** (imported in main.tsx):
+
 ```css
 @import "tailwindcss";
 
@@ -389,43 +417,71 @@ export default defineConfig({
 }
 
 /* Global resets */
-* { box-sizing: border-box; }
-html { scroll-behavior: smooth; scroll-padding-top: calc(var(--header-height) + 2rem); }
+* {
+  box-sizing: border-box;
+}
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--header-height) + 2rem);
+}
 body {
   margin: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
   font-size: 15px;
   line-height: 1.65;
   color: var(--color-text);
   background: var(--color-bg);
   -webkit-font-smoothing: antialiased;
 }
-::selection { background: var(--color-primary); color: white; }
+::selection {
+  background: var(--color-primary);
+  color: white;
+}
 ```
 
 **Conversion pattern — simple component:**
+
 ```tsx
 // styled-static
 const NavItem = styled.a`
-  display: block; padding: 0.4375rem 0.75rem; margin: 0.0625rem 0;
-  font-size: 0.875rem; color: var(--color-text-secondary);
-  text-decoration: none; border-radius: 6px;
-  border-left: 2px solid transparent; transition: all var(--transition);
-  &:hover { color: var(--color-text); background: var(--color-border-subtle); }
+  display: block;
+  padding: 0.4375rem 0.75rem;
+  margin: 0.0625rem 0;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  border-radius: 6px;
+  border-left: 2px solid transparent;
+  transition: all var(--transition);
+  &:hover {
+    color: var(--color-text);
+    background: var(--color-border-subtle);
+  }
 `;
 
 // Tailwind
 function NavItem({ className, ...props }: React.ComponentProps<"a">) {
-  return <a className={clsx(
-    "block py-[0.4375rem] px-3 my-px text-sm text-[var(--color-text-secondary)]",
-    "no-underline rounded-md border-l-2 border-transparent transition-all duration-150",
-    "hover:text-[var(--color-text)] hover:bg-[var(--color-border-subtle)]",
-    className
-  )} {...props} />;
+  return (
+    <a
+      className={clsx(
+        "block py-[0.4375rem] px-3 my-px text-sm text-[var(--color-text-secondary)]",
+        "no-underline rounded-md border-l-2 border-transparent transition-all duration-150",
+        "hover:text-[var(--color-text)] hover:bg-[var(--color-border-subtle)]",
+        className,
+      )}
+      {...props}
+    />
+  );
 }
 ```
 
 **Conversion pattern — variant component with `tv()`:**
+
 ```tsx
 import { tv } from "tailwind-variants";
 
@@ -434,8 +490,10 @@ const button = tv({
   variants: {
     variant: {
       primary: "bg-[var(--color-primary)] text-white hover:enabled:bg-[var(--color-primary-hover)]",
-      secondary: "bg-[var(--color-border)] text-[var(--color-text)] hover:enabled:bg-[var(--color-text-secondary)] hover:enabled:text-white",
-      ghost: "bg-transparent text-[var(--color-text-secondary)] hover:enabled:bg-[var(--color-border)] hover:enabled:text-[var(--color-text)]",
+      secondary:
+        "bg-[var(--color-border)] text-[var(--color-text)] hover:enabled:bg-[var(--color-text-secondary)] hover:enabled:text-white",
+      ghost:
+        "bg-transparent text-[var(--color-text-secondary)] hover:enabled:bg-[var(--color-border)] hover:enabled:text-[var(--color-text)]",
     },
     size: {
       sm: "py-1.5 px-3 text-[0.8125rem]",
@@ -445,12 +503,21 @@ const button = tv({
   },
 });
 
-function Button({ variant, size, className, ...props }: { variant: "primary" | "secondary" | "ghost"; size: "sm" | "md" | "lg" } & React.ComponentProps<"button">) {
+function Button({
+  variant,
+  size,
+  className,
+  ...props
+}: {
+  variant: "primary" | "secondary" | "ghost";
+  size: "sm" | "md" | "lg";
+} & React.ComponentProps<"button">) {
   return <button className={button({ variant, size, className })} {...props} />;
 }
 ```
 
 **Conversion pattern — `cssVariants` with `tv()`:**
+
 ```tsx
 const callout = tv({
   base: "flex gap-3.5 p-[1.125rem_1.25rem] my-6 rounded-[var(--radius)] text-[0.9375rem] leading-relaxed",
@@ -465,6 +532,7 @@ const callout = tv({
 ```
 
 **Key notes:**
+
 - `tailwind-variants` `tv()` maps almost 1:1 to `styledVariants`/`cssVariants`
 - `clsx` replaces `cx()` for conditional classes
 - `activeNavItem` → just a `clsx` conditional with inline Tailwind classes
@@ -481,6 +549,7 @@ const callout = tv({
 **Goal:** Convert template literal CSS to Restyle's object-syntax `styled()`.
 
 **Dependencies:**
+
 ```json
 {
   "restyle": "^2.0.0"
@@ -488,6 +557,7 @@ const callout = tv({
 ```
 
 **vite.config.ts:**
+
 ```ts
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
@@ -499,17 +569,18 @@ export default defineConfig({
 
 **Conversion rules:**
 
-| styled-static | Restyle |
-|---|---|
-| `styled.button\`padding: 1rem;\`` | `styled('button', { padding: '1rem' })` |
-| `styled(Base)\`...\`` | Compose manually (see below) |
-| `css\`...\`` | `css({ ... })` returns `[className, Styles]` tuple |
-| `createGlobalStyle\`...\`` | `<GlobalStyles>{{ ":root": {...}, body: {...} }}</GlobalStyles>` |
-| `cssVariants` | Manual function with `css()` per variant |
-| `styledVariants` | `styled('button', (props) => ({...}))` resolver |
-| `cx(a, b)` | Template literal `${a} ${b}` or custom cx helper |
+| styled-static                     | Restyle                                                          |
+| --------------------------------- | ---------------------------------------------------------------- |
+| `styled.button\`padding: 1rem;\`` | `styled('button', { padding: '1rem' })`                          |
+| `styled(Base)\`...\``             | Compose manually (see below)                                     |
+| `css\`...\``                      | `css({ ... })` returns `[className, Styles]` tuple               |
+| `createGlobalStyle\`...\``        | `<GlobalStyles>{{ ":root": {...}, body: {...} }}</GlobalStyles>` |
+| `cssVariants`                     | Manual function with `css()` per variant                         |
+| `styledVariants`                  | `styled('button', (props) => ({...}))` resolver                  |
+| `cx(a, b)`                        | Template literal `${a} ${b}` or custom cx helper                 |
 
 **CSS property conversion** (kebab-case → camelCase):
+
 ```
 padding           → padding (same)
 font-size         → fontSize
@@ -542,64 +613,89 @@ margin-bottom     → marginBottom
 ```
 
 **Nested selectors:**
+
 ```tsx
 // styled-static
 const NavItem = styled.a`
   color: gray;
-  &:hover { color: black; background: white; }
-  @media (max-width: 767px) { font-size: 0.8rem; }
+  &:hover {
+    color: black;
+    background: white;
+  }
+  @media (max-width: 767px) {
+    font-size: 0.8rem;
+  }
 `;
 
 // Restyle
-const NavItem = styled('a', {
-  color: 'gray',
-  '&:hover': { color: 'black', background: 'white' },
-  '@media (max-width: 767px)': { fontSize: '0.8rem' },
+const NavItem = styled("a", {
+  color: "gray",
+  "&:hover": { color: "black", background: "white" },
+  "@media (max-width: 767px)": { fontSize: "0.8rem" },
 });
 ```
 
 **Component extension workaround:**
+
 ```tsx
 // styled-static: const Extended = styled(StyledButton)`font-weight: 600;`
 // Restyle: render the base component and layer extra styles
-const StyledButton = styled('button', { padding: '0.5rem 1rem', background: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' });
+const StyledButton = styled("button", {
+  padding: "0.5rem 1rem",
+  background: "var(--color-primary)",
+  color: "white",
+  border: "none",
+  borderRadius: "6px",
+  cursor: "pointer",
+});
 
 function ExtendedButton(props: React.ComponentProps<typeof StyledButton>) {
-  const [cls, Styles] = css({ fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' });
-  return <><StyledButton {...props} className={`${cls} ${props.className || ''}`} /><Styles /></>;
+  const [cls, Styles] = css({
+    fontWeight: 600,
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+  });
+  return (
+    <>
+      <StyledButton {...props} className={`${cls} ${props.className || ""}`} />
+      <Styles />
+    </>
+  );
 }
 ```
 
 **`css()` tuple pattern:**
+
 ```tsx
 // Restyle's css() returns [classNames, StylesComponent]
 // The <Styles /> must be rendered for the styles to take effect
-const [highlightClass, HighlightStyles] = css({ boxShadow: '0 0 0 3px var(--color-primary)' });
+const [highlightClass, HighlightStyles] = css({ boxShadow: "0 0 0 3px var(--color-primary)" });
 // Must render <HighlightStyles /> somewhere in the tree
 ```
 
 **Global styles:**
+
 ```tsx
-import { GlobalStyles } from 'restyle';
+import { GlobalStyles } from "restyle";
 
 function App() {
   return (
     <>
       <GlobalStyles>
         {{
-          ':root': {
-            '--color-bg': '#ffffff',
-            '--color-text': '#0f172a',
+          ":root": {
+            "--color-bg": "#ffffff",
+            "--color-text": "#0f172a",
             // ... all CSS variables
           },
           '[data-theme="dark"]': {
-            '--color-bg': '#0a0a0a',
+            "--color-bg": "#0a0a0a",
             // ... dark overrides
           },
-          '*': { boxSizing: 'border-box' },
-          html: { scrollBehavior: 'smooth' },
-          body: { margin: 0, fontFamily: "'Inter', sans-serif", fontSize: '15px' },
-          '::selection': { background: 'var(--color-primary)', color: 'white' },
+          "*": { boxSizing: "border-box" },
+          html: { scrollBehavior: "smooth" },
+          body: { margin: 0, fontFamily: "'Inter', sans-serif", fontSize: "15px" },
+          "::selection": { background: "var(--color-primary)", color: "white" },
         }}
       </GlobalStyles>
       {/* rest of app */}
@@ -609,6 +705,7 @@ function App() {
 ```
 
 **Key notes:**
+
 - Every `css()` call returns a tuple — `<Styles />` components must be rendered
 - This is the most labor-intensive conversion (all CSS → camelCase objects)
 - Restyle is **runtime** (2.2kb) — styles injected via `<style>` elements
@@ -622,6 +719,7 @@ function App() {
 **Goal:** Convert to Panda CSS codegen with object syntax.
 
 **Dependencies (devDependencies):**
+
 ```json
 {
   "@pandacss/dev": "^0.52.0"
@@ -631,15 +729,17 @@ function App() {
 **Additional files:**
 
 `postcss.config.cjs`:
+
 ```js
 module.exports = {
   plugins: {
-    '@pandacss/dev/postcss': {},
+    "@pandacss/dev/postcss": {},
   },
 };
 ```
 
 `panda.config.ts`:
+
 ```ts
 import { defineConfig } from "@pandacss/dev";
 
@@ -666,13 +766,21 @@ export default defineConfig({
       // ... dark overrides
     },
     html: { scrollBehavior: "smooth", scrollPaddingTop: "calc(var(--header-height) + 2rem)" },
-    body: { margin: 0, fontFamily: "'Inter', -apple-system, sans-serif", fontSize: "15px", lineHeight: 1.65, color: "var(--color-text)", background: "var(--color-bg)" },
+    body: {
+      margin: 0,
+      fontFamily: "'Inter', -apple-system, sans-serif",
+      fontSize: "15px",
+      lineHeight: 1.65,
+      color: "var(--color-text)",
+      background: "var(--color-bg)",
+    },
     "::selection": { background: "var(--color-primary)", color: "white" },
   },
 });
 ```
 
 **vite.config.ts:**
+
 ```ts
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
@@ -683,6 +791,7 @@ export default defineConfig({
 ```
 
 **package.json scripts:**
+
 ```json
 {
   "prepare": "panda codegen",
@@ -692,35 +801,45 @@ export default defineConfig({
 ```
 
 **src/index.css:**
+
 ```css
 @layer reset, base, tokens, recipes, utilities;
 ```
 
 **Conversion rules:**
 
-| styled-static | Panda CSS |
-|---|---|
-| `styled.button\`padding: 1rem;\`` | `<button className={css({ padding: '1rem' })}>` |
-| `styled(Base)\`...\`` | Compose: `className={css({...extra})}` on `<Base>` |
-| `css\`...\`` | `css({...})` from `styled-system/css` (returns className) |
-| `cx(a, b)` | `cx(a, b)` from `styled-system/css` |
-| `createGlobalStyle` | `globalCss` in `panda.config.ts` |
-| `cssVariants` / `styledVariants` | `cva({...})` from `styled-system/css` |
+| styled-static                     | Panda CSS                                                 |
+| --------------------------------- | --------------------------------------------------------- |
+| `styled.button\`padding: 1rem;\`` | `<button className={css({ padding: '1rem' })}>`           |
+| `styled(Base)\`...\``             | Compose: `className={css({...extra})}` on `<Base>`        |
+| `css\`...\``                      | `css({...})` from `styled-system/css` (returns className) |
+| `cx(a, b)`                        | `cx(a, b)` from `styled-system/css`                       |
+| `createGlobalStyle`               | `globalCss` in `panda.config.ts`                          |
+| `cssVariants` / `styledVariants`  | `cva({...})` from `styled-system/css`                     |
 
 **Conversion pattern — simple component:**
+
 ```tsx
 import { css } from "../styled-system/css";
 
 // styled-static: const Sidebar = styled.aside`position: fixed; ...`;
-function Sidebar({ className, children, ...props }: React.ComponentProps<"aside"> ) {
+function Sidebar({ className, children, ...props }: React.ComponentProps<"aside">) {
   return (
-    <aside className={css({
-      position: "fixed", top: 0, left: 0,
-      width: "var(--sidebar-width)", height: "100vh",
-      background: "var(--color-bg-sidebar)",
-      borderRight: "1px solid var(--color-border)",
-      display: "flex", flexDirection: "column", zIndex: 100,
-    })} {...props}>
+    <aside
+      className={css({
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "var(--sidebar-width)",
+        height: "100vh",
+        background: "var(--color-bg-sidebar)",
+        borderRight: "1px solid var(--color-border)",
+        display: "flex",
+        flexDirection: "column",
+        zIndex: 100,
+      })}
+      {...props}
+    >
       {children}
     </aside>
   );
@@ -728,19 +847,31 @@ function Sidebar({ className, children, ...props }: React.ComponentProps<"aside"
 ```
 
 **Conversion pattern — variants with `cva()`:**
+
 ```tsx
 import { cva, cx } from "../styled-system/css";
 
 const button = cva({
   base: {
-    display: "inline-flex", alignItems: "center", justifyContent: "center",
-    gap: "0.5rem", padding: "0.5rem 1rem", fontSize: "0.875rem",
-    fontWeight: 500, border: "none", borderRadius: "6px",
-    cursor: "pointer", transition: "all 0.2s ease",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "0.5rem",
+    padding: "0.5rem 1rem",
+    fontSize: "0.875rem",
+    fontWeight: 500,
+    border: "none",
+    borderRadius: "6px",
+    cursor: "pointer",
+    transition: "all 0.2s ease",
   },
   variants: {
     variant: {
-      primary: { background: "var(--color-primary)", color: "white", _hover: { background: "var(--color-primary-hover)" } },
+      primary: {
+        background: "var(--color-primary)",
+        color: "white",
+        _hover: { background: "var(--color-primary-hover)" },
+      },
       secondary: { background: "var(--color-border)", color: "var(--color-text)" },
       ghost: { background: "transparent", color: "var(--color-text-secondary)" },
     },
@@ -752,12 +883,21 @@ const button = cva({
   },
 });
 
-function Button({ variant, size, className, ...props }: { variant: "primary" | "secondary" | "ghost"; size: "sm" | "md" | "lg" } & React.ComponentProps<"button">) {
+function Button({
+  variant,
+  size,
+  className,
+  ...props
+}: {
+  variant: "primary" | "secondary" | "ghost";
+  size: "sm" | "md" | "lg";
+} & React.ComponentProps<"button">) {
   return <button className={cx(button({ variant, size }), className)} {...props} />;
 }
 ```
 
 **Key notes:**
+
 - Panda CSS is **build-time** — zero runtime, CSS extracted via PostCSS
 - Must run `panda codegen` before any build or dev server start
 - `styled-system/` directory is generated — add to `.gitignore`
@@ -773,6 +913,7 @@ function Button({ variant, size, className, ...props }: { variant: "primary" | "
 **Goal:** Create `benchmark.sh` and optional `lighthouse.sh`, run all benchmarks, generate `results.md`.
 
 **`benchmarks/benchmark.sh`:**
+
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
@@ -845,6 +986,7 @@ cat "$RESULTS_FILE"
 ```
 
 **Optional `benchmarks/lighthouse.sh`:**
+
 - Install: `npm install -g @lhci/cli` or use `npx`
 - For each framework: `npx serve dist -l 3456 &`, run `lhci autorun`, kill serve
 - Capture Performance, FCP, LCP, TBT, CLS
@@ -854,14 +996,14 @@ cat "$RESULTS_FILE"
 
 ## 7. Execution Order
 
-| Phase | What | Thread instructions |
-|---|---|---|
-| **Phase 0** | Scaffold + styled-static + benchmark.sh | "Read the spec at `/specs/2026-02-06-benchmarks.md`. Execute Phase 0." |
-| **Phase 1** | Emotion implementation | "Read the spec at `/specs/2026-02-06-benchmarks.md`. Execute Phase 1. Use `/benchmarks/styled-static/` as the reference implementation to convert from." |
-| **Phase 2** | Tailwind implementation | "Read the spec at `/specs/2026-02-06-benchmarks.md`. Execute Phase 2. Use `/benchmarks/styled-static/` as the reference implementation to convert from." |
-| **Phase 3** | Restyle implementation | "Read the spec at `/specs/2026-02-06-benchmarks.md`. Execute Phase 3. Use `/benchmarks/styled-static/` as the reference implementation to convert from." |
-| **Phase 4** | Panda CSS implementation | "Read the spec at `/specs/2026-02-06-benchmarks.md`. Execute Phase 4. Use `/benchmarks/styled-static/` as the reference implementation to convert from." |
-| **Phase 5** | Benchmark run + results | "Read the spec at `/specs/2026-02-06-benchmarks.md`. Execute Phase 5. Run `./benchmarks/benchmark.sh` and verify results." |
+| Phase       | What                                    | Thread instructions                                                                                                                                      |
+| ----------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Phase 0** | Scaffold + styled-static + benchmark.sh | "Read the spec at `/specs/2026-02-06-benchmarks.md`. Execute Phase 0."                                                                                   |
+| **Phase 1** | Emotion implementation                  | "Read the spec at `/specs/2026-02-06-benchmarks.md`. Execute Phase 1. Use `/benchmarks/styled-static/` as the reference implementation to convert from." |
+| **Phase 2** | Tailwind implementation                 | "Read the spec at `/specs/2026-02-06-benchmarks.md`. Execute Phase 2. Use `/benchmarks/styled-static/` as the reference implementation to convert from." |
+| **Phase 3** | Restyle implementation                  | "Read the spec at `/specs/2026-02-06-benchmarks.md`. Execute Phase 3. Use `/benchmarks/styled-static/` as the reference implementation to convert from." |
+| **Phase 4** | Panda CSS implementation                | "Read the spec at `/specs/2026-02-06-benchmarks.md`. Execute Phase 4. Use `/benchmarks/styled-static/` as the reference implementation to convert from." |
+| **Phase 5** | Benchmark run + results                 | "Read the spec at `/specs/2026-02-06-benchmarks.md`. Execute Phase 5. Run `./benchmarks/benchmark.sh` and verify results."                               |
 
 Each phase is sequential. Each thread reads the spec, reads the reference implementation, and converts.
 
@@ -870,6 +1012,7 @@ Each phase is sequential. Each thread reads the spec, reads the reference implem
 ## 8. Verification Checklist
 
 Per-framework:
+
 - [ ] `bun install` succeeds
 - [ ] `bun run build` succeeds without errors
 - [ ] `dist/` contains JS, CSS (where applicable), and HTML files
@@ -885,6 +1028,7 @@ Per-framework:
 - [ ] Lazy-loaded sections load on scroll
 
 Final:
+
 - [ ] `benchmark.sh` runs all 5 frameworks end-to-end
 - [ ] `results.md` is generated with all metrics populated
 - [ ] No NaN or empty values in the results table

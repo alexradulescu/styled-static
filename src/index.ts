@@ -65,13 +65,7 @@ export type {
 } from "./types";
 
 // Theme helpers - runtime utilities for theme switching
-export {
-  getTheme,
-  setTheme,
-  initTheme,
-  onSystemThemeChange,
-  type InitThemeOptions,
-} from "./theme";
+export { getTheme, setTheme, initTheme, onSystemThemeChange, type InitThemeOptions } from "./theme";
 
 function throwConfigError(name: string): never {
   throw new Error(
@@ -81,7 +75,7 @@ function throwConfigError(name: string): never {
       `  import react from '@vitejs/plugin-react';\n\n` +
       `  export default defineConfig({\n` +
       `    plugins: [styledStatic(), react()],\n` +
-      `  });`
+      `  });`,
   );
 }
 
@@ -116,7 +110,7 @@ export const styled = new Proxy(
   {
     get: () => () => throwConfigError("styled"),
     apply: () => throwConfigError("styled"),
-  }
+  },
 ) as import("./types").StyledFunction;
 
 /**
@@ -136,10 +130,7 @@ export const styled = new Proxy(
  * <div className={isActive ? activeClass : ''} />
  * <Button className={`${activeClass} ${highlightClass}`}>Mixed</Button>
  */
-export function css(
-  _strings: TemplateStringsArray,
-  ..._interpolations: never[]
-): string {
+export function css(_strings: TemplateStringsArray, ..._interpolations: never[]): string {
   throwConfigError("css");
 }
 
@@ -161,10 +152,7 @@ export function css(
  * // @keyframes ss-abc123 { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
  * // .ss-xyz789 { animation: ss-abc123 1s linear infinite; }
  */
-export function keyframes(
-  _strings: TemplateStringsArray,
-  ..._interpolations: never[]
-): string {
+export function keyframes(_strings: TemplateStringsArray, ..._interpolations: never[]): string {
   throwConfigError("keyframes");
 }
 
@@ -276,7 +264,7 @@ export function styledVariants<
   T extends import("./types").HTMLTag | import("react").ComponentType<any>,
   V extends import("./types").VariantsConfig,
 >(
-  _config: import("./types").StyledVariantsDefinition<V> & { component: T }
+  _config: import("./types").StyledVariantsDefinition<V> & { component: T },
 ): import("./types").StyledVariantComponent<T, V> {
   throwConfigError("styledVariants");
 }
@@ -309,7 +297,7 @@ export function styledVariants<
  * <div className={cx(buttonCss({ color: 'primary' }), isActive && activeClass)}>
  */
 export function cssVariants<V extends import("./types").VariantsConfig>(
-  _config: import("./types").VariantsDefinition<V>
+  _config: import("./types").VariantsDefinition<V>,
 ): import("./types").CssVariantsFunction<V> {
   throwConfigError("cssVariants");
 }
@@ -354,7 +342,7 @@ export function withComponent<
   F extends { className: string },
 >(
   _toComponent: T,
-  _fromComponent: F
+  _fromComponent: F,
 ): import("./types").StyledComponent<T> & { className: string } {
   throwConfigError("withComponent");
 }

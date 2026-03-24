@@ -1,8 +1,11 @@
 export function initTheme(): "light" | "dark" {
   const stored = localStorage.getItem("theme");
-  const theme = stored === "dark" || stored === "light"
-    ? stored
-    : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  const theme =
+    stored === "dark" || stored === "light"
+      ? stored
+      : window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light";
   document.documentElement.setAttribute("data-theme", theme);
   return theme;
 }

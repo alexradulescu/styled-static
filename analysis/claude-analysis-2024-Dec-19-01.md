@@ -9,17 +9,17 @@ Library achieves near-optimal efficiency for static CSS-in-JS with comprehensive
 
 ## Metrics
 
-| Metric | Current | Previous | Delta |
-|--------|---------|----------|-------|
-| Runtime (minified) | 45 B | - | - |
-| Runtime (gzip) | 65 B | - | - |
-| Runtime (brotli) | 49 B | - | - |
-| Per-component | ~120 B | - | - |
-| Test coverage (lines) | 71.79% | - | - |
-| Test coverage (funcs) | 72.76% | - | - |
-| Tests passing | 119/119 | - | - |
-| TypeScript strict | Yes | - | - |
-| Runtime dependencies | 0 | - | - |
+| Metric                | Current | Previous | Delta |
+| --------------------- | ------- | -------- | ----- |
+| Runtime (minified)    | 45 B    | -        | -     |
+| Runtime (gzip)        | 65 B    | -        | -     |
+| Runtime (brotli)      | 49 B    | -        | -     |
+| Per-component         | ~120 B  | -        | -     |
+| Test coverage (lines) | 71.79%  | -        | -     |
+| Test coverage (funcs) | 72.76%  | -        | -     |
+| Tests passing         | 119/119 | -        | -     |
+| TypeScript strict     | Yes     | -        | -     |
+| Runtime dependencies  | 0       | -        | -     |
 
 ## Size
 
@@ -50,11 +50,13 @@ Library achieves near-optimal efficiency for static CSS-in-JS with comprehensive
 - 119 tests, 218 expect() calls
 
 Uncovered areas:
+
 - `src/index.ts` (27.66% lines): Runtime proxy error handlers (intentionally unreachable when plugin works)
 - `src/theme.ts` (39.71% lines): localStorage/matchMedia edge cases, SSR guards
 - `src/vite.ts` (91.60% lines): HMR paths, some error branches
 
 Coverage is lower due to:
+
 1. Proxy error handlers that only trigger if plugin misconfigured
 2. Browser-only theme helpers (matchMedia, localStorage)
 3. HMR-specific code paths
@@ -62,6 +64,7 @@ Coverage is lower due to:
 ## TypeScript
 
 Enabled strictness flags:
+
 - `strict: true`
 - `strictNullChecks: true`
 - `strictFunctionTypes: true`
@@ -77,6 +80,7 @@ Enabled strictness flags:
 - `forceConsistentCasingInFileNames: true`
 
 Not enabled:
+
 - `exactOptionalPropertyTypes: false`
 
 ## Changes Since Previous

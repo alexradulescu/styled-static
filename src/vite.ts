@@ -123,11 +123,7 @@ export interface StyledStaticOptions {
  * });
  */
 export function styledStatic(options: StyledStaticOptions = {}): Plugin {
-  const {
-    classPrefix = "ss",
-    debug: debugOption,
-    cssOutput = "auto",
-  } = options;
+  const { classPrefix = "ss", debug: debugOption, cssOutput = "auto" } = options;
 
   // SECURITY: Debug logging can expose file paths and internal state.
   // Only enable via explicit option or environment variable.
@@ -160,7 +156,7 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
 
       if (DEBUG) {
         console.log(
-          `[styled-static] CSS output mode: ${actualCssOutput} (config: ${cssOutput}, isLib: ${!!config.build?.lib})`
+          `[styled-static] CSS output mode: ${actualCssOutput} (config: ${cssOutput}, isLib: ${!!config.build?.lib})`,
         );
       }
     },
@@ -190,9 +186,7 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
         if (isDev) {
           // Add sourceURL comment for DevTools source mapping
           const sourceFile = data?.sourceFile ?? "";
-          const cssWithSource = sourceFile
-            ? `${css}\n/*# sourceURL=${sourceFile} */`
-            : css;
+          const cssWithSource = sourceFile ? `${css}\n/*# sourceURL=${sourceFile} */` : css;
 
           // Dev mode: return JS that injects CSS into DOM with HMR support
           return `
@@ -274,10 +268,7 @@ export default css;
       try {
         ast = this.parse(code) as ESTree.Program;
         if (DEBUG) {
-          console.log(
-            "[styled-static] AST parsed successfully, body length:",
-            ast.body.length
-          );
+          console.log("[styled-static] AST parsed successfully, body length:", ast.body.length);
         }
       } catch (e) {
         // Parse error - this might be a partial file or syntax error
@@ -289,10 +280,7 @@ export default css;
       const imports = findStyledStaticImports(ast);
       if (DEBUG) console.log("[styled-static] Found imports:", imports);
       const hasTemplateImports =
-        imports.css ||
-        imports.styled ||
-        imports.createGlobalStyle ||
-        imports.keyframes;
+        imports.css || imports.styled || imports.createGlobalStyle || imports.keyframes;
       const hasVariantImports = imports.styledVariants || imports.cssVariants;
       const hasWithComponent = !!imports.withComponent;
       if (!hasTemplateImports && !hasVariantImports && !hasWithComponent) {
@@ -301,41 +289,21 @@ export default css;
       }
 
       // Find all tagged template literals using our imports
-      const templates = hasTemplateImports
-        ? findTaggedTemplates(ast, imports, code)
-        : [];
-      if (DEBUG)
-        console.log("[styled-static] Found templates:", templates.length);
+      const templates = hasTemplateImports ? findTaggedTemplates(ast, imports, code) : [];
+      if (DEBUG) console.log("[styled-static] Found templates:", templates.length);
 
       // Find all variant calls using our imports
-      const variantCalls = hasVariantImports
-        ? findVariantCalls(ast, code, imports)
-        : [];
-      if (DEBUG)
-        console.log(
-          "[styled-static] Found variant calls:",
-          variantCalls.length
-        );
+      const variantCalls = hasVariantImports ? findVariantCalls(ast, code, imports) : [];
+      if (DEBUG) console.log("[styled-static] Found variant calls:", variantCalls.length);
 
       // Find all withComponent calls
-      const withComponentCalls = hasWithComponent
-        ? findWithComponentCalls(ast, imports)
-        : [];
+      const withComponentCalls = hasWithComponent ? findWithComponentCalls(ast, imports) : [];
       if (DEBUG)
-        console.log(
-          "[styled-static] Found withComponent calls:",
-          withComponentCalls.length
-        );
+        console.log("[styled-static] Found withComponent calls:", withComponentCalls.length);
 
-      if (
-        templates.length === 0 &&
-        variantCalls.length === 0 &&
-        withComponentCalls.length === 0
-      ) {
+      if (templates.length === 0 && variantCalls.length === 0 && withComponentCalls.length === 0) {
         if (DEBUG)
-          console.log(
-            "[styled-static] No templates, variants, or withComponent found, skipping"
-          );
+          console.log("[styled-static] No templates, variants, or withComponent found, skipping");
         return null;
       }
 
@@ -398,11 +366,7 @@ export default css;
         s.overwrite(t.node.start, t.node.end, replacement);
 
         // styled, styledExtend, styledAttrs need createElement and m
-        if (
-          t.type === "styled" ||
-          t.type === "styledExtend" ||
-          t.type === "styledAttrs"
-        ) {
+        if (t.type === "styled" || t.type === "styledExtend" || t.type === "styledAttrs") {
           needsCreateElement = true;
         }
         // css, keyframes, createGlobalStyle don't need runtime
@@ -442,10 +406,7 @@ export default css;
           for (const cv of v.compoundVariants) {
             // Build combined selector: .ss-btn--size-lg.ss-btn--intent-danger
             const selectors = Array.from(cv.conditions.entries())
-              .map(
-                ([variantName, value]) =>
-                  `.${baseClass}--${variantName}-${value}`
-              )
+              .map(([variantName, value]) => `.${baseClass}--${variantName}-${value}`)
               .join("");
             allCss += `${selectors} { ${cv.css} }\n`;
           }
@@ -461,12 +422,7 @@ export default css;
 
         // Generate replacement code
         const variantKeys = Array.from(v.variants.keys());
-        const result = generateVariantReplacement(
-          v,
-          baseClass,
-          variantKeys,
-          () => variantMapId++
-        );
+        const result = generateVariantReplacement(v, baseClass, variantKeys, () => variantMapId++);
         s.overwrite(v.start, v.end, result.code);
 
         // Collect hoisted declarations for complex variants
@@ -486,9 +442,7 @@ export default css;
         // SECURITY: Validate component references
         if (!isValidIdentifier(wc.fromComponent)) {
           /* unreachable: unreachable: fromComponent is an AST Identifier node, always valid */
-          throw new Error(
-            `[styled-static] Invalid fromComponent name: ${wc.fromComponent}`
-          );
+          throw new Error(`[styled-static] Invalid fromComponent name: ${wc.fromComponent}`);
         }
 
         // Generate replacement code
@@ -503,9 +457,7 @@ export default css;
           // Component reference: withComponent(Link, Button)
           if (!isValidIdentifier(wc.toComponent)) {
             /* unreachable: unreachable: toComponent is an AST Identifier node, always valid */
-            throw new Error(
-              `[styled-static] Invalid toComponent name: ${wc.toComponent}`
-            );
+            throw new Error(`[styled-static] Invalid toComponent name: ${wc.toComponent}`);
           }
           replacement = `Object.assign((p) => createElement(${wc.toComponent}, {...p, className: m(${wc.fromComponent}.className, p.className)}), { className: ${wc.fromComponent}.className })`;
         }

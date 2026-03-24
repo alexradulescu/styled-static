@@ -7,7 +7,9 @@ import { styled } from "restyle";
 
 export function KeyframeStyles() {
   return (
-    <style dangerouslySetInnerHTML={{ __html: `
+    <style
+      dangerouslySetInnerHTML={{
+        __html: `
       @keyframes ss-docs-spin {
         from { transform: rotate(0deg); }
         to { transform: rotate(360deg); }
@@ -16,7 +18,9 @@ export function KeyframeStyles() {
         0%, 100% { opacity: 1; }
         50% { opacity: 0.5; }
       }
-    `}} />
+    `,
+      }}
+    />
   );
 }
 

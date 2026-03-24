@@ -47,9 +47,9 @@ export function FeaturesSection({ theme, toggleTheme }: FeaturesSectionProps) {
         <Breadcrumb>Features</Breadcrumb>
         <SectionTitle>Polymorphism & Composition</SectionTitle>
         <Paragraph>
-          Emotion styled components support the <InlineCode>as</InlineCode> prop
-          at runtime for polymorphic rendering. For creating a pre-bound anchor
-          variant, use <InlineCode>.withComponent()</InlineCode>.
+          Emotion styled components support the <InlineCode>as</InlineCode> prop at runtime for
+          polymorphic rendering. For creating a pre-bound anchor variant, use{" "}
+          <InlineCode>.withComponent()</InlineCode>.
         </Paragraph>
         <CodeBlock>{`const Button = styled.button\`
   padding: 0.5rem 1rem;
@@ -82,9 +82,7 @@ const AnchorButton = Button.withComponent('a');
           <DemoLabel>StyledButton.withComponent(&apos;a&apos;)</DemoLabel>
           <ButtonGroup>
             <StyledButton>Original Button</StyledButton>
-            <AnchorButton href="#polymorphism">
-              Anchor (via withComponent)
-            </AnchorButton>
+            <AnchorButton href="#polymorphism">Anchor (via withComponent)</AnchorButton>
           </ButtonGroup>
         </DemoArea>
       </Section>
@@ -94,8 +92,7 @@ const AnchorButton = Button.withComponent('a');
         <Breadcrumb>Features</Breadcrumb>
         <SectionTitle>CSS Nesting</SectionTitle>
         <Paragraph>
-          styled-static uses native CSS nesting (supported in all modern
-          browsers). Use
+          styled-static uses native CSS nesting (supported in all modern browsers). Use
           <InlineCode>&</InlineCode> to reference the parent selector.
         </Paragraph>
         <CodeBlock>{`const Card = styled.div\`
@@ -129,15 +126,14 @@ const AnchorButton = Button.withComponent('a');
           <NestingCard>
             <h3>Nested CSS Card</h3>
             <p>
-              Hover to see box-shadow and border color change. The
-              &ldquo;hover me&rdquo; label uses a pseudo-element (::after)
-              and fades on hover.
+              Hover to see box-shadow and border color change. The &ldquo;hover me&rdquo; label uses
+              a pseudo-element (::after) and fades on hover.
             </p>
           </NestingCard>
         </DemoArea>
         <Callout type="tip" icon={<Lightbulb size={20} />}>
-          Native CSS nesting means zero build-time processing. Your CSS is
-          passed directly to the browser.
+          Native CSS nesting means zero build-time processing. Your CSS is passed directly to the
+          browser.
         </Callout>
       </Section>
 
@@ -146,8 +142,7 @@ const AnchorButton = Button.withComponent('a');
         <Breadcrumb>Features</Breadcrumb>
         <SectionTitle>Theming</SectionTitle>
         <Paragraph>
-          CSS-first theming with CSS variables and{" "}
-          <InlineCode>data-theme</InlineCode> attributes:
+          CSS-first theming with CSS variables and <InlineCode>data-theme</InlineCode> attributes:
         </Paragraph>
 
         <CodeBlock>{`const GlobalStyle = createGlobalStyle\`

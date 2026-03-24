@@ -18,7 +18,7 @@ export function Section({ className, ...props }: React.ComponentProps<"section">
       className={clsx(
         "mb-16 scroll-mt-[calc(var(--header-height)+2rem)]",
         "max-[767px]:mb-12 max-[767px]:scroll-mt-[calc(var(--mobile-header-height)+1rem)]",
-        className
+        className,
       )}
       {...props}
     />
@@ -30,7 +30,7 @@ export function Breadcrumb({ className, ...props }: React.ComponentProps<"span">
     <span
       className={clsx(
         "block text-[0.8125rem] font-medium text-[var(--color-primary)] mb-2",
-        className
+        className,
       )}
       {...props}
     />
@@ -43,7 +43,7 @@ export function SectionTitle({ className, ...props }: React.ComponentProps<"h2">
       className={clsx(
         "text-[1.625rem] font-semibold mb-5 tracking-[-0.02em] mt-0",
         "max-[767px]:text-[1.375rem]",
-        className
+        className,
       )}
       {...props}
     />
@@ -53,22 +53,14 @@ export function SectionTitle({ className, ...props }: React.ComponentProps<"h2">
 export function SubsectionTitle({ className, ...props }: React.ComponentProps<"h3">) {
   return (
     <h3
-      className={clsx(
-        "text-lg font-semibold mt-8 mb-4 text-[var(--color-text)]",
-        className
-      )}
+      className={clsx("text-lg font-semibold mt-8 mb-4 text-[var(--color-text)]", className)}
       {...props}
     />
   );
 }
 
 export function Paragraph({ className, ...props }: React.ComponentProps<"p">) {
-  return (
-    <p
-      className={clsx("mb-4 mt-0 text-[var(--color-text)]", className)}
-      {...props}
-    />
-  );
+  return <p className={clsx("mb-4 mt-0 text-[var(--color-text)]", className)} {...props} />;
 }
 
 export function InlineCode({ className, ...props }: React.ComponentProps<"code">) {
@@ -77,7 +69,7 @@ export function InlineCode({ className, ...props }: React.ComponentProps<"code">
       className={clsx(
         "px-1.5 py-0.5 text-[0.875em] font-[Fira_Code,Monaco,monospace]",
         "bg-[var(--color-border)] rounded",
-        className
+        className,
       )}
       {...props}
     />
@@ -96,7 +88,7 @@ export function DemoArea({ className, ...props }: React.ComponentProps<"div">) {
         "border border-[var(--color-border)] rounded-[var(--radius)]",
         "max-w-full overflow-x-auto",
         "max-[767px]:p-4 max-[767px]:my-4",
-        className
+        className,
       )}
       {...props}
     />
@@ -109,7 +101,7 @@ export function DemoLabel({ className, ...props }: React.ComponentProps<"div">) 
       className={clsx(
         "text-xs font-semibold text-[var(--color-text-secondary)]",
         "uppercase tracking-[0.05em] mb-4",
-        className
+        className,
       )}
       {...props}
     />
@@ -117,12 +109,7 @@ export function DemoLabel({ className, ...props }: React.ComponentProps<"div">) 
 }
 
 export function ButtonGroup({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      className={clsx("flex flex-wrap gap-2", className)}
-      {...props}
-    />
-  );
+  return <div className={clsx("flex flex-wrap gap-2", className)} {...props} />;
 }
 
 // Demo button using tv() for variants
@@ -167,12 +154,7 @@ export function Button({
   variant: "primary" | "secondary" | "ghost";
   size?: "sm" | "md" | "lg";
 } & React.ComponentProps<"button">) {
-  return (
-    <button
-      className={button({ variant, size: size || "md", className })}
-      {...props}
-    />
-  );
+  return <button className={button({ variant, size: size || "md", className })} {...props} />;
 }
 
 // Example styled components for demos
@@ -185,7 +167,7 @@ export function StyledButton({ className, ...props }: React.ComponentProps<"butt
         "bg-[var(--color-primary)] text-white",
         "border-none rounded-md cursor-pointer",
         "hover:bg-[var(--color-primary-hover)]",
-        className
+        className,
       )}
       {...props}
     />
@@ -201,7 +183,7 @@ export function ExtendedButton({ className, ...props }: React.ComponentProps<"bu
         "border-none rounded-md cursor-pointer",
         "hover:bg-[var(--color-primary-hover)]",
         "font-semibold uppercase tracking-[0.05em]",
-        className
+        className,
       )}
       {...props}
     />
@@ -213,11 +195,7 @@ export const highlightClass = "shadow-[0_0_0_3px_var(--color-primary)]";
 export function Counter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
-      className={clsx(
-        "flex items-center gap-4 text-2xl font-semibold",
-        "tabular-nums",
-        className
-      )}
+      className={clsx("flex items-center gap-4 text-2xl font-semibold", "tabular-nums", className)}
       {...props}
     />
   );
@@ -237,7 +215,7 @@ export function BigPrimaryButton({ className, ...props }: React.ComponentProps<"
         "hover:bg-[var(--color-primary-hover)]",
         "font-semibold uppercase tracking-[0.05em]",
         "text-base py-3 px-6 bg-[#2563eb] hover:bg-[#1d4ed8]",
-        className
+        className,
       )}
       {...props}
     />
@@ -257,7 +235,7 @@ export function AnchorButton({ className, ...props }: React.ComponentProps<"a">)
         "border-none rounded-md cursor-pointer",
         "hover:bg-[var(--color-primary-hover)]",
         "no-underline inline-flex items-center",
-        className
+        className,
       )}
       {...props}
     />
@@ -280,7 +258,7 @@ export function NestingCard({ className, ...props }: React.ComponentProps<"div">
         "max-[640px]:p-3",
         "[&_h3]:m-0 [&_h3]:mb-2 [&_h3]:text-base [&_h3]:font-semibold",
         "[&_p]:m-0 [&_p]:text-sm [&_p]:text-[var(--color-text-secondary)]",
-        className
+        className,
       )}
       {...props}
     />
@@ -303,7 +281,7 @@ export function PasswordInput({ className, ...props }: React.ComponentProps<"inp
         "transition-[border-color] duration-150",
         "focus:border-[var(--color-primary)]",
         "placeholder:text-[var(--color-text-muted)]",
-        className
+        className,
       )}
       {...props}
     />
@@ -321,7 +299,7 @@ export function SubmitButton({ className, ...props }: React.ComponentProps<"butt
         "border-none rounded-md cursor-pointer",
         "transition-[background] duration-200",
         "hover:bg-[#2563eb]",
-        className
+        className,
       )}
       {...props}
     />
@@ -341,7 +319,7 @@ const badgeVariants = {
 export function badgeCss({ variant }: { variant: "info" | "success" | "warning" }) {
   return clsx(
     "inline-flex items-center px-[0.625rem] py-1 rounded-full text-xs font-medium leading-[1.4]",
-    badgeVariants[variant]
+    badgeVariants[variant],
   );
 }
 
@@ -358,7 +336,7 @@ function CodeBlockWrapper({ className, ...props }: React.ComponentProps<"div">) 
       className={clsx(
         "my-6 rounded-[var(--radius-lg)] overflow-hidden",
         "border border-[#2a2a2a] bg-[var(--color-bg-code)] max-w-full",
-        className
+        className,
       )}
       {...props}
     />
@@ -371,7 +349,7 @@ function CodeBlockHeader({ className, ...props }: React.ComponentProps<"div">) {
       className={clsx(
         "flex items-center justify-between px-4",
         "bg-[#1a1a1a] border-b border-[#2a2a2a] min-h-[44px]",
-        className
+        className,
       )}
       {...props}
     />
@@ -386,17 +364,14 @@ function TabLabel({ className, ...props }: React.ComponentProps<"span">) {
         "text-[0.8125rem] font-medium text-[#e5e7eb]",
         "bg-[var(--color-bg-code)] rounded-t-lg",
         "relative top-px",
-        className
+        className,
       )}
       {...props}
     />
   );
 }
 
-function CodeBlockContent({
-  className,
-  ...props
-}: React.ComponentProps<"pre">) {
+function CodeBlockContent({ className, ...props }: React.ComponentProps<"pre">) {
   return (
     <pre
       className={clsx(
@@ -404,7 +379,7 @@ function CodeBlockContent({
         "font-[Fira_Code,Monaco,monospace] text-[0.8125rem] leading-[1.7]",
         "overflow-x-auto max-w-full",
         "max-[767px]:px-3 max-[767px]:py-4 max-[767px]:text-xs",
-        className
+        className,
       )}
       {...props}
     />
@@ -420,20 +395,14 @@ function CopyButton({ className, ...props }: React.ComponentProps<"button">) {
         "bg-transparent border border-[#3a3a3a] rounded-md cursor-pointer",
         "transition-all duration-150",
         "hover:bg-[#2a2a2a] hover:text-[#e5e7eb] hover:border-[#4a4a4a]",
-        className
+        className,
       )}
       {...props}
     />
   );
 }
 
-export function CodeBlock({
-  filename,
-  children,
-}: {
-  filename?: string;
-  children: string;
-}) {
+export function CodeBlock({ filename, children }: { filename?: string; children: string }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -482,12 +451,7 @@ const calloutVariant = tv({
 });
 
 function CalloutIcon({ className, ...props }: React.ComponentProps<"span">) {
-  return (
-    <span
-      className={clsx("text-xl shrink-0", className)}
-      {...props}
-    />
-  );
+  return <span className={clsx("text-xl shrink-0", className)} {...props} />;
 }
 
 function CalloutContent({ className, ...props }: React.ComponentProps<"div">) {

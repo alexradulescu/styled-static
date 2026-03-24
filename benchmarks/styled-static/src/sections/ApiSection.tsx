@@ -193,8 +193,7 @@ export function ApiSection() {
         <Breadcrumb>API</Breadcrumb>
         <SectionTitle>styled</SectionTitle>
         <Paragraph>
-          Create styled React components with static CSS extraction. CSS is
-          extracted at build time.
+          Create styled React components with static CSS extraction. CSS is extracted at build time.
         </Paragraph>
         <CodeBlock filename="Button.tsx">{`import { styled } from '@alex.radulescu/styled-static';
 
@@ -224,9 +223,8 @@ const Button = styled.button\`
         <Breadcrumb>API</Breadcrumb>
         <SectionTitle>Component Extension</SectionTitle>
         <Paragraph>
-          Extend existing styled components by passing them to{" "}
-          <InlineCode>styled()</InlineCode>. The new component inherits all
-          styles from the base.
+          Extend existing styled components by passing them to <InlineCode>styled()</InlineCode>.
+          The new component inherits all styles from the base.
         </Paragraph>
         <CodeBlock filename="ExtendedButton.tsx">{`const Button = styled.button\`
   padding: 0.5rem 1rem;
@@ -260,9 +258,8 @@ const BigPrimary = styled(BoldButton)\`
         <Breadcrumb>API</Breadcrumb>
         <SectionTitle>css Helper</SectionTitle>
         <Paragraph>
-          The <InlineCode>css</InlineCode> helper returns a scoped class name
-          string. Use it for conditional styles or to mix with styled
-          components.
+          The <InlineCode>css</InlineCode> helper returns a scoped class name string. Use it for
+          conditional styles or to mix with styled components.
         </Paragraph>
         <CodeBlock>{`import { css } from '@alex.radulescu/styled-static';
 
@@ -281,9 +278,7 @@ const highlightClass = css\`
               className={cx(isHighlighted && highlightClass)}
               onClick={() => setIsHighlighted(!isHighlighted)}
             >
-              {isHighlighted
-                ? "Highlighted! Click to remove"
-                : "Click to highlight"}
+              {isHighlighted ? "Highlighted! Click to remove" : "Click to highlight"}
             </StyledButton>
           </ButtonGroup>
         </DemoArea>
@@ -294,8 +289,8 @@ const highlightClass = css\`
         <Breadcrumb>API</Breadcrumb>
         <SectionTitle>cx Utility</SectionTitle>
         <Paragraph>
-          A minimal utility for conditionally joining class names. Filters out
-          falsy values automatically.
+          A minimal utility for conditionally joining class names. Filters out falsy values
+          automatically.
         </Paragraph>
         <CodeBlock>{`import { cx } from '@alex.radulescu/styled-static';
 
@@ -341,7 +336,7 @@ cx('a', null, undefined, false, 'b') // → 'a b'`}</CodeBlock>
               className={cx(
                 cxDemo.bold && boldClass,
                 cxDemo.rounded && roundedClass,
-                cxDemo.colored && coloredClass
+                cxDemo.colored && coloredClass,
               )}
             >
               Dynamic Classes
@@ -355,11 +350,9 @@ cx('a', null, undefined, false, 'b') // → 'a b'`}</CodeBlock>
         <Breadcrumb>API</Breadcrumb>
         <SectionTitle>keyframes</SectionTitle>
         <Paragraph>
-          Define keyframe animations via{" "}
-          <InlineCode>createGlobalStyle</InlineCode> and reference them by name
-          in styled components. The{" "}
-          <InlineCode>keyframes</InlineCode> helper generates a hashed name —
-          see the note below about interpolation support.
+          Define keyframe animations via <InlineCode>createGlobalStyle</InlineCode> and reference
+          them by name in styled components. The <InlineCode>keyframes</InlineCode> helper generates
+          a hashed name — see the note below about interpolation support.
         </Paragraph>
         <CodeBlock>{`import { createGlobalStyle, styled } from '@alex.radulescu/styled-static';
 
@@ -411,12 +404,10 @@ const PulsingDot = styled.div\`
         </DemoArea>
         <Callout type="warning" icon={<AlertTriangle size={20} />}>
           <InlineCode>{`\${keyframeVar}`}</InlineCode> interpolation inside{" "}
-          <InlineCode>styled</InlineCode> templates is not supported — the CSS
-          extractor captures raw source text and the variable reference would
-          end up literally in the CSS. Define named{" "}
-          <InlineCode>@keyframes</InlineCode> via{" "}
-          <InlineCode>createGlobalStyle</InlineCode> and reference them by
-          string name instead.
+          <InlineCode>styled</InlineCode> templates is not supported — the CSS extractor captures
+          raw source text and the variable reference would end up literally in the CSS. Define named{" "}
+          <InlineCode>@keyframes</InlineCode> via <InlineCode>createGlobalStyle</InlineCode> and
+          reference them by string name instead.
         </Callout>
       </Section>
 
@@ -457,23 +448,18 @@ const SubmitButton = styled.button.attrs({
           <DemoLabel>Result</DemoLabel>
           <AttrsColumn>
             <div>
-              <AttrsLabel>
-                PasswordInput (type=&quot;password&quot; via attrs)
-              </AttrsLabel>
+              <AttrsLabel>PasswordInput (type=&quot;password&quot; via attrs)</AttrsLabel>
               <PasswordInput placeholder="Enter password" />
             </div>
             <div>
-              <AttrsLabel>
-                SubmitButton (type=&quot;submit&quot;, aria-label via attrs)
-              </AttrsLabel>
+              <AttrsLabel>SubmitButton (type=&quot;submit&quot;, aria-label via attrs)</AttrsLabel>
               <SubmitButton>Submit Form</SubmitButton>
             </div>
           </AttrsColumn>
         </DemoArea>
         <Callout type="warning" icon={<AlertTriangle size={20} />}>
-          Unlike styled-components, attrs in styled-static must be static
-          objects (no functions). For dynamic attributes, use regular props on
-          your component.
+          Unlike styled-components, attrs in styled-static must be static objects (no functions).
+          For dynamic attributes, use regular props on your component.
         </Callout>
       </Section>
 
@@ -482,14 +468,13 @@ const SubmitButton = styled.button.attrs({
         <Breadcrumb>API</Breadcrumb>
         <SectionTitle>Variants API</SectionTitle>
         <Paragraph>
-          For type-safe variant handling, use{" "}
-          <InlineCode>styledVariants</InlineCode> to create components with
-          variant props, or <InlineCode>cssVariants</InlineCode> to get class
+          For type-safe variant handling, use <InlineCode>styledVariants</InlineCode> to create
+          components with variant props, or <InlineCode>cssVariants</InlineCode> to get class
           functions.
         </Paragraph>
         <Callout type="tip" icon={<Lightbulb size={20} />}>
-          Wrap CSS strings in <InlineCode>css`...`</InlineCode> to get IDE
-          syntax highlighting from the styled-components VSCode extension.
+          Wrap CSS strings in <InlineCode>css`...`</InlineCode> to get IDE syntax highlighting from
+          the styled-components VSCode extension.
         </Callout>
         <SubsectionTitle>styledVariants</SubsectionTitle>
         <CodeBlock>{`import { styledVariants, css } from '@alex.radulescu/styled-static';
@@ -555,17 +540,15 @@ const Button = styledVariants({
 
         <SubsectionTitle>Default & Compound Variants</SubsectionTitle>
         <Paragraph>
-          Use <InlineCode>defaultVariants</InlineCode> to set fallback values
-          when props are omitted. Use <InlineCode>compoundVariants</InlineCode>{" "}
-          to apply extra styles when multiple variant conditions match.
+          Use <InlineCode>defaultVariants</InlineCode> to set fallback values when props are
+          omitted. Use <InlineCode>compoundVariants</InlineCode> to apply extra styles when multiple
+          variant conditions match.
         </Paragraph>
         <DemoArea>
           <DemoLabel>Default variants (no props = primary + sm)</DemoLabel>
           <ButtonGroup>
             <VariantDemoButton>Default (primary sm)</VariantDemoButton>
-            <VariantDemoButton variant="secondary">
-              Secondary (sm default)
-            </VariantDemoButton>
+            <VariantDemoButton variant="secondary">Secondary (sm default)</VariantDemoButton>
             <VariantDemoButton size="lg">Primary (lg default)</VariantDemoButton>
           </ButtonGroup>
         </DemoArea>
@@ -621,8 +604,8 @@ const badgeCss = cssVariants({
         <Breadcrumb>API</Breadcrumb>
         <SectionTitle>Global Styles</SectionTitle>
         <Paragraph>
-          Use <InlineCode>createGlobalStyle</InlineCode> for global CSS like
-          resets, CSS variables, or base styles.
+          Use <InlineCode>createGlobalStyle</InlineCode> for global CSS like resets, CSS variables,
+          or base styles.
         </Paragraph>
         <CodeBlock>{`import { createGlobalStyle } from '@alex.radulescu/styled-static';
 
@@ -647,8 +630,7 @@ const GlobalStyle = createGlobalStyle\`
 <GlobalStyle />
 <App />`}</CodeBlock>
         <Callout type="note" icon={<Info size={20} />}>
-          The component renders nothing at runtime. All CSS is extracted and
-          injected via imports.
+          The component renders nothing at runtime. All CSS is extracted and injected via imports.
         </Callout>
         <DemoArea>
           <DemoLabel>Active on this page</DemoLabel>

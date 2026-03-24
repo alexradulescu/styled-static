@@ -11,8 +11,7 @@ import type * as ESTree from "estree";
 // Types
 // ============================================================================
 
-export interface TaggedTemplateWithPosition
-  extends ESTree.TaggedTemplateExpression {
+export interface TaggedTemplateWithPosition extends ESTree.TaggedTemplateExpression {
   start: number;
   end: number;
   quasi: TemplateLiteralWithPosition;
@@ -93,7 +92,7 @@ export interface FoundVariant {
  */
 function walkVariableDeclarations(
   ast: ESTree.Program,
-  processor: (node: ESTree.VariableDeclaration) => void
+  processor: (node: ESTree.VariableDeclaration) => void,
 ): void {
   for (const node of ast.body) {
     if (node.type === "VariableDeclaration") {
@@ -116,10 +115,7 @@ function walkVariableDeclarations(
  * Extract raw CSS content from a template literal.
  * Handles the content between the backticks.
  */
-export function extractTemplateContent(
-  code: string,
-  quasi: TemplateLiteralWithPosition
-): string {
+export function extractTemplateContent(code: string, quasi: TemplateLiteralWithPosition): string {
   return code.slice(quasi.start + 1, quasi.end - 1);
 }
 
@@ -134,7 +130,7 @@ export function extractTemplateContent(
 export function extractCssFromValueNode(
   node: ESTree.Expression,
   code: string,
-  cssImportName: string | undefined
+  cssImportName: string | undefined,
 ): string | undefined {
   if (node.type === "Literal" && typeof node.value === "string") {
     return node.value;
@@ -165,18 +161,14 @@ export function extractCssFromValueNode(
  * Find all imports from '@alex.radulescu/styled-static' and return their local names.
  * Handles aliased imports like `import { styled as s } from '@alex.radulescu/styled-static'`
  */
-export function findStyledStaticImports(
-  ast: ESTree.Program
-): StyledStaticImports {
+export function findStyledStaticImports(ast: ESTree.Program): StyledStaticImports {
   const imports: StyledStaticImports = {};
 
   for (const node of ast.body) {
     if (node.type === "ImportDeclaration") {
       const source = node.source.value as string;
       const isStyledStaticImport =
-        source === "@alex.radulescu/styled-static" ||
-        source === "./index" ||
-        source === "../index";
+        source === "@alex.radulescu/styled-static" || source === "./index" || source === "../index";
 
       if (isStyledStaticImport) {
         imports.source = source;
@@ -188,8 +180,7 @@ export function findStyledStaticImports(
 
             if (imported === "styled") imports.styled = local;
             if (imported === "css") imports.css = local;
-            if (imported === "createGlobalStyle")
-              imports.createGlobalStyle = local;
+            if (imported === "createGlobalStyle") imports.createGlobalStyle = local;
             if (imported === "keyframes") imports.keyframes = local;
             if (imported === "styledVariants") imports.styledVariants = local;
             if (imported === "cssVariants") imports.cssVariants = local;
@@ -214,16 +205,13 @@ export function findStyledStaticImports(
 export function findTaggedTemplates(
   ast: ESTree.Program,
   imports: StyledStaticImports,
-  code: string
+  code: string,
 ): FoundTemplate[] {
   const results: FoundTemplate[] = [];
 
   walkVariableDeclarations(ast, (node) => {
     for (const decl of node.declarations) {
-      if (
-        decl.init?.type === "TaggedTemplateExpression" &&
-        decl.id.type === "Identifier"
-      ) {
+      if (decl.init?.type === "TaggedTemplateExpression" && decl.id.type === "Identifier") {
         const template = decl.init as TaggedTemplateWithPosition;
         const varName = decl.id.name;
         const found = classifyTemplate(template, imports, varName, code);
@@ -242,7 +230,7 @@ function classifyTemplate(
   node: TaggedTemplateWithPosition,
   imports: StyledStaticImports,
   variableName: string,
-  code: string
+  code: string,
 ): FoundTemplate | null {
   const { tag } = node;
 
@@ -347,16 +335,13 @@ function classifyTemplate(
 export function findVariantCalls(
   ast: ESTree.Program,
   code: string,
-  imports: StyledStaticImports
+  imports: StyledStaticImports,
 ): FoundVariant[] {
   const results: FoundVariant[] = [];
 
   walkVariableDeclarations(ast, (node) => {
     for (const decl of node.declarations) {
-      if (
-        decl.init?.type === "CallExpression" &&
-        decl.id.type === "Identifier"
-      ) {
+      if (decl.init?.type === "CallExpression" && decl.id.type === "Identifier") {
         const call = decl.init as ESTree.CallExpression & {
           start: number;
           end: number;
@@ -378,7 +363,7 @@ function classifyVariantCall(
   node: ESTree.CallExpression & { start: number; end: number },
   code: string,
   imports: StyledStaticImports,
-  variableName: string
+  variableName: string,
 ): FoundVariant | null {
   if (node.callee.type !== "Identifier") return null;
 
@@ -388,10 +373,7 @@ function classifyVariantCall(
 
   if (!isStyledVariants && !isCssVariants) return null;
 
-  if (
-    node.arguments.length !== 1 ||
-    node.arguments[0]?.type !== "ObjectExpression"
-  ) {
+  if (node.arguments.length !== 1 || node.arguments[0]?.type !== "ObjectExpression") {
     return null;
   }
 
@@ -401,9 +383,7 @@ function classifyVariantCall(
   let baseCss: string | undefined;
   const variants = new Map<string, Map<string, string>>();
   let defaultVariants: Map<string, string> | undefined;
-  let compoundVariants:
-    | Array<{ conditions: Map<string, string>; css: string }>
-    | undefined;
+  let compoundVariants: Array<{ conditions: Map<string, string>; css: string }> | undefined;
 
   for (const prop of configObj.properties) {
     if (prop.type !== "Property" || prop.key.type !== "Identifier") continue;
@@ -412,10 +392,7 @@ function classifyVariantCall(
 
     // component: 'button' or component: Button
     if (propName === "component") {
-      if (
-        prop.value.type === "Literal" &&
-        typeof prop.value.value === "string"
-      ) {
+      if (prop.value.type === "Literal" && typeof prop.value.value === "string") {
         component = prop.value.value;
       } else if (prop.value.type === "Identifier") {
         component = prop.value.name;
@@ -424,38 +401,26 @@ function classifyVariantCall(
 
     // css: `...` or css: css`...`
     if (propName === "css") {
-      baseCss = extractCssFromValueNode(
-        prop.value as ESTree.Expression,
-        code,
-        imports.css
-      );
+      baseCss = extractCssFromValueNode(prop.value as ESTree.Expression, code, imports.css);
     }
 
     // variants: { color: { primary: `...` }, size: { sm: `...` } }
     if (propName === "variants" && prop.value.type === "ObjectExpression") {
       for (const variantProp of prop.value.properties) {
-        if (
-          variantProp.type !== "Property" ||
-          variantProp.key.type !== "Identifier"
-        )
-          continue;
+        if (variantProp.type !== "Property" || variantProp.key.type !== "Identifier") continue;
         if (variantProp.value.type !== "ObjectExpression") continue;
 
         const variantName = variantProp.key.name;
         const variantValues = new Map<string, string>();
 
         for (const valueProp of variantProp.value.properties) {
-          if (
-            valueProp.type !== "Property" ||
-            valueProp.key.type !== "Identifier"
-          )
-            continue;
+          if (valueProp.type !== "Property" || valueProp.key.type !== "Identifier") continue;
 
           const valueName = valueProp.key.name;
           const cssContent = extractCssFromValueNode(
             valueProp.value as ESTree.Expression,
             code,
-            imports.css
+            imports.css,
           );
 
           if (cssContent) {
@@ -470,25 +435,15 @@ function classifyVariantCall(
     }
 
     // defaultVariants: { size: 'md', intent: 'primary' }
-    if (
-      propName === "defaultVariants" &&
-      prop.value.type === "ObjectExpression"
-    ) {
+    if (propName === "defaultVariants" && prop.value.type === "ObjectExpression") {
       const defaults = new Map<string, string>();
       for (const defaultProp of prop.value.properties) {
-        if (
-          defaultProp.type !== "Property" ||
-          defaultProp.key.type !== "Identifier"
-        )
-          continue;
+        if (defaultProp.type !== "Property" || defaultProp.key.type !== "Identifier") continue;
 
         const variantName = defaultProp.key.name;
         let defaultValue: string | undefined;
 
-        if (
-          defaultProp.value.type === "Literal" &&
-          typeof defaultProp.value.value === "string"
-        ) {
+        if (defaultProp.value.type === "Literal" && typeof defaultProp.value.value === "string") {
           defaultValue = defaultProp.value.value;
         }
 
@@ -502,10 +457,7 @@ function classifyVariantCall(
     }
 
     // compoundVariants: [{ size: 'lg', intent: 'danger', css: `...` }]
-    if (
-      propName === "compoundVariants" &&
-      prop.value.type === "ArrayExpression"
-    ) {
+    if (propName === "compoundVariants" && prop.value.type === "ArrayExpression") {
       const compounds: Array<{
         conditions: Map<string, string>;
         css: string;
@@ -518,8 +470,7 @@ function classifyVariantCall(
         let cssContent: string | undefined;
 
         for (const cvProp of element.properties) {
-          if (cvProp.type !== "Property" || cvProp.key.type !== "Identifier")
-            continue;
+          if (cvProp.type !== "Property" || cvProp.key.type !== "Identifier") continue;
 
           const key = cvProp.key.name;
 
@@ -527,13 +478,10 @@ function classifyVariantCall(
             cssContent = extractCssFromValueNode(
               cvProp.value as ESTree.Expression,
               code,
-              imports.css
+              imports.css,
             );
           } else {
-            if (
-              cvProp.value.type === "Literal" &&
-              typeof cvProp.value.value === "string"
-            ) {
+            if (cvProp.value.type === "Literal" && typeof cvProp.value.value === "string") {
               conditions.set(key, cvProp.value.value);
             }
           }
@@ -579,16 +527,13 @@ function classifyVariantCall(
  */
 export function findWithComponentCalls(
   ast: ESTree.Program,
-  imports: StyledStaticImports
+  imports: StyledStaticImports,
 ): FoundWithComponent[] {
   const results: FoundWithComponent[] = [];
 
   walkVariableDeclarations(ast, (node) => {
     for (const decl of node.declarations) {
-      if (
-        decl.init?.type === "CallExpression" &&
-        decl.id.type === "Identifier"
-      ) {
+      if (decl.init?.type === "CallExpression" && decl.id.type === "Identifier") {
         const call = decl.init as ESTree.CallExpression & {
           start: number;
           end: number;

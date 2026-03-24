@@ -39,6 +39,7 @@ bun test --coverage 2>/dev/null || bun test
 ```
 
 Read these files:
+
 - `src/runtime/index.ts` - Check runtime size
 - `src/vite.ts` - Check security patterns
 - `tsconfig.json` - Check TypeScript strictness settings
@@ -53,28 +54,34 @@ Read these files:
 ### 3. Analyze Each Area
 
 #### Size Analysis
+
 - Runtime size (minified, brotli)
 - Per-component overhead (measure generated code)
 - Compare with previous
 
 #### React Rendering
+
 - Check component generation pattern in `src/vite.ts`
 - Verify no context usage (grep for useContext, createContext)
 - Verify props spreading pattern
 - Check for any new rerender triggers
 
 #### Security
+
 - Check `isValidIdentifier` function exists
 - Check `safeStringLiteral` function exists
 - Verify no dynamic class name construction in variant generation
 - Check debug mode is opt-in only
 
 #### Test Coverage
+
 - Run tests and capture coverage percentage
 - Note any uncovered files or functions
 
 #### TypeScript Strictness
+
 Check `tsconfig.json` for:
+
 - `strict: true`
 - `noUncheckedIndexedAccess`
 - `exactOptionalPropertyTypes`
@@ -96,14 +103,14 @@ One sentence. No adjectives. Just the functional state.
 
 ## Metrics
 
-| Metric | Current | Previous | Delta |
-|--------|---------|----------|-------|
-| Runtime (minified) | XX B | XX B | +/-X B |
-| Runtime (brotli) | XX B | XX B | +/-X B |
-| Per-component | ~XXX B | ~XXX B | +/-X B |
-| Test coverage | XX% | XX% | +/-X% |
-| TypeScript strict | Yes/No | Yes/No | - |
-| Dependencies (runtime) | X | X | - |
+| Metric                 | Current | Previous | Delta  |
+| ---------------------- | ------- | -------- | ------ |
+| Runtime (minified)     | XX B    | XX B     | +/-X B |
+| Runtime (brotli)       | XX B    | XX B     | +/-X B |
+| Per-component          | ~XXX B  | ~XXX B   | +/-X B |
+| Test coverage          | XX%     | XX%      | +/-X%  |
+| TypeScript strict      | Yes/No  | Yes/No   | -      |
+| Dependencies (runtime) | X       | X        | -      |
 
 ## Size
 
@@ -159,14 +166,14 @@ Library maintains minimal runtime with no regressions.
 
 ## Metrics
 
-| Metric | Current | Previous | Delta |
-|--------|---------|----------|-------|
-| Runtime (minified) | 45 B | 45 B | - |
-| Runtime (brotli) | 50 B | 50 B | - |
-| Per-component | ~120 B | ~120 B | - |
-| Test coverage | 94% | 92% | +2% |
-| TypeScript strict | Yes | Yes | - |
-| Dependencies (runtime) | 0 | 0 | - |
+| Metric                 | Current | Previous | Delta |
+| ---------------------- | ------- | -------- | ----- |
+| Runtime (minified)     | 45 B    | 45 B     | -     |
+| Runtime (brotli)       | 50 B    | 50 B     | -     |
+| Per-component          | ~120 B  | ~120 B   | -     |
+| Test coverage          | 94%     | 92%      | +2%   |
+| TypeScript strict      | Yes     | Yes      | -     |
+| Dependencies (runtime) | 0       | 0        | -     |
 
 ## Size
 

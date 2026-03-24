@@ -288,7 +288,7 @@ export const AnchorButton = Object.assign(
       </>
     );
   },
-  { className: _anchorBtnClass }
+  { className: _anchorBtnClass },
 );
 
 export const highlightCss = css({
@@ -549,13 +549,7 @@ const CopyButton = styled("button", {
   },
 });
 
-export function CodeBlock({
-  filename,
-  children,
-}: {
-  filename?: string;
-  children: string;
-}) {
+export function CodeBlock({ filename, children }: { filename?: string; children: string }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {

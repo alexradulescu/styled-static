@@ -31,28 +31,38 @@ example/        # Working demo app
 
 ```tsx
 // Style elements
-const Button = styled.button`padding: 1rem;`;
+const Button = styled.button`
+  padding: 1rem;
+`;
 
 // Extend components (multi-level works too)
-const Primary = styled(Button)`background: blue;`;
-const BigPrimary = styled(Primary)`font-size: 2rem;`;
+const Primary = styled(Button)`
+  background: blue;
+`;
+const BigPrimary = styled(Primary)`
+  font-size: 2rem;
+`;
 
 // Access className for manual composition
-<a className={Button.className} href="/link">Link with button styles</a>
+<a className={Button.className} href="/link">
+  Link with button styles
+</a>;
 
 // Get class string
-const active = css`outline: 2px solid;`;
+const active = css`
+  outline: 2px solid;
+`;
 
 // Global styles
 const GlobalStyle = createGlobalStyle`* { box-sizing: border-box; }`;
 
 // Polymorphism via withComponent (replaces 'as' prop)
-import { Link } from 'react-router-dom';
+import { Link } from "react-router-dom";
 const LinkButton = withComponent(Link, Button);
-<LinkButton to="/path">Router link styled as button</LinkButton>
+<LinkButton to="/path">Router link styled as button</LinkButton>;
 
 // Default attributes
-const PasswordInput = styled.input.attrs({ type: 'password' })`...`;
+const PasswordInput = styled.input.attrs({ type: "password" })`...`;
 ```
 
 ## Key Design Decisions
@@ -94,8 +104,8 @@ import { m } from "@alex.radulescu/styled-static/runtime";
 import "@alex.radulescu/styled-static:abc123-0.css";
 
 const Button = Object.assign(
-  (p) => createElement("button", {...p, className: m("ss-abc123", p.className)}),
-  { className: "ss-abc123" }
+  (p) => createElement("button", { ...p, className: m("ss-abc123", p.className) }),
+  { className: "ss-abc123" },
 );
 ```
 
@@ -105,17 +115,21 @@ The CSS is extracted to a virtual module. The styled component becomes an inline
 
 ```tsx
 // Input
-const Button = styled.button`padding: 1rem;`;
-const Primary = styled(Button)`background: blue;`;
+const Button = styled.button`
+  padding: 1rem;
+`;
+const Primary = styled(Button)`
+  background: blue;
+`;
 
 // Output
 const Button = Object.assign(
-  (p) => createElement("button", {...p, className: m("ss-btn", p.className)}),
-  { className: "ss-btn" }
+  (p) => createElement("button", { ...p, className: m("ss-btn", p.className) }),
+  { className: "ss-btn" },
 );
 const Primary = Object.assign(
-  (p) => createElement(Button, {...p, className: m("ss-primary", p.className)}),
-  { className: Button.className + " ss-primary" }  // "ss-btn ss-primary"
+  (p) => createElement(Button, { ...p, className: m("ss-primary", p.className) }),
+  { className: Button.className + " ss-primary" }, // "ss-btn ss-primary"
 );
 ```
 
@@ -123,8 +137,8 @@ const Primary = Object.assign(
 
 The runtime is minimal - just a className merge function:
 
-| Module | Minified | Brotli |
-|--------|----------|--------|
+| Module             | Minified | Brotli   |
+| ------------------ | -------- | -------- |
 | `runtime/index.ts` | **45 B** | **50 B** |
 
 This is a 98% reduction from the previous 3.4 KB runtime.
@@ -136,18 +150,20 @@ We use `Object.assign` to create inline component functions with static properti
 ```tsx
 // This creates a valid React component with a .className property
 const Button = Object.assign(
-  (p) => createElement("button", {...p, className: m("ss-btn", p.className)}),
-  { className: "ss-btn" }
+  (p) => createElement("button", { ...p, className: m("ss-btn", p.className) }),
+  { className: "ss-btn" },
 );
 ```
 
 **Why this works:**
+
 1. **Functions are objects** - In JavaScript, functions can have properties
 2. **React components are functions** - A function returning JSX is a valid React component
 3. **Object.assign returns the first argument** - The function itself, now with `.className` attached
 4. **Single expression** - Easy to generate via AST replacement (no multi-statement blocks)
 
 **Caveats:**
+
 - `React.memo(Button)` won't copy static properties - use `Object.assign(memo(Button), { className: Button.className })`
 - Works perfectly with React Compiler (it only cares that it's a function)
 

@@ -4,7 +4,14 @@
  */
 import { type ReactNode, useState } from "react";
 import { AlertTriangle, Check, Copy, Info, Lightbulb } from "lucide-react";
-import { css, cssVariants, cx, styled, styledVariants, withComponent } from "@alex.radulescu/styled-static";
+import {
+  css,
+  cssVariants,
+  cx,
+  styled,
+  styledVariants,
+  withComponent,
+} from "@alex.radulescu/styled-static";
 import { highlight } from "sugar-high";
 
 // =============================================================================
@@ -438,13 +445,7 @@ const CopyButton = styled.button`
   }
 `;
 
-export function CodeBlock({
-  filename,
-  children,
-}: {
-  filename?: string;
-  children: string;
-}) {
+export function CodeBlock({ filename, children }: { filename?: string; children: string }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {

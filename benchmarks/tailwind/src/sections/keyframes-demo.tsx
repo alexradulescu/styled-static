@@ -15,7 +15,7 @@ export function Spinner({ className, ...props }: React.ComponentProps<"div">) {
       className={clsx(
         "w-6 h-6 border-[3px] border-[var(--color-primary)] border-t-transparent rounded-full",
         "animate-ss-spin",
-        className
+        className,
       )}
       {...props}
     />
@@ -25,10 +25,7 @@ export function Spinner({ className, ...props }: React.ComponentProps<"div">) {
 export function PulsingDot({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
-      className={clsx(
-        "w-3 h-3 bg-[var(--color-primary)] rounded-full animate-ss-pulse",
-        className
-      )}
+      className={clsx("w-3 h-3 bg-[var(--color-primary)] rounded-full animate-ss-pulse", className)}
       {...props}
     />
   );

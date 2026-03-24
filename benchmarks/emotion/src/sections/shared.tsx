@@ -179,11 +179,7 @@ export function Button({
 } & Omit<React.ComponentProps<"button">, "size">) {
   return (
     <ButtonBase
-      className={cx(
-        variantStyles[variant],
-        sizeStyles[size || "md"],
-        className
-      )}
+      className={cx(variantStyles[variant], sizeStyles[size || "md"], className)}
       {...props}
     />
   );
@@ -255,17 +251,8 @@ const passwordInputCss = css`
   }
 `;
 
-export function PasswordInput({
-  className,
-  ...props
-}: React.ComponentProps<"input">) {
-  return (
-    <input
-      type="password"
-      className={cx(passwordInputCss, className)}
-      {...props}
-    />
-  );
+export function PasswordInput({ className, ...props }: React.ComponentProps<"input">) {
+  return <input type="password" className={cx(passwordInputCss, className)} {...props} />;
 }
 
 const submitButtonCss = css`
@@ -285,11 +272,7 @@ const submitButtonCss = css`
   }
 `;
 
-export function SubmitButton({
-  className,
-  children,
-  ...props
-}: React.ComponentProps<"button">) {
+export function SubmitButton({ className, children, ...props }: React.ComponentProps<"button">) {
   return (
     <button
       type="submit"
@@ -493,13 +476,7 @@ const CopyButton = styled.button`
   }
 `;
 
-export function CodeBlock({
-  filename,
-  children,
-}: {
-  filename?: string;
-  children: string;
-}) {
+export function CodeBlock({ filename, children }: { filename?: string; children: string }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {

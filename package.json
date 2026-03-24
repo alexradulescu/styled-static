@@ -1,12 +1,26 @@
 {
   "name": "@alex.radulescu/styled-static",
-  "version": "0.15.0",
-  "description": "Near-zero-runtime styled components for React 19+ with Vite. CSS extracted at build time, minimal runtime.",
-  "type": "module",
+  "version": "0.16.0",
   "private": false,
-  "publishConfig": {
-    "access": "public"
+  "description": "Near-zero-runtime styled components for React 19+ with Vite. CSS extracted at build time, minimal runtime.",
+  "keywords": [
+    "css-in-js",
+    "react",
+    "static-css",
+    "styled-components",
+    "vite",
+    "zero-runtime"
+  ],
+  "license": "MIT",
+  "author": "Alex Radulescu",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alexradulescu/styled-static"
   },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -24,9 +38,9 @@
       "import": "./dist/runtime/index.js"
     }
   },
-  "files": [
-    "dist"
-  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json && bun run build:minify && bun run build:sizes",
     "build:minify": "bun scripts/minify.ts",
@@ -35,45 +49,33 @@
     "dev:watch": "tsc --watch",
     "test": "printf '\\033[33m⚠️  [1/2] Node tests (theme.ts coverage intentionally low — browser paths covered in run 2)\\033[0m\\n' && bun test --coverage --only-failures src/vite.test.ts src/index.test.ts src/theme.test.ts && printf '\\033[32m✓ [2/2] Browser tests (theme.ts expected 100%%)\\033[0m\\n' && bun test --coverage --only-failures --preload ./src/setup-dom.ts ./src/theme.browser.test.ts",
     "test:watch": "bun test --watch",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "lint": "oxlint src",
+    "lint:fix": "oxlint --fix src",
     "prepublishOnly": "npm run build"
-  },
-  "engines": {
-    "bun": ">=1.3.8"
-  },
-  "peerDependencies": {
-    "vite": "^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0",
-    "react": "^19.0.0"
   },
   "dependencies": {},
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.8.7",
-    "@trivago/prettier-plugin-sort-imports": "^6.0.2",
     "@types/node": "^25.5.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "acorn": "^8.16.0",
     "magic-string": "^0.30.21",
-    "prettier": "^3.8.1",
+    "oxfmt": "^0.42.0",
+    "oxlint": "^1.57.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "typescript": "^6.0.2",
     "vite": "^8.0.2"
   },
-  "keywords": [
-    "styled-components",
-    "css-in-js",
-    "vite",
-    "react",
-    "zero-runtime",
-    "static-css"
-  ],
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/alexradulescu/styled-static"
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "vite": "^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0"
   },
-  "author": "Alex Radulescu"
+  "engines": {
+    "bun": ">=1.3.8"
+  }
 }

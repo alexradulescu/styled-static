@@ -37,7 +37,7 @@ function createMockContext() {
 async function transform(
   plugin: Plugin,
   code: string,
-  id: string
+  id: string,
 ): Promise<{ code: string; map: any } | null> {
   const ctx = createMockContext();
   const transformFn = plugin.transform as Function;
@@ -104,11 +104,7 @@ describe("file filtering", () => {
   it("should skip node_modules", async () => {
     const code = `import { styled } from '@alex.radulescu/styled-static';
 const Button = styled.button\`padding: 1rem;\`;`;
-    const result = await transform(
-      plugin,
-      code,
-      "/node_modules/some-pkg/index.tsx"
-    );
+    const result = await transform(plugin, code, "/node_modules/some-pkg/index.tsx");
     expect(result).toBeNull();
   });
 
@@ -219,10 +215,7 @@ const Link = styled.a\`color: blue;\`;`;
     expect(result?.code).toContain('createElement("a"');
 
     // Should have 3 CSS imports
-    const cssImportCount = countMatches(
-      result?.code ?? "",
-      /import "virtual:styled-static\//g
-    );
+    const cssImportCount = countMatches(result?.code ?? "", /import "virtual:styled-static\//g);
     expect(cssImportCount).toBe(3);
   });
 
@@ -474,10 +467,7 @@ const hoverClass = css\`transform: scale(1.1);\`;
 const disabledClass = css\`opacity: 0.5;\`;`;
     const result = await transform(plugin, code, "/test.tsx");
 
-    const cssImportCount = countMatches(
-      result?.code ?? "",
-      /import "virtual:styled-static\//g
-    );
+    const cssImportCount = countMatches(result?.code ?? "", /import "virtual:styled-static\//g);
     expect(cssImportCount).toBe(3);
   });
 
@@ -612,10 +602,7 @@ const slideIn = keyframes\`from { transform: translateX(-100%); } to { transform
     const result = await transform(plugin, code, "/test.tsx");
 
     // Should have 3 CSS imports
-    const cssImportCount = countMatches(
-      result?.code ?? "",
-      /import "virtual:styled-static\//g
-    );
+    const cssImportCount = countMatches(result?.code ?? "", /import "virtual:styled-static\//g);
     expect(cssImportCount).toBe(3);
   });
 });
@@ -1284,9 +1271,7 @@ const text = "styled.button is great";
 const Button = styled.button\`padding: 1rem;\`;`;
     const result = await transform(plugin, code, "/test.tsx");
 
-    expect(result?.code).toContain(
-      "const config = { styled: { button: true } }"
-    );
+    expect(result?.code).toContain("const config = { styled: { button: true } }");
     expect(result?.code).toContain('const text = "styled.button is great"');
     expect(result?.code).toContain('createElement("button"');
 
@@ -1703,7 +1688,7 @@ const Button = styled.button\`padding: 1rem;\`;`;
 
     // Check that no styled-static logs were made
     const styledStaticLogs = consoleSpy.mock.calls.filter((call) =>
-      String(call[0]).includes("[styled-static]")
+      String(call[0]).includes("[styled-static]"),
     );
 
     expect(styledStaticLogs.length).toBe(0);
@@ -1726,7 +1711,7 @@ const Button = styled.button\`padding: 1rem;\`;`;
 
     // Check that styled-static logs were made
     const styledStaticLogs = consoleSpy.mock.calls.filter((call) =>
-      String(call[0]).includes("[styled-static]")
+      String(call[0]).includes("[styled-static]"),
     );
 
     expect(styledStaticLogs.length).toBeGreaterThan(0);
@@ -1831,9 +1816,7 @@ describe("cx utility", () => {
     const isActive = true;
     const isDisabled = false;
 
-    expect(cx("base", isActive && "active", isDisabled && "disabled")).toBe(
-      "base active"
-    );
+    expect(cx("base", isActive && "active", isDisabled && "disabled")).toBe("base active");
   });
 
   it("should handle all falsy values", async () => {
@@ -2150,12 +2133,10 @@ const Button = styled.button\`padding: 1rem;\`;`;
       expect.objectContaining({
         type: "asset",
         fileName: "components/Button.css",
-      })
+      }),
     );
     // The chunk code should be rewritten to have relative CSS import
-    expect(mockBundle["components/Button.js"].code).toContain(
-      'import "./Button.css"'
-    );
+    expect(mockBundle["components/Button.js"].code).toContain('import "./Button.css"');
   });
 
   it("should skip chunks with no CSS", async () => {
@@ -2364,7 +2345,7 @@ const Button = styled.button\`padding: 1rem;\`;`;
 
     expect(consoleSpy).toHaveBeenCalledWith(
       expect.stringContaining("[styled-static]"),
-      expect.anything()
+      expect.anything(),
     );
     consoleSpy.mockRestore();
   });
@@ -2382,9 +2363,7 @@ const cls = cx("a", "b");`;
     // Should return null since cx doesn't need transformation
     expect(result).toBeNull();
     // Should have logged that no imports were found
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "[styled-static] No imports found, skipping"
-    );
+    expect(consoleSpy).toHaveBeenCalledWith("[styled-static] No imports found, skipping");
     consoleSpy.mockRestore();
   });
 
@@ -2399,10 +2378,7 @@ const ??? = invalid syntax here;`;
     const result = await transform(plugin, code, "/src/BadFile.tsx");
     expect(result).toBeNull();
 
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "[styled-static] AST parse error:",
-      expect.anything()
-    );
+    expect(consoleSpy).toHaveBeenCalledWith("[styled-static] AST parse error:", expect.anything());
     consoleSpy.mockRestore();
   });
 
@@ -2412,7 +2388,7 @@ const ??? = invalid syntax here;`;
     (plugin.configResolved as Function)?.({ command: "build", build: {} });
 
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[styled-static] CSS output mode:")
+      expect.stringContaining("[styled-static] CSS output mode:"),
     );
     consoleSpy.mockRestore();
   });
@@ -2428,16 +2404,20 @@ const Button = styled.button\`padding: 1rem;\`;`;
 
     const emitFile = mock();
     const generateBundle = plugin.generateBundle as Function;
-    generateBundle.call({ emitFile }, {}, {
-      "comp/Dbg.js": {
-        type: "chunk",
-        moduleIds: ["/src/comp/Dbg.tsx"],
-        code: 'import "virtual:styled-static/something";',
+    generateBundle.call(
+      { emitFile },
+      {},
+      {
+        "comp/Dbg.js": {
+          type: "chunk",
+          moduleIds: ["/src/comp/Dbg.tsx"],
+          code: 'import "virtual:styled-static/something";',
+        },
       },
-    });
+    );
 
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[styled-static] Emitted CSS file:")
+      expect.stringContaining("[styled-static] Emitted CSS file:"),
     );
     consoleSpy.mockRestore();
   });
@@ -2913,9 +2893,7 @@ describe("debug mode no-templates log (vite.ts:336)", () => {
 export { styled };`;
     const result = await transform(plugin, code, "/src/ReExport.tsx");
     expect(result).toBeNull();
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("No templates")
-    );
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("No templates"));
     consoleSpy.mockRestore();
   });
 });

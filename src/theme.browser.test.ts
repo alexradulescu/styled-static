@@ -9,12 +9,7 @@
  * Run with: bun test --preload ./src/setup-dom.ts src/theme.browser.test.ts
  */
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
-import {
-  getTheme,
-  initTheme,
-  onSystemThemeChange,
-  setTheme,
-} from "./theme";
+import { getTheme, initTheme, onSystemThemeChange, setTheme } from "./theme";
 
 // Mirror of vi.stubGlobal: uses Object.defineProperty to override read-only globals
 function stubGlobal(name: string, value: unknown) {

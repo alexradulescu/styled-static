@@ -382,9 +382,7 @@ function walk(node: Node, callback: (node: Node) => void) {
     const child = (node as any)[key];
     if (child && typeof child === "object") {
       if (Array.isArray(child)) {
-        child.forEach(
-          (c) => c && typeof c.type === "string" && walk(c, callback)
-        );
+        child.forEach((c) => c && typeof c.type === "string" && walk(c, callback));
       } else if (typeof child.type === "string") {
         walk(child, callback);
       }

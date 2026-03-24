@@ -25,17 +25,17 @@ import { KeyframeStyles } from "./sections/keyframes-demo";
 
 // Lazy-loaded sections for code splitting
 const ApiSection = lazy(() =>
-  import("./sections/ApiSection").then((m) => ({ default: m.ApiSection }))
+  import("./sections/ApiSection").then((m) => ({ default: m.ApiSection })),
 );
 const FeaturesSection = lazy(() =>
   import("./sections/FeaturesSection").then((m) => ({
     default: m.FeaturesSection,
-  }))
+  })),
 );
 const HowItWorksSection = lazy(() =>
   import("./sections/HowItWorksSection").then((m) => ({
     default: m.HowItWorksSection,
-  }))
+  })),
 );
 
 // =============================================================================
@@ -354,7 +354,8 @@ const heroBannerStyle = css({
     left: 0,
     right: 0,
     bottom: 0,
-    background: "linear-gradient(135deg, transparent 40%, rgba(16, 185, 129, 0.08) 40%, rgba(16, 185, 129, 0.08) 60%, transparent 60%), linear-gradient(225deg, transparent 30%, rgba(16, 185, 129, 0.05) 30%, rgba(16, 185, 129, 0.05) 50%, transparent 50%)",
+    background:
+      "linear-gradient(135deg, transparent 40%, rgba(16, 185, 129, 0.08) 40%, rgba(16, 185, 129, 0.08) 60%, transparent 60%), linear-gradient(225deg, transparent 30%, rgba(16, 185, 129, 0.05) 30%, rgba(16, 185, 129, 0.05) 50%, transparent 50%)",
   },
   "&::after": {
     content: '""',
@@ -363,7 +364,8 @@ const heroBannerStyle = css({
     right: "10%",
     width: "200px",
     height: "200px",
-    background: "linear-gradient(45deg, transparent 45%, rgba(16, 185, 129, 0.12) 45%, rgba(16, 185, 129, 0.12) 55%, transparent 55%)",
+    background:
+      "linear-gradient(45deg, transparent 45%, rgba(16, 185, 129, 0.12) 45%, rgba(16, 185, 129, 0.12) 55%, transparent 55%)",
     transform: "rotate(15deg)",
   },
   "@media (max-width: 767px)": {
@@ -618,7 +620,16 @@ const sections: SectionInfo[] = [
     id: "comparison",
     title: "Library Comparison",
     group: "Internals",
-    keywords: ["comparison", "bundle", "size", "emotion", "linaria", "panda", "css-in-js", "alternatives"],
+    keywords: [
+      "comparison",
+      "bundle",
+      "size",
+      "emotion",
+      "linaria",
+      "panda",
+      "css-in-js",
+      "alternatives",
+    ],
   },
 ];
 
@@ -682,7 +693,7 @@ export function App() {
           }
         });
       },
-      { rootMargin: "-20% 0px -70% 0px" }
+      { rootMargin: "-20% 0px -70% 0px" },
     );
 
     const observeSections = () => {
@@ -717,9 +728,7 @@ export function App() {
     ? sections.filter(
         (s) =>
           s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          s.keywords.some((k) =>
-            k.toLowerCase().includes(searchQuery.toLowerCase())
-          )
+          s.keywords.some((k) => k.toLowerCase().includes(searchQuery.toLowerCase())),
       )
     : sections;
 
@@ -731,114 +740,114 @@ export function App() {
       acc[group].push(section);
       return acc;
     },
-    {} as Record<string, SectionInfo[]>
+    {} as Record<string, SectionInfo[]>,
   );
 
   const closeSidebar = () => setSidebarOpen(false);
 
   return (
     <>
-    <KeyframeStyles />
-    <div className={layoutStyle}>
-      <header className={mobileHeaderStyle}>
-        <span className={headerTitleStyle}>styled-static</span>
-        <button
-          className={burgerButtonStyle}
-          onClick={() => setSidebarOpen((prev) => !prev)}
-          aria-label="Toggle menu"
-        >
-          <span />
-          <span />
-        </button>
-      </header>
-      <div className={overlayStyle} data-visible={sidebarOpen} onClick={closeSidebar} />
-      <aside className={sidebarStyle} data-open={sidebarOpen}>
-        <div className={sidebarHeaderStyle}>
-          <a href="#" className={logoStyle}>
-            <Palette size={24} />
-            styled-static
-          </a>
-          <div className={searchInputStyle}>
-            <span className={searchIconStyle}>
-              <Search size={16} />
-            </span>
-            <input
-              ref={searchInputRef}
-              className={searchFieldStyle}
-              type="text"
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            <span className={searchHintStyle}>&#x2318;K</span>
-          </div>
-        </div>
-
-        <nav className={navSectionStyle}>
-          {Object.entries(groupedSections).map(([group, items]) => (
-            <div key={group} className={navGroupStyle}>
-              <div className={navGroupTitleStyle}>
-                {group === "Getting Started" && <Rocket size={12} />}
-                {group === "API" && <Code2 size={12} />}
-                {group === "Features" && <Sparkles size={12} />}
-                {group}
-              </div>
-              {items.map((item) => (
-                <a
-                  key={item.id}
-                  href={`#${item.id}`}
-                  className={cx(navItemStyle, activeSection === item.id && activeNavItemStyle)}
-                  onClick={() => {
-                    setSearchQuery("");
-                    closeSidebar();
-                  }}
-                >
-                  {item.title}
-                </a>
-              ))}
-            </div>
-          ))}
-        </nav>
-
-        <div className={sidebarFooterStyle}>
-          <button className={themeToggleStyle} onClick={toggleTheme} aria-label="Toggle theme">
-            {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
-          </button>
-          <a
-            href="https://github.com/alexradulescu/styled-static"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="GitHub repository"
-            className={iconLinkStyle}
+      <KeyframeStyles />
+      <div className={layoutStyle}>
+        <header className={mobileHeaderStyle}>
+          <span className={headerTitleStyle}>styled-static</span>
+          <button
+            className={burgerButtonStyle}
+            onClick={() => setSidebarOpen((prev) => !prev)}
+            aria-label="Toggle menu"
           >
-            <Github size={18} />
-          </a>
-        </div>
-      </aside>
+            <span />
+            <span />
+          </button>
+        </header>
+        <div className={overlayStyle} data-visible={sidebarOpen} onClick={closeSidebar} />
+        <aside className={sidebarStyle} data-open={sidebarOpen}>
+          <div className={sidebarHeaderStyle}>
+            <a href="#" className={logoStyle}>
+              <Palette size={24} />
+              styled-static
+            </a>
+            <div className={searchInputStyle}>
+              <span className={searchIconStyle}>
+                <Search size={16} />
+              </span>
+              <input
+                ref={searchInputRef}
+                className={searchFieldStyle}
+                type="text"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <span className={searchHintStyle}>&#x2318;K</span>
+            </div>
+          </div>
 
-      <main className={mainStyle}>
-        <div className={contentStyle}>
-          {/* Hero */}
-          <h1 className={pageTitleStyle}>styled-static</h1>
-          <p className={pageSubtitleStyle}>
-            Near-zero-runtime CSS-in-JS for React 19+ with Vite. Write
-            styled-components syntax, get static CSS extracted at build time.
-          </p>
-          <div className={heroBannerStyle} />
+          <nav className={navSectionStyle}>
+            {Object.entries(groupedSections).map(([group, items]) => (
+              <div key={group} className={navGroupStyle}>
+                <div className={navGroupTitleStyle}>
+                  {group === "Getting Started" && <Rocket size={12} />}
+                  {group === "API" && <Code2 size={12} />}
+                  {group === "Features" && <Sparkles size={12} />}
+                  {group}
+                </div>
+                {items.map((item) => (
+                  <a
+                    key={item.id}
+                    href={`#${item.id}`}
+                    className={cx(navItemStyle, activeSection === item.id && activeNavItemStyle)}
+                    onClick={() => {
+                      setSearchQuery("");
+                      closeSidebar();
+                    }}
+                  >
+                    {item.title}
+                  </a>
+                ))}
+              </div>
+            ))}
+          </nav>
 
-          {/* ========================================== */}
-          {/* GETTING STARTED - Inline (not lazy loaded) */}
-          {/* ========================================== */}
+          <div className={sidebarFooterStyle}>
+            <button className={themeToggleStyle} onClick={toggleTheme} aria-label="Toggle theme">
+              {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
+            <a
+              href="https://github.com/alexradulescu/styled-static"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="GitHub repository"
+              className={iconLinkStyle}
+            >
+              <Github size={18} />
+            </a>
+          </div>
+        </aside>
 
-          {/* Quick Overview */}
-          <section id="quick-overview" className={sectionStyle}>
-            <span className={breadcrumbStyle}>Getting Started</span>
-            <h2 className={sectionTitleStyle}>Quick Overview</h2>
-            <p className={paragraphStyle}>
-              All the APIs you need at a glance. styled-static provides 10
-              core functions that cover most CSS-in-JS use cases:
+        <main className={mainStyle}>
+          <div className={contentStyle}>
+            {/* Hero */}
+            <h1 className={pageTitleStyle}>styled-static</h1>
+            <p className={pageSubtitleStyle}>
+              Near-zero-runtime CSS-in-JS for React 19+ with Vite. Write styled-components syntax,
+              get static CSS extracted at build time.
             </p>
-            <CodeBlock>{`// Style elements
+            <div className={heroBannerStyle} />
+
+            {/* ========================================== */}
+            {/* GETTING STARTED - Inline (not lazy loaded) */}
+            {/* ========================================== */}
+
+            {/* Quick Overview */}
+            <section id="quick-overview" className={sectionStyle}>
+              <span className={breadcrumbStyle}>Getting Started</span>
+              <h2 className={sectionTitleStyle}>Quick Overview</h2>
+              <p className={paragraphStyle}>
+                All the APIs you need at a glance. styled-static provides 10 core functions that
+                cover most CSS-in-JS use cases:
+              </p>
+              <CodeBlock>{`// Style elements
 const Button = styled.button\`padding: 0.5rem 1rem;\`;
 
 // Extend components
@@ -875,150 +884,147 @@ const Input = styled.input.attrs({ type: 'password' })\`padding: 0.5rem;\`;
 
 // Polymorphism
 const LinkButton = withComponent(Link, Button);`}</CodeBlock>
-          </section>
+            </section>
 
-          {/* Why styled-static? */}
-          <section id="why" className={sectionStyle}>
-            <span className={breadcrumbStyle}>Getting Started</span>
-            <h2 className={sectionTitleStyle}>Why styled-static?</h2>
+            {/* Why styled-static? */}
+            <section id="why" className={sectionStyle}>
+              <span className={breadcrumbStyle}>Getting Started</span>
+              <h2 className={sectionTitleStyle}>Why styled-static?</h2>
 
-            <div className={calloutVariants({ type: "tip" })}>
-              <span className={calloutIconStyle}>
-                <Globe size={20} />
-              </span>
-              <div className={calloutContentStyle}>
-                <strong>CSS evolved.</strong> Native nesting, CSS variables,
-                container queries—the gap between CSS and CSS-in-JS is smaller
-                than ever.
+              <div className={calloutVariants({ type: "tip" })}>
+                <span className={calloutIconStyle}>
+                  <Globe size={20} />
+                </span>
+                <div className={calloutContentStyle}>
+                  <strong>CSS evolved.</strong> Native nesting, CSS variables, container queries—the
+                  gap between CSS and CSS-in-JS is smaller than ever.
+                </div>
               </div>
-            </div>
 
-            <div className={calloutVariants({ type: "note" })}>
-              <span className={calloutIconStyle}>
-                <HeartCrack size={20} />
-              </span>
-              <div className={calloutContentStyle}>
-                <strong>CSS-in-JS fatigue.</strong> Most libraries are
-                obsolete, complex, or have large runtime overhead.
+              <div className={calloutVariants({ type: "note" })}>
+                <span className={calloutIconStyle}>
+                  <HeartCrack size={20} />
+                </span>
+                <div className={calloutContentStyle}>
+                  <strong>CSS-in-JS fatigue.</strong> Most libraries are obsolete, complex, or have
+                  large runtime overhead.
+                </div>
               </div>
-            </div>
 
-            <div className={calloutVariants({ type: "tip" })}>
-              <span className={calloutIconStyle}>
-                <Sparkles size={20} />
-              </span>
-              <div className={calloutContentStyle}>
-                <strong>Syntactic sugar over CSS modules.</strong> Better DX
-                for writing CSS, without runtime interpolation.
+              <div className={calloutVariants({ type: "tip" })}>
+                <span className={calloutIconStyle}>
+                  <Sparkles size={20} />
+                </span>
+                <div className={calloutContentStyle}>
+                  <strong>Syntactic sugar over CSS modules.</strong> Better DX for writing CSS,
+                  without runtime interpolation.
+                </div>
               </div>
-            </div>
 
-            <div className={calloutVariants({ type: "warning" })}>
-              <span className={calloutIconStyle}>
-                <Shield size={20} />
-              </span>
-              <div className={calloutContentStyle}>
-                <strong>Zero dependencies.</strong> Minimal attack surface.
-                Nothing to audit.
+              <div className={calloutVariants({ type: "warning" })}>
+                <span className={calloutIconStyle}>
+                  <Shield size={20} />
+                </span>
+                <div className={calloutContentStyle}>
+                  <strong>Zero dependencies.</strong> Minimal attack surface. Nothing to audit.
+                </div>
               </div>
-            </div>
 
-            <div className={calloutVariants({ type: "tip" })}>
-              <span className={calloutIconStyle}>
-                <Target size={20} />
-              </span>
-              <div className={calloutContentStyle}>
-                <strong>Intentionally simple.</strong> 95% native browser + 5%
-                sprinkles.
+              <div className={calloutVariants({ type: "tip" })}>
+                <span className={calloutIconStyle}>
+                  <Target size={20} />
+                </span>
+                <div className={calloutContentStyle}>
+                  <strong>Intentionally simple.</strong> 95% native browser + 5% sprinkles.
+                </div>
               </div>
-            </div>
 
-            <div className={calloutVariants({ type: "note" })}>
-              <span className={calloutIconStyle}>
-                <PartyPopper size={20} />
-              </span>
-              <div className={calloutContentStyle}>
-                <strong>Built for fun.</strong> Curiosity-driven, useful code.
+              <div className={calloutVariants({ type: "note" })}>
+                <span className={calloutIconStyle}>
+                  <PartyPopper size={20} />
+                </span>
+                <div className={calloutContentStyle}>
+                  <strong>Built for fun.</strong> Curiosity-driven, useful code.
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
 
-          {/* What We Don't Do */}
-          <section id="what-we-dont-do" className={sectionStyle}>
-            <span className={breadcrumbStyle}>Getting Started</span>
-            <h2 className={sectionTitleStyle}>What We Don't Do</h2>
+            {/* What We Don't Do */}
+            <section id="what-we-dont-do" className={sectionStyle}>
+              <span className={breadcrumbStyle}>Getting Started</span>
+              <h2 className={sectionTitleStyle}>What We Don't Do</h2>
 
-            <div className={calloutVariants({ type: "warning" })}>
-              <span className={calloutIconStyle}>
-                <Ban size={20} />
-              </span>
-              <div className={calloutContentStyle}>
-                <strong>No runtime interpolation</strong> — Can't write{" "}
-                <code className={inlineCodeStyle}>{`\${props => props.color}`}</code>. Use
-                variants, CSS variables, or data attributes.
+              <div className={calloutVariants({ type: "warning" })}>
+                <span className={calloutIconStyle}>
+                  <Ban size={20} />
+                </span>
+                <div className={calloutContentStyle}>
+                  <strong>No runtime interpolation</strong> — Can't write{" "}
+                  <code className={inlineCodeStyle}>{`\${props => props.color}`}</code>. Use
+                  variants, CSS variables, or data attributes.
+                </div>
               </div>
-            </div>
 
-            <div className={calloutVariants({ type: "note" })}>
-              <span className={calloutIconStyle}>
-                <Atom size={20} />
-              </span>
-              <div className={calloutContentStyle}>
-                <strong>React 19+ only</strong> — Uses automatic ref
-                forwarding (no <code className={inlineCodeStyle}>forwardRef</code>).
+              <div className={calloutVariants({ type: "note" })}>
+                <span className={calloutIconStyle}>
+                  <Atom size={20} />
+                </span>
+                <div className={calloutContentStyle}>
+                  <strong>React 19+ only</strong> — Uses automatic ref forwarding (no{" "}
+                  <code className={inlineCodeStyle}>forwardRef</code>).
+                </div>
               </div>
-            </div>
 
-            <div className={calloutVariants({ type: "note" })}>
-              <span className={calloutIconStyle}>
-                <Zap size={20} />
-              </span>
-              <div className={calloutContentStyle}>
-                <strong>Vite only</strong> — Uses Vite's AST parser and
-                virtual modules. No Webpack/Rollup.
+              <div className={calloutVariants({ type: "note" })}>
+                <span className={calloutIconStyle}>
+                  <Zap size={20} />
+                </span>
+                <div className={calloutContentStyle}>
+                  <strong>Vite only</strong> — Uses Vite's AST parser and virtual modules. No
+                  Webpack/Rollup.
+                </div>
               </div>
-            </div>
 
-            <p className={cx(paragraphStyle, paragraphMutedStyle)}>
-              Each constraint removes complexity—no CSS parsing, no
-              forwardRef, one great integration.
-            </p>
-          </section>
+              <p className={cx(paragraphStyle, paragraphMutedStyle)}>
+                Each constraint removes complexity—no CSS parsing, no forwardRef, one great
+                integration.
+              </p>
+            </section>
 
-          {/* Installation */}
-          <section id="installation" className={sectionStyle}>
-            <span className={breadcrumbStyle}>Getting Started</span>
-            <h2 className={sectionTitleStyle}>Installation</h2>
-            <p className={paragraphStyle}>
-              Install the package with your preferred package manager:
-            </p>
-            <CodeBlock filename="terminal">{`npm install styled-static
+            {/* Installation */}
+            <section id="installation" className={sectionStyle}>
+              <span className={breadcrumbStyle}>Getting Started</span>
+              <h2 className={sectionTitleStyle}>Installation</h2>
+              <p className={paragraphStyle}>
+                Install the package with your preferred package manager:
+              </p>
+              <CodeBlock filename="terminal">{`npm install styled-static
 # or
 bun add styled-static`}</CodeBlock>
-            <p className={paragraphStyle}>Configure the Vite plugin:</p>
-            <CodeBlock filename="vite.config.ts">{`import { defineConfig } from 'vite';
+              <p className={paragraphStyle}>Configure the Vite plugin:</p>
+              <CodeBlock filename="vite.config.ts">{`import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { styledStatic } from 'styled-static/vite';
 
 export default defineConfig({
   plugins: [styledStatic(), react()],
 });`}</CodeBlock>
-            <div className={calloutVariants({ type: "note" })}>
-              <span className={calloutIconStyle}>
-                <Info size={20} />
-              </span>
-              <div className={calloutContentStyle}>
-                The plugin must be placed <strong>before</strong> the React
-                plugin in the plugins array.
+              <div className={calloutVariants({ type: "note" })}>
+                <span className={calloutIconStyle}>
+                  <Info size={20} />
+                </span>
+                <div className={calloutContentStyle}>
+                  The plugin must be placed <strong>before</strong> the React plugin in the plugins
+                  array.
+                </div>
               </div>
-            </div>
 
-            <p className={cx(paragraphStyle, paragraphSpacedStyle)}>
-              <strong>Optional: Lightning CSS</strong> for autoprefixing and
-              faster CSS processing:
-            </p>
-            <CodeBlock filename="terminal">{`npm install lightningcss`}</CodeBlock>
-            <CodeBlock filename="vite.config.ts">{`import { defineConfig } from 'vite';
+              <p className={cx(paragraphStyle, paragraphSpacedStyle)}>
+                <strong>Optional: Lightning CSS</strong> for autoprefixing and faster CSS
+                processing:
+              </p>
+              <CodeBlock filename="terminal">{`npm install lightningcss`}</CodeBlock>
+              <CodeBlock filename="vite.config.ts">{`import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { styledStatic } from 'styled-static/vite';
 
@@ -1026,50 +1032,44 @@ export default defineConfig({
   css: { transformer: 'lightningcss' },
   plugins: [styledStatic(), react()],
 });`}</CodeBlock>
-            <div className={calloutVariants({ type: "tip" })}>
-              <span className={calloutIconStyle}>
-                <Zap size={20} />
-              </span>
-              <div className={calloutContentStyle}>
-                Lightning CSS provides automatic vendor prefixes, better
-                minification, and faster builds than PostCSS.
+              <div className={calloutVariants({ type: "tip" })}>
+                <span className={calloutIconStyle}>
+                  <Zap size={20} />
+                </span>
+                <div className={calloutContentStyle}>
+                  Lightning CSS provides automatic vendor prefixes, better minification, and faster
+                  builds than PostCSS.
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
 
-          {/* ========================================== */}
-          {/* API SECTION - Lazy loaded */}
-          {/* ========================================== */}
-          <Suspense
-            fallback={<div className={loadingWrapperStyle}>Loading API docs...</div>}
-          >
-            <ApiSection />
-          </Suspense>
+            {/* ========================================== */}
+            {/* API SECTION - Lazy loaded */}
+            {/* ========================================== */}
+            <Suspense fallback={<div className={loadingWrapperStyle}>Loading API docs...</div>}>
+              <ApiSection />
+            </Suspense>
 
-          {/* ========================================== */}
-          {/* FEATURES SECTION - Lazy loaded */}
-          {/* ========================================== */}
-          <Suspense
-            fallback={
-              <div className={loadingWrapperStyle}>Loading Features docs...</div>
-            }
-          >
-            <FeaturesSection theme={theme} toggleTheme={toggleTheme} />
-          </Suspense>
+            {/* ========================================== */}
+            {/* FEATURES SECTION - Lazy loaded */}
+            {/* ========================================== */}
+            <Suspense
+              fallback={<div className={loadingWrapperStyle}>Loading Features docs...</div>}
+            >
+              <FeaturesSection theme={theme} toggleTheme={toggleTheme} />
+            </Suspense>
 
-          {/* ========================================== */}
-          {/* HOW IT WORKS SECTION - Lazy loaded */}
-          {/* ========================================== */}
-          <Suspense
-            fallback={
-              <div className={loadingWrapperStyle}>Loading How It Works docs...</div>
-            }
-          >
-            <HowItWorksSection />
-          </Suspense>
-        </div>
-      </main>
-    </div>
+            {/* ========================================== */}
+            {/* HOW IT WORKS SECTION - Lazy loaded */}
+            {/* ========================================== */}
+            <Suspense
+              fallback={<div className={loadingWrapperStyle}>Loading How It Works docs...</div>}
+            >
+              <HowItWorksSection />
+            </Suspense>
+          </div>
+        </main>
+      </div>
     </>
   );
 }

@@ -239,9 +239,7 @@ export function Button({
   variant: "primary" | "secondary" | "ghost";
   size?: "sm" | "md" | "lg";
 } & React.ComponentProps<"button">) {
-  return (
-    <button className={cx(button({ variant, size }), className)} {...props} />
-  );
+  return <button className={cx(button({ variant, size }), className)} {...props} />;
 }
 
 // Example styled components for demos
@@ -345,7 +343,14 @@ const submitButtonStyle = css({
 });
 
 export function SubmitButton({ className, ...props }: React.ComponentProps<"button">) {
-  return <button type="submit" aria-label="Submit form" className={cx(submitButtonStyle, className)} {...props} />;
+  return (
+    <button
+      type="submit"
+      aria-label="Submit form"
+      className={cx(submitButtonStyle, className)}
+      {...props}
+    />
+  );
 }
 
 // =============================================================================
@@ -552,13 +557,7 @@ const copyButtonStyle = css({
   },
 });
 
-export function CodeBlock({
-  filename,
-  children,
-}: {
-  filename?: string;
-  children: string;
-}) {
+export function CodeBlock({ filename, children }: { filename?: string; children: string }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -586,7 +585,10 @@ export function CodeBlock({
           )}
         </button>
       </div>
-      <pre className={codeBlockContentStyle} dangerouslySetInnerHTML={{ __html: highlightedCode }} />
+      <pre
+        className={codeBlockContentStyle}
+        dangerouslySetInnerHTML={{ __html: highlightedCode }}
+      />
     </div>
   );
 }

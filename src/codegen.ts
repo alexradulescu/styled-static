@@ -39,10 +39,7 @@ export function safeStringLiteral(str: string): string {
  *
  * SECURITY: Uses safeStringLiteral() for className to prevent code injection.
  */
-export function generateReplacement(
-  template: FoundTemplate,
-  className: string
-): string {
+export function generateReplacement(template: FoundTemplate, className: string): string {
   const cls = safeStringLiteral(className);
 
   switch (template.type) {
@@ -52,14 +49,9 @@ export function generateReplacement(
     case "styledExtend":
       // template.baseComponent comes from AST (Identifier node) so it is a valid
       // JS identifier by construction, but assert for defense-in-depth.
-      if (
-        !template.baseComponent ||
-        !isValidIdentifier(template.baseComponent)
-      ) {
+      if (!template.baseComponent || !isValidIdentifier(template.baseComponent)) {
         /* unreachable: unreachable: AST Identifier nodes are always valid identifiers */
-        throw new Error(
-          `[styled-static] Invalid base component name: ${template.baseComponent}`
-        );
+        throw new Error(`[styled-static] Invalid base component name: ${template.baseComponent}`);
       }
       return `Object.assign((p) => createElement(${template.baseComponent}, {...p, className: m(${cls}, p.className)}), { className: ${template.baseComponent}.className + " " + ${cls} })`;
 
@@ -103,7 +95,7 @@ export function generateVariantReplacement(
   variant: FoundVariant,
   baseClass: string,
   variantKeys: string[],
-  nextMapId: () => number
+  nextMapId: () => number,
 ): VariantReplacementResult {
   const cls = safeStringLiteral(baseClass);
   const isCssVariants = variant.type === "cssVariants";
@@ -111,7 +103,7 @@ export function generateVariantReplacement(
   // Calculate total variant values to determine strategy
   const totalVariantValues = variantKeys.reduce(
     (sum, key) => sum + (variant.variants.get(key)?.size ?? 0),
-    0
+    0,
   );
   const useHoistedMap = totalVariantValues > VARIANT_MAP_THRESHOLD;
 
@@ -136,10 +128,7 @@ export function generateVariantReplacement(
       const values = variant.variants.get(key);
       if (!values) return "";
       const valueEntries = Array.from(values.keys())
-        .map(
-          (v) =>
-            `${safeStringLiteral(v)}:${safeStringLiteral(` ${baseClass}--${key}-${v}`)}`
-        )
+        .map((v) => `${safeStringLiteral(v)}:${safeStringLiteral(` ${baseClass}--${key}-${v}`)}`)
         .join(",");
       return `${key}:{${valueEntries}}`;
     });
@@ -160,7 +149,7 @@ export function generateVariantReplacement(
         const valueChecks = Array.from(values.keys())
           .map(
             (value, i) =>
-              `${i === 0 ? "if" : "else if"} (${keyRef} === ${safeStringLiteral(value)}) c += ${safeStringLiteral(` ${baseClass}--${key}-${value}`)}`
+              `${i === 0 ? "if" : "else if"} (${keyRef} === ${safeStringLiteral(value)}) c += ${safeStringLiteral(` ${baseClass}--${key}-${value}`)}`,
           )
           .join("; ");
         if (valueChecks) {
@@ -168,8 +157,7 @@ export function generateVariantReplacement(
         }
       }
     }
-    variantLogic =
-      variantChecks.length > 0 ? variantChecks.join("; ") + "; " : "";
+    variantLogic = variantChecks.length > 0 ? variantChecks.join("; ") + "; " : "";
   }
 
   // Note: Compound variants work through CSS specificity alone.
@@ -183,25 +171,17 @@ export function generateVariantReplacement(
     if (isHtmlTag) {
       if (!variant.component || !/^[a-z][a-z0-9]*$/.test(variant.component)) {
         /* unreachable: component is a lowercase-validated AST value */
-        throw new Error(
-          `[styled-static] Invalid HTML tag name: ${variant.component}`
-        );
+        throw new Error(`[styled-static] Invalid HTML tag name: ${variant.component}`);
       }
     } else {
       if (!variant.component || !isValidIdentifier(variant.component)) {
         /* unreachable: component comes from AST Identifier node, always valid */
-        throw new Error(
-          `[styled-static] Invalid component name: ${variant.component}`
-        );
+        throw new Error(`[styled-static] Invalid component name: ${variant.component}`);
       }
     }
 
-    const componentRef = isHtmlTag
-      ? safeStringLiteral(variant.component!)
-      : variant.component!;
-    const classNameValue = isHtmlTag
-      ? cls
-      : `${variant.component}.className + " " + ${cls}`;
+    const componentRef = isHtmlTag ? safeStringLiteral(variant.component!) : variant.component!;
+    const classNameValue = isHtmlTag ? cls : `${variant.component}.className + " " + ${cls}`;
 
     return {
       code: `Object.assign((${propsDestructure}) => { let c = ${cls}; ${variantLogic}return createElement(${componentRef}, {...p, className: m(c, className)}); }, { className: ${classNameValue} })`,
@@ -212,11 +192,7 @@ export function generateVariantReplacement(
   // cssVariants: returns a function that generates class string
   // Apply defaultVariants by merging defaults with provided variants
   let defaultsPrefix = "";
-  if (
-    isCssVariants &&
-    variant.defaultVariants &&
-    variant.defaultVariants.size > 0
-  ) {
+  if (isCssVariants && variant.defaultVariants && variant.defaultVariants.size > 0) {
     const defaultEntries = Array.from(variant.defaultVariants.entries())
       .map(([k, v]) => `${safeStringLiteral(k)}:${safeStringLiteral(v)}`)
       .join(",");
@@ -259,10 +235,7 @@ export function rewriteCssImports(code: string, cssFileName: string): string {
   // Remove /* empty css */ comments Vite adds
   code = code.replace(/\/\*\s*empty css\s*\*\/\s*/g, "");
   // Remove useless side-effect import of styled-static package
-  code = code.replace(
-    /import\s*["']@alex\.radulescu\/styled-static["'];?\n?/g,
-    ""
-  );
+  code = code.replace(/import\s*["']@alex\.radulescu\/styled-static["'];?\n?/g, "");
 
   // Get just the filename for relative import (same directory)
   const baseName = cssFileName.split("/").pop() || cssFileName;

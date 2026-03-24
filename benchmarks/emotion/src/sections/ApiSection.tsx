@@ -189,7 +189,7 @@ function VariantDemoButton({
         variantDemoVariants[variant],
         variantDemoSizes[size],
         isCompound && variantDemoCompound,
-        className
+        className,
       )}
       {...props}
     >
@@ -209,8 +209,7 @@ export function ApiSection() {
         <Breadcrumb>API</Breadcrumb>
         <SectionTitle>styled</SectionTitle>
         <Paragraph>
-          Create styled React components with static CSS extraction. CSS is
-          extracted at build time.
+          Create styled React components with static CSS extraction. CSS is extracted at build time.
         </Paragraph>
         <CodeBlock filename="Button.tsx">{`import { styled } from '@alex.radulescu/styled-static';
 
@@ -240,9 +239,8 @@ const Button = styled.button\`
         <Breadcrumb>API</Breadcrumb>
         <SectionTitle>Component Extension</SectionTitle>
         <Paragraph>
-          Extend existing styled components by passing them to{" "}
-          <InlineCode>styled()</InlineCode>. The new component inherits all
-          styles from the base.
+          Extend existing styled components by passing them to <InlineCode>styled()</InlineCode>.
+          The new component inherits all styles from the base.
         </Paragraph>
         <CodeBlock filename="ExtendedButton.tsx">{`const Button = styled.button\`
   padding: 0.5rem 1rem;
@@ -276,9 +274,8 @@ const BigPrimary = styled(BoldButton)\`
         <Breadcrumb>API</Breadcrumb>
         <SectionTitle>css Helper</SectionTitle>
         <Paragraph>
-          The <InlineCode>css</InlineCode> helper returns a scoped class name
-          string. Use it for conditional styles or to mix with styled
-          components.
+          The <InlineCode>css</InlineCode> helper returns a scoped class name string. Use it for
+          conditional styles or to mix with styled components.
         </Paragraph>
         <CodeBlock>{`import { css } from '@alex.radulescu/styled-static';
 
@@ -297,9 +294,7 @@ const highlightClass = css\`
               className={cx(isHighlighted && highlightClass)}
               onClick={() => setIsHighlighted(!isHighlighted)}
             >
-              {isHighlighted
-                ? "Highlighted! Click to remove"
-                : "Click to highlight"}
+              {isHighlighted ? "Highlighted! Click to remove" : "Click to highlight"}
             </StyledButton>
           </ButtonGroup>
         </DemoArea>
@@ -310,8 +305,8 @@ const highlightClass = css\`
         <Breadcrumb>API</Breadcrumb>
         <SectionTitle>cx Utility</SectionTitle>
         <Paragraph>
-          A minimal utility for conditionally joining class names. Filters out
-          falsy values automatically.
+          A minimal utility for conditionally joining class names. Filters out falsy values
+          automatically.
         </Paragraph>
         <CodeBlock>{`import { cx } from '@alex.radulescu/styled-static';
 
@@ -357,7 +352,7 @@ cx('a', null, undefined, false, 'b') // → 'a b'`}</CodeBlock>
               className={cx(
                 cxDemo.bold && boldClass,
                 cxDemo.rounded && roundedClass,
-                cxDemo.colored && coloredClass
+                cxDemo.colored && coloredClass,
               )}
             >
               Dynamic Classes
@@ -371,10 +366,9 @@ cx('a', null, undefined, false, 'b') // → 'a b'`}</CodeBlock>
         <Breadcrumb>API</Breadcrumb>
         <SectionTitle>keyframes</SectionTitle>
         <Paragraph>
-          Create scoped keyframe animations using the{" "}
-          <InlineCode>keyframes</InlineCode> helper from{" "}
-          <InlineCode>@emotion/react</InlineCode>. The animation name is hashed
-          to avoid conflicts between components.
+          Create scoped keyframe animations using the <InlineCode>keyframes</InlineCode> helper from{" "}
+          <InlineCode>@emotion/react</InlineCode>. The animation name is hashed to avoid conflicts
+          between components.
         </Paragraph>
         <CodeBlock>{`import { keyframes } from '@emotion/react';
 import styled from '@emotion/styled';
@@ -419,8 +413,8 @@ const PulsingDot = styled.div\`
           </ButtonGroup>
         </DemoArea>
         <Callout type="note" icon={<Info size={20} />}>
-          Emotion interpolates the keyframe object directly into the template
-          literal, replacing it with a hashed animation name at runtime.
+          Emotion interpolates the keyframe object directly into the template literal, replacing it
+          with a hashed animation name at runtime.
         </Callout>
       </Section>
 
@@ -429,9 +423,8 @@ const PulsingDot = styled.div\`
         <Breadcrumb>API</Breadcrumb>
         <SectionTitle>attrs</SectionTitle>
         <Paragraph>
-          Emotion does not have a built-in <InlineCode>.attrs()</InlineCode>{" "}
-          method. Default HTML attributes are set via wrapper components with
-          hardcoded props.
+          Emotion does not have a built-in <InlineCode>.attrs()</InlineCode> method. Default HTML
+          attributes are set via wrapper components with hardcoded props.
         </Paragraph>
         <CodeBlock>{`// Emotion: use a wrapper component with hardcoded defaults
 function PasswordInput({ className, ...props }) {
@@ -464,9 +457,7 @@ function SubmitButton({ className, children, ...props }) {
           <DemoLabel>Result</DemoLabel>
           <AttrsColumn>
             <div>
-              <AttrsLabel>
-                PasswordInput (type=&quot;password&quot; via wrapper)
-              </AttrsLabel>
+              <AttrsLabel>PasswordInput (type=&quot;password&quot; via wrapper)</AttrsLabel>
               <PasswordInput placeholder="Enter password" />
             </div>
             <div>
@@ -478,8 +469,8 @@ function SubmitButton({ className, children, ...props }) {
           </AttrsColumn>
         </DemoArea>
         <Callout type="warning" icon={<AlertTriangle size={20} />}>
-          Unlike styled-components, Emotion has no <InlineCode>.attrs()</InlineCode> API.
-          Use wrapper components or spread default props manually.
+          Unlike styled-components, Emotion has no <InlineCode>.attrs()</InlineCode> API. Use
+          wrapper components or spread default props manually.
         </Callout>
       </Section>
 
@@ -489,13 +480,12 @@ function SubmitButton({ className, children, ...props }) {
         <SectionTitle>Variants API</SectionTitle>
         <Paragraph>
           Emotion has no built-in variants API. Use plain objects of{" "}
-          <InlineCode>css`...`</InlineCode> strings combined with{" "}
-          <InlineCode>cx()</InlineCode> for component variant props, and the
-          same pattern for class variants.
+          <InlineCode>css`...`</InlineCode> strings combined with <InlineCode>cx()</InlineCode> for
+          component variant props, and the same pattern for class variants.
         </Paragraph>
         <Callout type="tip" icon={<Lightbulb size={20} />}>
-          Wrap CSS strings in <InlineCode>css`...`</InlineCode> to get IDE
-          syntax highlighting from the styled-components VSCode extension.
+          Wrap CSS strings in <InlineCode>css`...`</InlineCode> to get IDE syntax highlighting from
+          the styled-components VSCode extension.
         </Callout>
         <SubsectionTitle>styledVariants</SubsectionTitle>
         <CodeBlock>{`import { css, cx } from '@emotion/css';
@@ -548,17 +538,14 @@ function Button({ variant = 'primary', size = 'sm', ...props }) {
 
         <SubsectionTitle>Default & Compound Variants</SubsectionTitle>
         <Paragraph>
-          Use JavaScript default parameters for fallback values when props are
-          omitted. Compound styles are applied with additional{" "}
-          <InlineCode>cx()</InlineCode> conditions.
+          Use JavaScript default parameters for fallback values when props are omitted. Compound
+          styles are applied with additional <InlineCode>cx()</InlineCode> conditions.
         </Paragraph>
         <DemoArea>
           <DemoLabel>Default variants (no props = primary + sm)</DemoLabel>
           <ButtonGroup>
             <VariantDemoButton>Default (primary sm)</VariantDemoButton>
-            <VariantDemoButton variant="secondary">
-              Secondary (sm default)
-            </VariantDemoButton>
+            <VariantDemoButton variant="secondary">Secondary (sm default)</VariantDemoButton>
             <VariantDemoButton size="lg">Primary (lg default)</VariantDemoButton>
           </ButtonGroup>
         </DemoArea>
@@ -613,9 +600,8 @@ const badgeCss = ({ variant }) => cx(badgeBase, badgeVariants[variant]);
         <Breadcrumb>API</Breadcrumb>
         <SectionTitle>Global Styles</SectionTitle>
         <Paragraph>
-          Use <InlineCode>Global</InlineCode> from{" "}
-          <InlineCode>@emotion/react</InlineCode> for global CSS like resets,
-          CSS variables, or base styles.
+          Use <InlineCode>Global</InlineCode> from <InlineCode>@emotion/react</InlineCode> for
+          global CSS like resets, CSS variables, or base styles.
         </Paragraph>
         <CodeBlock>{`import { Global, css } from '@emotion/react';
 
@@ -640,8 +626,8 @@ const globalStyles = css\`
 <Global styles={globalStyles} />
 <App />`}</CodeBlock>
         <Callout type="note" icon={<Info size={20} />}>
-          Unlike styled-static's <InlineCode>createGlobalStyle</InlineCode>,
-          Emotion's <InlineCode>Global</InlineCode> injects styles at runtime.
+          Unlike styled-static's <InlineCode>createGlobalStyle</InlineCode>, Emotion's{" "}
+          <InlineCode>Global</InlineCode> injects styles at runtime.
         </Callout>
         <DemoArea>
           <DemoLabel>Active on this page</DemoLabel>

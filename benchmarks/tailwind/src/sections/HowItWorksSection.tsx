@@ -27,12 +27,7 @@ function HowItWorksWrapper({ className, ...props }: React.ComponentProps<"div">)
 }
 
 function BenefitsList({ className, ...props }: React.ComponentProps<"ul">) {
-  return (
-    <ul
-      className={clsx("ml-6 text-[var(--color-text-secondary)]", className)}
-      {...props}
-    />
-  );
+  return <ul className={clsx("ml-6 text-[var(--color-text-secondary)]", className)} {...props} />;
 }
 
 function LegendParagraph({ className, ...props }: React.ComponentProps<"p">) {
@@ -50,7 +45,7 @@ function CompareTableWrap({ className, ...props }: React.ComponentProps<"div">) 
       className={clsx(
         "overflow-x-auto my-4 mb-6",
         "border border-[var(--color-border)] rounded-[var(--radius)]",
-        className
+        className,
       )}
       {...props}
     />
@@ -58,12 +53,7 @@ function CompareTableWrap({ className, ...props }: React.ComponentProps<"div">) 
 }
 
 function CompareTable({ className, ...props }: React.ComponentProps<"table">) {
-  return (
-    <table
-      className={clsx("w-full border-collapse text-sm", className)}
-      {...props}
-    />
-  );
+  return <table className={clsx("w-full border-collapse text-sm", className)} {...props} />;
 }
 
 function CompareHeaderRow({ className, ...props }: React.ComponentProps<"tr">) {
@@ -71,7 +61,7 @@ function CompareHeaderRow({ className, ...props }: React.ComponentProps<"tr">) {
     <tr
       className={clsx(
         "bg-[var(--color-bg-sidebar)] border-b border-[var(--color-border)]",
-        className
+        className,
       )}
       {...props}
     />
@@ -79,51 +69,28 @@ function CompareHeaderRow({ className, ...props }: React.ComponentProps<"tr">) {
 }
 
 function CompareHeaderCell({ className, ...props }: React.ComponentProps<"th">) {
-  return (
-    <th
-      className={clsx("p-3 text-left", className)}
-      {...props}
-    />
-  );
+  return <th className={clsx("p-3 text-left", className)} {...props} />;
 }
 
 function CompareRow({ className, ...props }: React.ComponentProps<"tr">) {
   return (
     <tr
-      className={clsx(
-        "border-b border-[var(--color-border-subtle)] last:border-b-0",
-        className
-      )}
+      className={clsx("border-b border-[var(--color-border-subtle)] last:border-b-0", className)}
       {...props}
     />
   );
 }
 
 function CompareCell({ className, ...props }: React.ComponentProps<"td">) {
-  return (
-    <td
-      className={clsx("p-3", className)}
-      {...props}
-    />
-  );
+  return <td className={clsx("p-3", className)} {...props} />;
 }
 
 function CompareCellBest({ className, ...props }: React.ComponentProps<"td">) {
-  return (
-    <td
-      className={clsx("p-3 text-[var(--color-primary)]", className)}
-      {...props}
-    />
-  );
+  return <td className={clsx("p-3 text-[var(--color-primary)]", className)} {...props} />;
 }
 
 function RestyleLink({ className, ...props }: React.ComponentProps<"a">) {
-  return (
-    <a
-      className={clsx("text-[var(--color-text)]", className)}
-      {...props}
-    />
-  );
+  return <a className={clsx("text-[var(--color-text)]", className)} {...props} />;
 }
 
 export function HowItWorksSection() {
@@ -134,10 +101,9 @@ export function HowItWorksSection() {
         <Breadcrumb>Internals</Breadcrumb>
         <SectionTitle>How It Works</SectionTitle>
         <Paragraph>
-          styled-static takes a different approach from runtime CSS-in-JS
-          libraries. Instead of generating CSS at runtime, it extracts all CSS
-          at build time using a Vite plugin. This gives you the developer
-          experience of styled-components with near-zero runtime cost.
+          styled-static takes a different approach from runtime CSS-in-JS libraries. Instead of
+          generating CSS at runtime, it extracts all CSS at build time using a Vite plugin. This
+          gives you the developer experience of styled-components with near-zero runtime cost.
         </Paragraph>
       </Section>
 
@@ -146,11 +112,10 @@ export function HowItWorksSection() {
         <Breadcrumb>Internals</Breadcrumb>
         <SubsectionTitle>Build-Time Transformation</SubsectionTitle>
         <Paragraph>
-          When you write a styled component, the Vite plugin intercepts your
-          source code and performs AST-based transformation. The CSS is
-          extracted to a static file, and the component definition is replaced
-          with an inline React component. The runtime is just ~45 bytes for
-          className merging.
+          When you write a styled component, the Vite plugin intercepts your source code and
+          performs AST-based transformation. The CSS is extracted to a static file, and the
+          component definition is replaced with an inline React component. The runtime is just ~45
+          bytes for className merging.
         </Paragraph>
 
         <Paragraph>Here's what happens to your code:</Paragraph>
@@ -175,8 +140,8 @@ const Button = Object.assign(
 );`}</CodeBlock>
 
         <Callout type="tip" icon={<Lightbulb size={20} />}>
-          The CSS is completely removed from your JavaScript bundle and moved to
-          a separate CSS file that Vite can optimize and cache.
+          The CSS is completely removed from your JavaScript bundle and moved to a separate CSS file
+          that Vite can optimize and cache.
         </Callout>
       </Section>
 
@@ -185,8 +150,8 @@ const Button = Object.assign(
         <Breadcrumb>Internals</Breadcrumb>
         <SubsectionTitle>Virtual CSS Modules</SubsectionTitle>
         <Paragraph>
-          The extracted CSS is served through Vite's virtual module system. Each
-          styled component gets a unique virtual CSS module with a name like{" "}
+          The extracted CSS is served through Vite's virtual module system. Each styled component
+          gets a unique virtual CSS module with a name like{" "}
           <InlineCode>styled-static:abc123-0.css</InlineCode>.
         </Paragraph>
 
@@ -211,9 +176,8 @@ const Button = Object.assign(
         <Breadcrumb>Internals</Breadcrumb>
         <SubsectionTitle>Minimal Runtime</SubsectionTitle>
         <Paragraph>
-          The runtime is just ~45 bytes because components are generated inline
-          at build time. The only runtime code is a simple function to merge
-          className strings:
+          The runtime is just ~45 bytes because components are generated inline at build time. The
+          only runtime code is a simple function to merge className strings:
         </Paragraph>
 
         <CodeBlock>{`// The entire runtime (~45 bytes minified)
@@ -225,10 +189,9 @@ export const m = (b, u) => (u ? \`\${b} \${u}\` : b);
 // m("ss-btn ss-primary", "") → "ss-btn ss-primary"`}</CodeBlock>
 
         <Paragraph>
-          For polymorphic rendering, use{" "}
-          <InlineCode>withComponent(To, From)</InlineCode> instead of an{" "}
-          <InlineCode>as</InlineCode> prop. This resolves the component at build
-          time rather than runtime.
+          For polymorphic rendering, use <InlineCode>withComponent(To, From)</InlineCode> instead of
+          an <InlineCode>as</InlineCode> prop. This resolves the component at build time rather than
+          runtime.
         </Paragraph>
       </Section>
 
@@ -237,8 +200,8 @@ export const m = (b, u) => (u ? \`\${b} \${u}\` : b);
         <Breadcrumb>Internals</Breadcrumb>
         <SubsectionTitle>Zero-Runtime Features</SubsectionTitle>
         <Paragraph>
-          Some features have literally zero runtime cost because they are
-          completely replaced at build time:
+          Some features have literally zero runtime cost because they are completely replaced at
+          build time:
         </Paragraph>
 
         <CodeBlock>{`// css helper - zero runtime
@@ -275,7 +238,9 @@ const GlobalStyles = () => null;`}</CodeBlock>
                 <CompareHeaderCell>Emotion</CompareHeaderCell>
                 <CompareHeaderCell>Linaria</CompareHeaderCell>
                 <CompareHeaderCell>
-                  <RestyleLink href="https://restyle.dev" target="_blank" rel="noopener noreferrer">Restyle</RestyleLink>
+                  <RestyleLink href="https://restyle.dev" target="_blank" rel="noopener noreferrer">
+                    Restyle
+                  </RestyleLink>
                 </CompareHeaderCell>
                 <CompareHeaderCell>Panda CSS</CompareHeaderCell>
               </CompareHeaderRow>
@@ -283,7 +248,9 @@ const GlobalStyles = () => null;`}</CodeBlock>
             <tbody>
               <CompareRow>
                 <CompareCell>Runtime</CompareCell>
-                <CompareCellBest><strong>~50 B</strong></CompareCellBest>
+                <CompareCellBest>
+                  <strong>~50 B</strong>
+                </CompareCellBest>
                 <CompareCell>~11 KB</CompareCell>
                 <CompareCell>~1.5 KB</CompareCell>
                 <CompareCell>~2.2 KB</CompareCell>
@@ -314,7 +281,9 @@ const GlobalStyles = () => null;`}</CodeBlock>
                 <CompareCell>Any</CompareCell>
               </CompareRow>
               <CompareRow>
-                <CompareCell><InlineCode>styled.el</InlineCode></CompareCell>
+                <CompareCell>
+                  <InlineCode>styled.el</InlineCode>
+                </CompareCell>
                 <CompareCell>✓</CompareCell>
                 <CompareCell>✓</CompareCell>
                 <CompareCell>✓</CompareCell>
@@ -322,7 +291,9 @@ const GlobalStyles = () => null;`}</CodeBlock>
                 <CompareCell>◐</CompareCell>
               </CompareRow>
               <CompareRow>
-                <CompareCell><InlineCode>styled(Comp)</InlineCode></CompareCell>
+                <CompareCell>
+                  <InlineCode>styled(Comp)</InlineCode>
+                </CompareCell>
                 <CompareCell>✓</CompareCell>
                 <CompareCell>✓</CompareCell>
                 <CompareCell>✓</CompareCell>
@@ -338,7 +309,9 @@ const GlobalStyles = () => null;`}</CodeBlock>
                 <CompareCell>✓</CompareCell>
               </CompareRow>
               <CompareRow>
-                <CompareCell><InlineCode>css</InlineCode> helper</CompareCell>
+                <CompareCell>
+                  <InlineCode>css</InlineCode> helper
+                </CompareCell>
                 <CompareCell>✓</CompareCell>
                 <CompareCell>✓</CompareCell>
                 <CompareCell>✓</CompareCell>
@@ -346,7 +319,9 @@ const GlobalStyles = () => null;`}</CodeBlock>
                 <CompareCell>✓</CompareCell>
               </CompareRow>
               <CompareRow>
-                <CompareCell><InlineCode>css</InlineCode> inline prop</CompareCell>
+                <CompareCell>
+                  <InlineCode>css</InlineCode> inline prop
+                </CompareCell>
                 <CompareCell>✗</CompareCell>
                 <CompareCell>✓</CompareCell>
                 <CompareCell>✗</CompareCell>
@@ -378,7 +353,9 @@ const GlobalStyles = () => null;`}</CodeBlock>
                 <CompareCell>✓</CompareCell>
               </CompareRow>
               <CompareRow>
-                <CompareCell><InlineCode>.className</InlineCode> access</CompareCell>
+                <CompareCell>
+                  <InlineCode>.className</InlineCode> access
+                </CompareCell>
                 <CompareCell>✓</CompareCell>
                 <CompareCell>✗</CompareCell>
                 <CompareCell>✗</CompareCell>
@@ -395,9 +372,8 @@ const GlobalStyles = () => null;`}</CodeBlock>
         <Breadcrumb>Internals</Breadcrumb>
         <SubsectionTitle>Component Extensions</SubsectionTitle>
         <Paragraph>
-          When you extend a component with{" "}
-          <InlineCode>styled(Component)</InlineCode>, the transformation is even
-          simpler - it just passes through to the base component:
+          When you extend a component with <InlineCode>styled(Component)</InlineCode>, the
+          transformation is even simpler - it just passes through to the base component:
         </Paragraph>
 
         <CodeBlock>{`// Source
@@ -418,9 +394,8 @@ const Primary = Object.assign(
 // This ensures proper CSS cascade: base → extension → user`}</CodeBlock>
 
         <Paragraph>
-          The base component handles its own className (including any extensions
-          it has), and the new className is merged last. This ensures proper CSS
-          cascade: base → extension → user.
+          The base component handles its own className (including any extensions it has), and the
+          new className is merged last. This ensures proper CSS cascade: base → extension → user.
         </Paragraph>
       </Section>
 
@@ -429,9 +404,8 @@ const Primary = Object.assign(
         <Breadcrumb>Internals</Breadcrumb>
         <SubsectionTitle>Variants Implementation</SubsectionTitle>
         <Paragraph>
-          Variant components build class strings dynamically at runtime based on
-          prop values. All variant values are sanitized to prevent CSS injection
-          attacks.
+          Variant components build class strings dynamically at runtime based on prop values. All
+          variant values are sanitized to prevent CSS injection attacks.
         </Paragraph>
 
         <CodeBlock>{`// Source
@@ -466,8 +440,8 @@ const Button = Object.assign(
         <Breadcrumb>Internals</Breadcrumb>
         <SubsectionTitle>Development-Only Features</SubsectionTitle>
         <Paragraph>
-          The generated code is identical in development and production builds.
-          Debug logging is available via an environment variable:
+          The generated code is identical in development and production builds. Debug logging is
+          available via an environment variable:
         </Paragraph>
 
         <CodeBlock>{`# Enable debug logging during development
@@ -480,9 +454,9 @@ const Button = Object.assign(
 );`}</CodeBlock>
 
         <Paragraph>
-          Since components are generated inline at build time, there's no
-          runtime <InlineCode>displayName</InlineCode> handling. React DevTools
-          will show the variable name from your source code.
+          Since components are generated inline at build time, there's no runtime{" "}
+          <InlineCode>displayName</InlineCode> handling. React DevTools will show the variable name
+          from your source code.
         </Paragraph>
       </Section>
 
@@ -491,8 +465,8 @@ const Button = Object.assign(
         <Breadcrumb>Internals</Breadcrumb>
         <SubsectionTitle>Plugin Configuration</SubsectionTitle>
         <Paragraph>
-          The Vite plugin accepts configuration options for customizing class
-          name prefixes, debug logging, and CSS output mode:
+          The Vite plugin accepts configuration options for customizing class name prefixes, debug
+          logging, and CSS output mode:
         </Paragraph>
 
         <CodeBlock>{`// vite.config.ts
@@ -503,21 +477,18 @@ styledStatic({
 })`}</CodeBlock>
 
         <Paragraph>
-          The <InlineCode>cssOutput</InlineCode> option controls how CSS is
-          emitted during builds:
+          The <InlineCode>cssOutput</InlineCode> option controls how CSS is emitted during builds:
         </Paragraph>
         <BenefitsList>
           <li>
-            <strong>'auto'</strong> (default) — Uses 'file' for library builds,
-            'virtual' for apps
+            <strong>'auto'</strong> (default) — Uses 'file' for library builds, 'virtual' for apps
           </li>
           <li>
-            <strong>'virtual'</strong> — CSS as virtual modules (Vite bundles
-            into single file)
+            <strong>'virtual'</strong> — CSS as virtual modules (Vite bundles into single file)
           </li>
           <li>
-            <strong>'file'</strong> — CSS as separate files co-located with JS
-            (enables tree-shaking)
+            <strong>'file'</strong> — CSS as separate files co-located with JS (enables
+            tree-shaking)
           </li>
         </BenefitsList>
       </Section>
@@ -527,10 +498,9 @@ styledStatic({
         <Breadcrumb>Internals</Breadcrumb>
         <SubsectionTitle>Library Builds</SubsectionTitle>
         <Paragraph>
-          When building a component library with{" "}
-          <InlineCode>build.lib</InlineCode> configured, styled-static
-          automatically outputs CSS as separate files co-located with each JS
-          file. This enables CSS tree-shaking for consuming applications.
+          When building a component library with <InlineCode>build.lib</InlineCode> configured,
+          styled-static automatically outputs CSS as separate files co-located with each JS file.
+          This enables CSS tree-shaking for consuming applications.
         </Paragraph>
 
         <CodeBlock>{`# Output structure for library builds
@@ -544,17 +514,15 @@ dist/
       Alert.css    # Alert-specific styles only`}</CodeBlock>
 
         <Paragraph>
-          Consuming apps automatically get only the CSS for components they
-          import:
+          Consuming apps automatically get only the CSS for components they import:
         </Paragraph>
 
         <CodeBlock>{`// In your app - only Button.css is included in the bundle
 import { Button } from "my-component-library/components/Button";`}</CodeBlock>
 
         <Callout type="tip" icon={<Lightbulb size={20} />}>
-          For app builds (no <InlineCode>build.lib</InlineCode>), CSS is bundled
-          as virtual modules into a single CSS file, which is the default Vite
-          behavior.
+          For app builds (no <InlineCode>build.lib</InlineCode>), CSS is bundled as virtual modules
+          into a single CSS file, which is the default Vite behavior.
         </Callout>
       </Section>
     </HowItWorksWrapper>

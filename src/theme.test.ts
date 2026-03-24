@@ -7,13 +7,7 @@
  * Browser tests are in theme.browser.test.ts
  */
 import { describe, expect, it } from "bun:test";
-import {
-  type InitThemeOptions,
-  getTheme,
-  initTheme,
-  onSystemThemeChange,
-  setTheme,
-} from "./theme";
+import { type InitThemeOptions, getTheme, initTheme, onSystemThemeChange, setTheme } from "./theme";
 
 // =============================================================================
 // SSR / Node.js Environment Tests

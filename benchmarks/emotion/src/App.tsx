@@ -27,17 +27,17 @@ import { KeyframeStyles } from "./sections/keyframes-demo";
 
 // Lazy-loaded sections for code splitting
 const ApiSection = lazy(() =>
-  import("./sections/ApiSection").then((m) => ({ default: m.ApiSection }))
+  import("./sections/ApiSection").then((m) => ({ default: m.ApiSection })),
 );
 const FeaturesSection = lazy(() =>
   import("./sections/FeaturesSection").then((m) => ({
     default: m.FeaturesSection,
-  }))
+  })),
 );
 const HowItWorksSection = lazy(() =>
   import("./sections/HowItWorksSection").then((m) => ({
     default: m.HowItWorksSection,
-  }))
+  })),
 );
 
 // =============================================================================
@@ -169,7 +169,9 @@ const MobileHeader = styled.header`
   align-items: center;
   justify-content: space-between;
   z-index: 150;
-  transition: background var(--transition), border-color var(--transition);
+  transition:
+    background var(--transition),
+    border-color var(--transition);
 
   @media (max-width: 767px) {
     display: flex;
@@ -481,25 +483,43 @@ const HeroBanner = styled.div`
 
   /* Geometric pattern using pseudo-elements */
   &::before {
-    content: '';
+    content: "";
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
     background:
-      linear-gradient(135deg, transparent 40%, rgba(16, 185, 129, 0.08) 40%, rgba(16, 185, 129, 0.08) 60%, transparent 60%),
-      linear-gradient(225deg, transparent 30%, rgba(16, 185, 129, 0.05) 30%, rgba(16, 185, 129, 0.05) 50%, transparent 50%);
+      linear-gradient(
+        135deg,
+        transparent 40%,
+        rgba(16, 185, 129, 0.08) 40%,
+        rgba(16, 185, 129, 0.08) 60%,
+        transparent 60%
+      ),
+      linear-gradient(
+        225deg,
+        transparent 30%,
+        rgba(16, 185, 129, 0.05) 30%,
+        rgba(16, 185, 129, 0.05) 50%,
+        transparent 50%
+      );
   }
 
   &::after {
-    content: '';
+    content: "";
     position: absolute;
     top: 20%;
     right: 10%;
     width: 200px;
     height: 200px;
-    background: linear-gradient(45deg, transparent 45%, rgba(16, 185, 129, 0.12) 45%, rgba(16, 185, 129, 0.12) 55%, transparent 55%);
+    background: linear-gradient(
+      45deg,
+      transparent 45%,
+      rgba(16, 185, 129, 0.12) 45%,
+      rgba(16, 185, 129, 0.12) 55%,
+      transparent 55%
+    );
     transform: rotate(15deg);
   }
 
@@ -758,7 +778,16 @@ const sections: SectionInfo[] = [
     id: "comparison",
     title: "Library Comparison",
     group: "Internals",
-    keywords: ["comparison", "bundle", "size", "emotion", "linaria", "panda", "css-in-js", "alternatives"],
+    keywords: [
+      "comparison",
+      "bundle",
+      "size",
+      "emotion",
+      "linaria",
+      "panda",
+      "css-in-js",
+      "alternatives",
+    ],
   },
 ];
 
@@ -824,7 +853,7 @@ export function App() {
           }
         });
       },
-      { rootMargin: "-20% 0px -70% 0px" }
+      { rootMargin: "-20% 0px -70% 0px" },
     );
 
     // Function to observe any new sections that appear in the DOM
@@ -863,9 +892,7 @@ export function App() {
     ? sections.filter(
         (s) =>
           s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          s.keywords.some((k) =>
-            k.toLowerCase().includes(searchQuery.toLowerCase())
-          )
+          s.keywords.some((k) => k.toLowerCase().includes(searchQuery.toLowerCase())),
       )
     : sections;
 
@@ -877,7 +904,7 @@ export function App() {
       acc[group].push(section);
       return acc;
     },
-    {} as Record<string, SectionInfo[]>
+    {} as Record<string, SectionInfo[]>,
   );
 
   const closeSidebar = () => setSidebarOpen(false);
@@ -889,10 +916,7 @@ export function App() {
       <Layout>
         <MobileHeader>
           <HeaderTitle>styled-static</HeaderTitle>
-          <BurgerButton
-            onClick={() => setSidebarOpen((prev) => !prev)}
-            aria-label="Toggle menu"
-          >
+          <BurgerButton onClick={() => setSidebarOpen((prev) => !prev)} aria-label="Toggle menu">
             <span />
             <span />
           </BurgerButton>
@@ -965,8 +989,8 @@ export function App() {
             {/* Hero */}
             <PageTitle>styled-static</PageTitle>
             <PageSubtitle>
-              Near-zero-runtime CSS-in-JS for React 19+ with Vite. Write
-              styled-components syntax, get static CSS extracted at build time.
+              Near-zero-runtime CSS-in-JS for React 19+ with Vite. Write styled-components syntax,
+              get static CSS extracted at build time.
             </PageSubtitle>
             <HeroBanner />
 
@@ -979,8 +1003,8 @@ export function App() {
               <Breadcrumb>Getting Started</Breadcrumb>
               <SectionTitle>Quick Overview</SectionTitle>
               <Paragraph>
-                All the APIs you need at a glance. styled-static provides 10
-                core functions that cover most CSS-in-JS use cases:
+                All the APIs you need at a glance. styled-static provides 10 core functions that
+                cover most CSS-in-JS use cases:
               </Paragraph>
               <CodeBlock>{`// Style elements
 const Button = styled.button\`padding: 0.5rem 1rem;\`;
@@ -1031,9 +1055,8 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
                   <Globe size={20} />
                 </CalloutIcon>
                 <CalloutContent>
-                  <strong>CSS evolved.</strong> Native nesting, CSS variables,
-                  container queries—the gap between CSS and CSS-in-JS is smaller
-                  than ever.
+                  <strong>CSS evolved.</strong> Native nesting, CSS variables, container queries—the
+                  gap between CSS and CSS-in-JS is smaller than ever.
                 </CalloutContent>
               </div>
 
@@ -1042,8 +1065,8 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
                   <HeartCrack size={20} />
                 </CalloutIcon>
                 <CalloutContent>
-                  <strong>CSS-in-JS fatigue.</strong> Most libraries are
-                  obsolete, complex, or have large runtime overhead.
+                  <strong>CSS-in-JS fatigue.</strong> Most libraries are obsolete, complex, or have
+                  large runtime overhead.
                 </CalloutContent>
               </div>
 
@@ -1052,8 +1075,8 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
                   <Sparkles size={20} />
                 </CalloutIcon>
                 <CalloutContent>
-                  <strong>Syntactic sugar over CSS modules.</strong> Better DX
-                  for writing CSS, without runtime interpolation.
+                  <strong>Syntactic sugar over CSS modules.</strong> Better DX for writing CSS,
+                  without runtime interpolation.
                 </CalloutContent>
               </div>
 
@@ -1062,8 +1085,7 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
                   <Shield size={20} />
                 </CalloutIcon>
                 <CalloutContent>
-                  <strong>Zero dependencies.</strong> Minimal attack surface.
-                  Nothing to audit.
+                  <strong>Zero dependencies.</strong> Minimal attack surface. Nothing to audit.
                 </CalloutContent>
               </div>
 
@@ -1072,8 +1094,7 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
                   <Target size={20} />
                 </CalloutIcon>
                 <CalloutContent>
-                  <strong>Intentionally simple.</strong> 95% native browser + 5%
-                  sprinkles.
+                  <strong>Intentionally simple.</strong> 95% native browser + 5% sprinkles.
                 </CalloutContent>
               </div>
 
@@ -1098,8 +1119,8 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
                 </CalloutIcon>
                 <CalloutContent>
                   <strong>No runtime interpolation</strong> — Can't write{" "}
-                  <InlineCode>{`\${props => props.color}`}</InlineCode>. Use
-                  variants, CSS variables, or data attributes.
+                  <InlineCode>{`\${props => props.color}`}</InlineCode>. Use variants, CSS
+                  variables, or data attributes.
                 </CalloutContent>
               </div>
 
@@ -1108,8 +1129,8 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
                   <Atom size={20} />
                 </CalloutIcon>
                 <CalloutContent>
-                  <strong>React 19+ only</strong> — Uses automatic ref
-                  forwarding (no <InlineCode>forwardRef</InlineCode>).
+                  <strong>React 19+ only</strong> — Uses automatic ref forwarding (no{" "}
+                  <InlineCode>forwardRef</InlineCode>).
                 </CalloutContent>
               </div>
 
@@ -1118,14 +1139,14 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
                   <Zap size={20} />
                 </CalloutIcon>
                 <CalloutContent>
-                  <strong>Vite only</strong> — Uses Vite's AST parser and
-                  virtual modules. No Webpack/Rollup.
+                  <strong>Vite only</strong> — Uses Vite's AST parser and virtual modules. No
+                  Webpack/Rollup.
                 </CalloutContent>
               </div>
 
               <Paragraph className={paragraphMuted}>
-                Each constraint removes complexity—no CSS parsing, no
-                forwardRef, one great integration.
+                Each constraint removes complexity—no CSS parsing, no forwardRef, one great
+                integration.
               </Paragraph>
             </Section>
 
@@ -1133,9 +1154,7 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
             <Section id="installation">
               <Breadcrumb>Getting Started</Breadcrumb>
               <SectionTitle>Installation</SectionTitle>
-              <Paragraph>
-                Install the package with your preferred package manager:
-              </Paragraph>
+              <Paragraph>Install the package with your preferred package manager:</Paragraph>
               <CodeBlock filename="terminal">{`npm install styled-static
 # or
 bun add styled-static`}</CodeBlock>
@@ -1152,14 +1171,14 @@ export default defineConfig({
                   <Info size={20} />
                 </CalloutIcon>
                 <CalloutContent>
-                  The plugin must be placed <strong>before</strong> the React
-                  plugin in the plugins array.
+                  The plugin must be placed <strong>before</strong> the React plugin in the plugins
+                  array.
                 </CalloutContent>
               </div>
 
               <Paragraph className={paragraphSpaced}>
-                <strong>Optional: Lightning CSS</strong> for autoprefixing and
-                faster CSS processing:
+                <strong>Optional: Lightning CSS</strong> for autoprefixing and faster CSS
+                processing:
               </Paragraph>
               <CodeBlock filename="terminal">{`npm install lightningcss`}</CodeBlock>
               <CodeBlock filename="vite.config.ts">{`import { defineConfig } from 'vite';
@@ -1175,8 +1194,8 @@ export default defineConfig({
                   <Zap size={20} />
                 </CalloutIcon>
                 <CalloutContent>
-                  Lightning CSS provides automatic vendor prefixes, better
-                  minification, and faster builds than PostCSS.
+                  Lightning CSS provides automatic vendor prefixes, better minification, and faster
+                  builds than PostCSS.
                 </CalloutContent>
               </div>
             </Section>
@@ -1184,31 +1203,21 @@ export default defineConfig({
             {/* ========================================== */}
             {/* API SECTION - Lazy loaded */}
             {/* ========================================== */}
-            <Suspense
-              fallback={<LoadingWrapper>Loading API docs...</LoadingWrapper>}
-            >
+            <Suspense fallback={<LoadingWrapper>Loading API docs...</LoadingWrapper>}>
               <ApiSection />
             </Suspense>
 
             {/* ========================================== */}
             {/* FEATURES SECTION - Lazy loaded */}
             {/* ========================================== */}
-            <Suspense
-              fallback={
-                <LoadingWrapper>Loading Features docs...</LoadingWrapper>
-              }
-            >
+            <Suspense fallback={<LoadingWrapper>Loading Features docs...</LoadingWrapper>}>
               <FeaturesSection theme={theme} toggleTheme={toggleTheme} />
             </Suspense>
 
             {/* ========================================== */}
             {/* HOW IT WORKS SECTION - Lazy loaded */}
             {/* ========================================== */}
-            <Suspense
-              fallback={
-                <LoadingWrapper>Loading How It Works docs...</LoadingWrapper>
-              }
-            >
+            <Suspense fallback={<LoadingWrapper>Loading How It Works docs...</LoadingWrapper>}>
               <HowItWorksSection />
             </Suspense>
           </Content>

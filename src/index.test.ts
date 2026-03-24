@@ -13,34 +13,38 @@ import { m } from "./runtime/index";
 
 describe("runtime error guards (untransformed calls)", () => {
   it("styled proxy get should throw config error", () => {
-    expect(() => styled.button`padding: 1rem;`).toThrow(
-      "styled was not transformed at build time"
-    );
+    expect(
+      () =>
+        styled.button`
+          padding: 1rem;
+        `,
+    ).toThrow("styled was not transformed at build time");
   });
 
   it("styled proxy apply should throw config error when called as function", () => {
     // The Proxy uses a function target so the apply trap fires when styled() is called
     // directly at runtime (i.e., the plugin didn't transform styled(Component)`...`).
-    expect(() => (styled as any)()).toThrow(
-      "styled was not transformed at build time"
-    );
+    expect(() => (styled as any)()).toThrow("styled was not transformed at build time");
   });
 
   it("css should throw config error", () => {
-    expect(() => css`padding: 1rem;`).toThrow(
-      "css was not transformed at build time"
-    );
+    expect(
+      () =>
+        css`
+          padding: 1rem;
+        `,
+    ).toThrow("css was not transformed at build time");
   });
 
   it("keyframes should throw config error", () => {
     expect(() => keyframes`from { opacity: 0; }`).toThrow(
-      "keyframes was not transformed at build time"
+      "keyframes was not transformed at build time",
     );
   });
 
   it("createGlobalStyle should throw config error", () => {
     expect(() => createGlobalStyle`body { margin: 0; }`).toThrow(
-      "createGlobalStyle was not transformed at build time"
+      "createGlobalStyle was not transformed at build time",
     );
   });
 
@@ -50,24 +54,25 @@ describe("runtime error guards (untransformed calls)", () => {
         component: "button",
         css: "",
         variants: {},
-      } as any)
+      } as any),
     ).toThrow("styledVariants was not transformed at build time");
   });
 
   it("cssVariants should throw config error", () => {
-    expect(() =>
-      cssVariants({ css: "", variants: {} } as any)
-    ).toThrow("cssVariants was not transformed at build time");
+    expect(() => cssVariants({ css: "", variants: {} } as any)).toThrow(
+      "cssVariants was not transformed at build time",
+    );
   });
 
   it("withComponent should throw config error", () => {
     expect(() => withComponent("a" as any, {} as any)).toThrow(
-      "withComponent was not transformed at build time"
+      "withComponent was not transformed at build time",
     );
   });
 
   it("error message includes plugin setup instructions", () => {
     try {
+      // oxlint-disable-next-line no-unused-expressions
       css`test`;
     } catch (e: any) {
       expect(e.message).toContain("vite.config.ts");

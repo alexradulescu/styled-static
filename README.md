@@ -308,15 +308,15 @@ Set default HTML attributes using `.attrs()`:
 
 ```tsx
 const SubmitButton = styled.button.attrs({
-  type: 'submit',
-  'aria-label': 'Submit form',
+  type: "submit",
+  "aria-label": "Submit form",
 })`
   padding: 0.5rem 1rem;
   background: #3b82f6;
   color: white;
 `;
 
-<SubmitButton>Send</SubmitButton>
+<SubmitButton>Send</SubmitButton>;
 // Renders: <button type="submit" aria-label="Submit form" class="ss-xyz789">
 ```
 
@@ -327,13 +327,15 @@ const SubmitButton = styled.button.attrs({
 Combine class names conditionally. Intentionally flat (no nested arrays/objects) for minimal bundle size:
 
 ```tsx
-import { css, cx } from '@alex.radulescu/styled-static';
+import { css, cx } from "@alex.radulescu/styled-static";
 
-const activeClass = css`color: blue;`;
+const activeClass = css`
+  color: blue;
+`;
 
-cx('base', 'active')                    // → "base active"
-cx('btn', isActive && activeClass)      // → "btn ss-abc123" or "btn"
-cx('a', null, undefined, false, 'b')    // → "a b"
+cx("base", "active"); // → "base active"
+cx("btn", isActive && activeClass); // → "btn ss-abc123" or "btn"
+cx("a", null, undefined, false, "b"); // → "a b"
 ```
 
 ### Global Styles
@@ -362,10 +364,9 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <GlobalStyle />
     <App />
-  </StrictMode>
+  </StrictMode>,
 );
 ```
-
 
 ### Variants API
 
@@ -550,6 +551,7 @@ const Card = styled.div`
 ## Dynamic Styling
 
 No runtime interpolation—use these patterns instead:
+
 - **[Variants API](#variants-api)** — Type-safe component variants (recommended)
 - **[cx utility](#cx-utility)** — Conditional class toggling
 - **CSS variables** — Pass via `style` prop for truly dynamic values
@@ -583,11 +585,11 @@ import { initTheme, setTheme, getTheme, onSystemThemeChange } from "@alex.radule
 initTheme({ defaultTheme: "light", useSystemPreference: true });
 
 // Switch themes
-setTheme("dark");              // persists to localStorage
-setTheme("pokemon", false);    // no persist (preview)
+setTheme("dark"); // persists to localStorage
+setTheme("pokemon", false); // no persist (preview)
 
 // Read current
-const current = getTheme();    // 'light' | 'dark' | etc.
+const current = getTheme(); // 'light' | 'dark' | etc.
 
 // React to OS changes
 const unsub = onSystemThemeChange((prefersDark) => {
@@ -595,12 +597,12 @@ const unsub = onSystemThemeChange((prefersDark) => {
 });
 ```
 
-| Function | Description |
-| -------- | ----------- |
-| `initTheme(options?)` | Init on load. Priority: localStorage → system → default |
-| `setTheme(theme, persist?)` | Set theme. Persists to localStorage by default |
-| `getTheme()` | Get current theme from `data-theme` |
-| `onSystemThemeChange(cb)` | Subscribe to OS theme changes |
+| Function                    | Description                                             |
+| --------------------------- | ------------------------------------------------------- |
+| `initTheme(options?)`       | Init on load. Priority: localStorage → system → default |
+| `setTheme(theme, persist?)` | Set theme. Persists to localStorage by default          |
+| `getTheme()`                | Get current theme from `data-theme`                     |
+| `onSystemThemeChange(cb)`   | Subscribe to OS theme changes                           |
 
 ---
 
@@ -625,7 +627,7 @@ export default {
     config.optimizeDeps = config.optimizeDeps || {};
     config.optimizeDeps.include = [
       ...(config.optimizeDeps.include || []),
-      '@alex.radulescu/styled-static',
+      "@alex.radulescu/styled-static",
     ];
     return config;
   },
@@ -660,8 +662,8 @@ import { m } from "@alex.radulescu/styled-static/runtime";
 import "@alex.radulescu/styled-static:abc123-0.css";
 
 const Button = Object.assign(
-  (p) => createElement("button", {...p, className: m("ss-abc123", p.className)}),
-  { className: "ss-abc123" }
+  (p) => createElement("button", { ...p, className: m("ss-abc123", p.className) }),
+  { className: "ss-abc123" },
 );
 ```
 
@@ -697,7 +699,7 @@ This is a **98% reduction** from traditional CSS-in-JS libraries.
 
 ```tsx
 // The ENTIRE runtime - just className merging
-export const m = (base, user) => user ? `${base} ${user}` : base;
+export const m = (base, user) => (user ? `${base} ${user}` : base);
 ```
 
 Everything else is generated at build time as inline components.
@@ -708,7 +710,9 @@ Some features have literally zero runtime cost because they're completely replac
 
 ```tsx
 // css helper - zero runtime (just a string)
-const activeClass = css`outline: 2px solid blue;`;
+const activeClass = css`
+  outline: 2px solid blue;
+`;
 // Generated: const activeClass = "ss-xyz789";
 
 // Global styles - zero runtime (just CSS import)
@@ -771,11 +775,13 @@ Full type inference is provided:
 const Button = styled.button`...`;
 
 // ✅ Type-safe: button props are available
-<Button type="submit" disabled>Submit</Button>
+<Button type="submit" disabled>
+  Submit
+</Button>;
 
 // ✅ Type-safe: withComponent infers props from target component
 const LinkButton = withComponent(Link, Button);
-<LinkButton to="/path">Link</LinkButton>
+<LinkButton to="/path">Link</LinkButton>;
 
 // ✅ Type-safe: .className is always string
 const classes = Button.className; // string
@@ -793,21 +799,21 @@ Zero runtime dependencies. Uses native CSS nesting (Chrome 112+, Safari 16.5+, F
 
 **Legend:** ✓ Yes | ◐ Partial | ✗ No
 
-| | styled-static | Emotion | Linaria | [Restyle](https://restyle.dev) | Panda CSS |
-|-|---------------|---------|---------|--------|-----------|
-| Runtime | **~50 B** | ~11 KB | ~1.5 KB | ~2.2 KB | 0 B |
-| Dependencies | 0 | 5+ | 10+ | 0 | 5+ |
-| React | 19+ | 16+ | 16+ | 19+ | 16+ |
-| Bundler | Vite | Any | Many | Any | Any |
-| `styled.el` | ✓ | ✓ | ✓ | ✓ | ◐ |
-| `styled(Comp)` | ✓ | ✓ | ✓ | ✓ | ◐ |
-| Variants | ✓ | ◐ | ◐ | ◐ | ✓ |
-| `css` helper | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `css` inline prop | ✗ | ✓ | ✗ | ✓ | ✓ |
-| Runtime interpolation | ✗ | ✓ | ✗ | ✓ | ✗ |
-| Default variants | ✓ | ✗ | ✗ | ✗ | ✓ |
-| Compound variants | ✓ | ✗ | ✗ | ✗ | ✓ |
-| `.className` access | ✓ | ✗ | ✗ | ✗ | ✗ |
+|                       | styled-static | Emotion | Linaria | [Restyle](https://restyle.dev) | Panda CSS |
+| --------------------- | ------------- | ------- | ------- | ------------------------------ | --------- |
+| Runtime               | **~50 B**     | ~11 KB  | ~1.5 KB | ~2.2 KB                        | 0 B       |
+| Dependencies          | 0             | 5+      | 10+     | 0                              | 5+        |
+| React                 | 19+           | 16+     | 16+     | 19+                            | 16+       |
+| Bundler               | Vite          | Any     | Many    | Any                            | Any       |
+| `styled.el`           | ✓             | ✓       | ✓       | ✓                              | ◐         |
+| `styled(Comp)`        | ✓             | ✓       | ✓       | ✓                              | ◐         |
+| Variants              | ✓             | ◐       | ◐       | ◐                              | ✓         |
+| `css` helper          | ✓             | ✓       | ✓       | ✓                              | ✓         |
+| `css` inline prop     | ✗             | ✓       | ✗       | ✓                              | ✓         |
+| Runtime interpolation | ✗             | ✓       | ✗       | ✓                              | ✗         |
+| Default variants      | ✓             | ✗       | ✗       | ✗                              | ✓         |
+| Compound variants     | ✓             | ✗       | ✗       | ✗                              | ✓         |
+| `.className` access   | ✓             | ✗       | ✗       | ✗                              | ✗         |
 
 ---
 

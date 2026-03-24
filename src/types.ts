@@ -159,7 +159,7 @@ export type StyledVariantComponent<
  * @template V - The variants configuration
  */
 export type CssVariantsFunction<V extends VariantsConfig> = (
-  variants?: Partial<VariantProps<V>>
+  variants?: Partial<VariantProps<V>>,
 ) => string;
 
 /** Extract props from an HTML tag or component */
@@ -215,15 +215,14 @@ export type PropsOf<T> = T extends HTMLTag
  *
  * @template T - The HTML tag or component being styled
  */
-export type StyledComponent<T extends HTMLTag | ComponentType<any>> =
-  (T extends HTMLTag
-    ? ComponentType<PropsOf<T>>
-    : T extends ComponentType<infer P>
-      ? ComponentType<P>
-      : never) & {
-    /** The static class name(s) for this styled component */
-    className: string;
-  };
+export type StyledComponent<T extends HTMLTag | ComponentType<any>> = (T extends HTMLTag
+  ? ComponentType<PropsOf<T>>
+  : T extends ComponentType<infer P>
+    ? ComponentType<P>
+    : never) & {
+  /** The static class name(s) for this styled component */
+  className: string;
+};
 
 // ============================================================================
 // Attrs Types
@@ -246,19 +245,13 @@ export interface StyledElementBuilder<T extends HTMLTag> {
    * styled.input.attrs({ type: 'password' })`padding: 0.5rem;`
    */
   attrs<A extends Partial<JSX.IntrinsicElements[T]>>(
-    attrs: A | ((props: JSX.IntrinsicElements[T]) => A)
-  ): (
-    strings: TemplateStringsArray,
-    ...interpolations: never[]
-  ) => StyledComponent<T>;
+    attrs: A | ((props: JSX.IntrinsicElements[T]) => A),
+  ): (strings: TemplateStringsArray, ...interpolations: never[]) => StyledComponent<T>;
 
   /**
    * Template tag to create styled component.
    */
-  (
-    strings: TemplateStringsArray,
-    ...interpolations: never[]
-  ): StyledComponent<T>;
+  (strings: TemplateStringsArray, ...interpolations: never[]): StyledComponent<T>;
 }
 
 /**
@@ -324,11 +317,8 @@ export type StyledFunction = {
    * ```
    */
   <T extends HTMLTag>(
-    tag: T
-  ): (
-    strings: TemplateStringsArray,
-    ...interpolations: never[]
-  ) => StyledComponent<T>;
+    tag: T,
+  ): (strings: TemplateStringsArray, ...interpolations: never[]) => StyledComponent<T>;
 
   /**
    * Extend an existing styled component or any component with className prop.
@@ -341,7 +331,7 @@ export type StyledFunction = {
    * ```
    */
   <P extends { className?: string }>(
-    component: ComponentType<P>
+    component: ComponentType<P>,
   ): (
     strings: TemplateStringsArray,
     ...interpolations: never[]

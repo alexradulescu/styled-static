@@ -47,9 +47,8 @@ export function FeaturesSection({ theme, toggleTheme }: FeaturesSectionProps) {
         <Breadcrumb>Features</Breadcrumb>
         <SectionTitle>Polymorphism & Composition</SectionTitle>
         <Paragraph>
-          Every styled component exposes a static{" "}
-          <InlineCode>.className</InlineCode> property for manual composition.
-          For rendering one component with another's styles, use{" "}
+          Every styled component exposes a static <InlineCode>.className</InlineCode> property for
+          manual composition. For rendering one component with another's styles, use{" "}
           <InlineCode>withComponent</InlineCode>.
         </Paragraph>
         <CodeBlock>{`const Button = styled.button\`
@@ -82,7 +81,7 @@ const LinkButton = withComponent(Link, Button);
                 "bg-[var(--color-primary)] text-white",
                 "border-none rounded-md cursor-pointer",
                 "hover:bg-[var(--color-primary-hover)]",
-                "no-underline inline-flex items-center"
+                "no-underline inline-flex items-center",
               )}
               href="#polymorphism"
             >
@@ -94,9 +93,7 @@ const LinkButton = withComponent(Link, Button);
           <DemoLabel>withComponent(&apos;a&apos;, StyledButton)</DemoLabel>
           <ButtonGroup>
             <StyledButton>Original Button</StyledButton>
-            <AnchorButton href="#polymorphism">
-              Anchor (via withComponent)
-            </AnchorButton>
+            <AnchorButton href="#polymorphism">Anchor (via withComponent)</AnchorButton>
           </ButtonGroup>
         </DemoArea>
       </Section>
@@ -106,8 +103,7 @@ const LinkButton = withComponent(Link, Button);
         <Breadcrumb>Features</Breadcrumb>
         <SectionTitle>CSS Nesting</SectionTitle>
         <Paragraph>
-          styled-static uses native CSS nesting (supported in all modern
-          browsers). Use
+          styled-static uses native CSS nesting (supported in all modern browsers). Use
           <InlineCode>&</InlineCode> to reference the parent selector.
         </Paragraph>
         <CodeBlock>{`const Card = styled.div\`
@@ -141,15 +137,14 @@ const LinkButton = withComponent(Link, Button);
           <NestingCard>
             <h3>Nested CSS Card</h3>
             <p>
-              Hover to see box-shadow and border color change. The
-              &ldquo;hover me&rdquo; label uses a pseudo-element (::after)
-              and fades on hover.
+              Hover to see box-shadow and border color change. The &ldquo;hover me&rdquo; label uses
+              a pseudo-element (::after) and fades on hover.
             </p>
           </NestingCard>
         </DemoArea>
         <Callout type="tip" icon={<Lightbulb size={20} />}>
-          Native CSS nesting means zero build-time processing. Your CSS is
-          passed directly to the browser.
+          Native CSS nesting means zero build-time processing. Your CSS is passed directly to the
+          browser.
         </Callout>
       </Section>
 
@@ -158,8 +153,7 @@ const LinkButton = withComponent(Link, Button);
         <Breadcrumb>Features</Breadcrumb>
         <SectionTitle>Theming</SectionTitle>
         <Paragraph>
-          CSS-first theming with CSS variables and{" "}
-          <InlineCode>data-theme</InlineCode> attributes:
+          CSS-first theming with CSS variables and <InlineCode>data-theme</InlineCode> attributes:
         </Paragraph>
 
         <CodeBlock>{`const GlobalStyle = createGlobalStyle\`

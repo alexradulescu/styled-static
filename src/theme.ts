@@ -25,9 +25,7 @@ const DEFAULT_THEME = "light";
 
 /** Convert a `data-*` attribute name to a camelCase dataset key. */
 function dataToCamelCase(attribute: string): string {
-  return attribute
-    .slice(5)
-    .replace(/-([a-z])/g, (_, l: string) => l.toUpperCase());
+  return attribute.slice(5).replace(/-([a-z])/g, (_, l: string) => l.toUpperCase());
 }
 
 /**
@@ -75,10 +73,7 @@ export function getTheme(attribute = "data-theme"): string {
   // Handle both data-* and regular attributes
   if (attribute.startsWith("data-")) {
     // dataset uses camelCase keys: data-color-mode → colorMode
-    return (
-      document.documentElement.dataset[dataToCamelCase(attribute)] ||
-      DEFAULT_THEME
-    );
+    return document.documentElement.dataset[dataToCamelCase(attribute)] || DEFAULT_THEME;
   }
   return document.documentElement.getAttribute(attribute) || DEFAULT_THEME;
 }
@@ -100,10 +95,9 @@ export function getTheme(attribute = "data-theme"): string {
 export function setTheme(
   theme: string,
   persist = true,
-  options: { storageKey?: string; attribute?: string } = {}
+  options: { storageKey?: string; attribute?: string } = {},
 ): void {
-  const { storageKey = DEFAULT_STORAGE_KEY, attribute = "data-theme" } =
-    options;
+  const { storageKey = DEFAULT_STORAGE_KEY, attribute = "data-theme" } = options;
 
   if (typeof document === "undefined") return;
 
@@ -206,9 +200,7 @@ export function initTheme(options: InitThemeOptions = {}): string {
  * // Later: stop listening
  * unsubscribe();
  */
-export function onSystemThemeChange(
-  callback: (prefersDark: boolean) => void
-): () => void {
+export function onSystemThemeChange(callback: (prefersDark: boolean) => void): () => void {
   if (typeof matchMedia === "undefined") {
     return () => {};
   }
