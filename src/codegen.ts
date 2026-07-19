@@ -19,6 +19,10 @@ export function isValidIdentifier(str: string): boolean {
   return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(str);
 }
 
+export function isValidComponentReference(value: string): boolean {
+  return value.split(".").every(isValidIdentifier);
+}
+
 /**
  * SECURITY: Safely escape a string for use in generated code.
  * Uses JSON.stringify to properly escape special characters.
@@ -26,6 +30,53 @@ export function isValidIdentifier(str: string): boolean {
 export function safeStringLiteral(str: string): string {
   return JSON.stringify(str);
 }
+
+/** Convert an arbitrary API name into a readable, collision-resistant CSS class segment. */
+export function toClassNameSegment(value: string): string {
+  const readable = value.replace(/[^a-zA-Z0-9_-]/g, "-") || "value";
+  return readable === value ? readable : `${readable}-${simpleHash(value)}`;
+}
+
+export function createVariantClassName(
+  baseClass: string,
+  variantName: string,
+  valueName: string,
+): string {
+  return `${baseClass}--${toClassNameSegment(variantName)}-${toClassNameSegment(valueName)}`;
+}
+
+/** Small local hash used only to disambiguate sanitized class-name segments. */
+function simpleHash(value: string): string {
+  let result = 5381;
+  for (let index = 0; index < value.length; index++) {
+    result = (result * 33) ^ value.charCodeAt(index);
+  }
+  return (result >>> 0).toString(36).slice(0, 5);
+}
+
+export function createVariantValueName(name: string, index: number): string {
+  const readable = name.replace(/[^a-zA-Z0-9_$]/g, "_");
+  return `_variant_${readable || "value"}_${index}`;
+}
+
+export interface GeneratedRuntimeNames {
+  createElement: string;
+  mergeClassNames: string;
+  props: string;
+  remainingProps: string;
+  userClassName: string;
+  classNames: string;
+  variantValues?: string[];
+}
+
+const defaultRuntimeNames: GeneratedRuntimeNames = {
+  createElement: "createElement",
+  mergeClassNames: "m",
+  props: "props",
+  remainingProps: "remainingProps",
+  userClassName: "userClassName",
+  classNames: "classNames",
+};
 
 // ============================================================================
 // Template Code Generation
@@ -35,28 +86,33 @@ export function safeStringLiteral(str: string): string {
  * Generate the replacement code for a styled template.
  *
  * This generates inline React components using Object.assign pattern:
- * Object.assign((p) => createElement(tag, {...p, className: m(cls, p.className)}), { className: cls })
+ * Object.assign((props) => createElement(tag, {...props, className: m(cls, props.className)}), { className: cls })
  *
  * SECURITY: Uses safeStringLiteral() for className to prevent code injection.
  */
-export function generateReplacement(template: FoundTemplate, className: string): string {
+export function generateReplacement(
+  template: FoundTemplate,
+  className: string,
+  runtimeNames: GeneratedRuntimeNames = defaultRuntimeNames,
+): string {
   const cls = safeStringLiteral(className);
+  const { createElement, mergeClassNames, props } = runtimeNames;
 
   switch (template.type) {
     case "styled":
-      return `Object.assign((p) => createElement(${safeStringLiteral(template.tag)}, {...p, className: m(${cls}, p.className)}), { className: ${cls} })`;
+      return `Object.assign((${props}) => ${createElement}(${safeStringLiteral(template.tag)}, {...${props}, className: ${mergeClassNames}(${cls}, ${props}.className)}), { className: ${cls} })`;
 
     case "styledExtend":
       // template.baseComponent comes from AST (Identifier node) so it is a valid
       // JS identifier by construction, but assert for defense-in-depth.
-      if (!template.baseComponent || !isValidIdentifier(template.baseComponent)) {
-        /* unreachable: unreachable: AST Identifier nodes are always valid identifiers */
+      if (!template.baseComponent || !isValidComponentReference(template.baseComponent)) {
+        /* unreachable: AST component references are validated during parsing */
         throw new Error(`[styled-static] Invalid base component name: ${template.baseComponent}`);
       }
-      return `Object.assign((p) => createElement(${template.baseComponent}, {...p, className: m(${cls}, p.className)}), { className: ${template.baseComponent}.className + " " + ${cls} })`;
+      return `Object.assign((${props}) => ${createElement}(${template.baseComponent}, {...${props}, className: ${mergeClassNames}(${cls}, ${props}.className)}), { className: [${template.baseComponent}.className, ${cls}].filter(Boolean).join(" ") })`;
 
     case "styledAttrs":
-      return `Object.assign((p) => createElement(${safeStringLiteral(template.tag)}, {...(${template.attrsArg ?? "{}"}), ...p, className: m(${cls}, p.className)}), { className: ${cls} })`;
+      return `Object.assign((${props}) => ${createElement}(${safeStringLiteral(template.tag)}, {...(${template.attrsArg ?? "{}"}), ...${props}, className: ${mergeClassNames}(${cls}, ${props}.className)}), { className: ${cls} })`;
 
     case "css":
       return cls;
@@ -73,92 +129,61 @@ export function generateReplacement(template: FoundTemplate, className: string):
 // Variant Code Generation
 // ============================================================================
 
-/** Threshold for switching from if/else to hoisted map */
-const VARIANT_MAP_THRESHOLD = 4;
-
-/** Result from variant replacement generation */
-export interface VariantReplacementResult {
-  code: string;
-  hoisted: string | undefined;
-}
-
 /**
  * Generate replacement code for a variant call.
  *
- * Uses a hybrid approach:
- * - For <= 4 total variant values: if/else chains (zero allocation, simple)
- * - For > 4 total variant values: hoisted static map (O(1) lookup, compact)
- *
- * SECURITY: Validates component names and generates explicit equality checks.
+ * Uses explicit equality checks for every variant. This is deliberately verbose:
+ * it is easy to audit, accepts no inherited object properties, and never turns a
+ * user-provided value into a class name.
  */
 export function generateVariantReplacement(
   variant: FoundVariant,
   baseClass: string,
   variantKeys: string[],
-  nextMapId: () => number,
-): VariantReplacementResult {
+  runtimeNames: GeneratedRuntimeNames = defaultRuntimeNames,
+): string {
   const cls = safeStringLiteral(baseClass);
-  const isCssVariants = variant.type === "cssVariants";
-
-  // Calculate total variant values to determine strategy
-  const totalVariantValues = variantKeys.reduce(
-    (sum, key) => sum + (variant.variants.get(key)?.size ?? 0),
-    0,
-  );
-  const useHoistedMap = totalVariantValues > VARIANT_MAP_THRESHOLD;
+  const {
+    createElement,
+    mergeClassNames,
+    remainingProps,
+    userClassName,
+    classNames,
+    variantValues,
+  } = runtimeNames;
 
   // Destructure variant props from the component props, with defaults if specified
-  const propsEntries = variantKeys.map((key) => {
+  const propsEntries = variantKeys.map((key, index) => {
     const defaultValue = variant.defaultVariants?.get(key);
-    return defaultValue ? `${key} = ${safeStringLiteral(defaultValue)}` : key;
+    const localName = variantValues?.[index] ?? createVariantValueName(key, index);
+    const defaultInitializer = defaultValue ? ` = ${safeStringLiteral(defaultValue)}` : "";
+    return `${safeStringLiteral(key)}: ${localName}${defaultInitializer}`;
   });
   const propsDestructure =
     variantKeys.length > 0
-      ? `{ ${propsEntries.join(", ")}, className, ...p }`
-      : `{ className, ...p }`;
+      ? `{ ${propsEntries.join(", ")}, className: ${userClassName}, ...${remainingProps} }`
+      : `{ className: ${userClassName}, ...${remainingProps} }`;
 
-  let variantLogic: string;
-  let hoisted: string | undefined;
+  const variantChecks: string[] = [];
+  for (let keyIndex = 0; keyIndex < variantKeys.length; keyIndex++) {
+    const key = variantKeys[keyIndex];
+    if (!key) continue;
 
-  if (useHoistedMap && variantKeys.length > 0) {
-    // Generate hoisted static map for > 4 values
-    const mapName = `_vm${nextMapId()}`;
-
-    const mapEntries = variantKeys.map((key) => {
-      const values = variant.variants.get(key);
-      if (!values) return "";
-      const valueEntries = Array.from(values.keys())
-        .map((v) => `${safeStringLiteral(v)}:${safeStringLiteral(` ${baseClass}--${key}-${v}`)}`)
-        .join(",");
-      return `${key}:{${valueEntries}}`;
-    });
-    hoisted = `const ${mapName}={${mapEntries.join(",")}};`;
-
-    const lookups = variantKeys.map((key) => {
-      const keyRef = isCssVariants ? `variants.${key}` : key;
-      return `c+=${mapName}.${key}[${keyRef}]||""`;
-    });
-    variantLogic = lookups.join(";") + ";";
-  } else {
-    // Generate if/else checks for <= 4 values (original approach)
-    const variantChecks: string[] = [];
-    for (const key of variantKeys) {
-      const values = variant.variants.get(key);
-      if (values) {
-        const keyRef = isCssVariants ? `variants.${key}` : key;
-        const valueChecks = Array.from(values.keys())
-          .map(
-            (value, i) =>
-              `${i === 0 ? "if" : "else if"} (${keyRef} === ${safeStringLiteral(value)}) c += ${safeStringLiteral(` ${baseClass}--${key}-${value}`)}`,
-          )
-          .join("; ");
-        if (valueChecks) {
-          variantChecks.push(valueChecks);
-        }
+    const values = variant.variants.get(key);
+    if (values) {
+      const keyRef = variantValues?.[keyIndex] ?? createVariantValueName(key, keyIndex);
+      const valueChecks = Array.from(values.keys())
+        .map((value, valueIndex) => {
+          const modifierClass = createVariantClassName(baseClass, key, value);
+          return `${valueIndex === 0 ? "if" : "else if"} (${keyRef} === ${safeStringLiteral(value)}) ${classNames} += ${safeStringLiteral(` ${modifierClass}`)}`;
+        })
+        .join("; ");
+      if (valueChecks) {
+        variantChecks.push(valueChecks);
       }
     }
-    variantLogic = variantChecks.length > 0 ? variantChecks.join("; ") + "; " : "";
   }
+  const variantLogic = variantChecks.length > 0 ? variantChecks.join("; ") + "; " : "";
 
   // Note: Compound variants work through CSS specificity alone.
   // The combined selectors (e.g., .ss-btn--size-lg.ss-btn--intent-danger)
@@ -166,42 +191,44 @@ export function generateVariantReplacement(
   // No additional runtime logic is needed.
 
   if (variant.type === "styledVariants") {
-    const isHtmlTag = variant.component && /^[a-z]/.test(variant.component);
+    const component = variant.component;
 
-    if (isHtmlTag) {
-      if (!variant.component || !/^[a-z][a-z0-9]*$/.test(variant.component)) {
-        /* unreachable: component is a lowercase-validated AST value */
-        throw new Error(`[styled-static] Invalid HTML tag name: ${variant.component}`);
+    if (component?.kind === "htmlTag") {
+      if (!/^[a-zA-Z][a-zA-Z0-9:-]*$/.test(component.value)) {
+        /* unreachable: component is a validated JSX intrinsic element */
+        throw new Error(`[styled-static] Invalid HTML tag name: ${component.value}`);
       }
     } else {
-      if (!variant.component || !isValidIdentifier(variant.component)) {
-        /* unreachable: component comes from AST Identifier node, always valid */
-        throw new Error(`[styled-static] Invalid component name: ${variant.component}`);
+      if (!component || !isValidComponentReference(component.value)) {
+        /* unreachable: component comes from a validated AST reference */
+        throw new Error(`[styled-static] Invalid component name: ${component?.value}`);
       }
     }
 
-    const componentRef = isHtmlTag ? safeStringLiteral(variant.component!) : variant.component!;
-    const classNameValue = isHtmlTag ? cls : `${variant.component}.className + " " + ${cls}`;
+    const componentRef =
+      component.kind === "htmlTag" ? safeStringLiteral(component.value) : component.value;
+    const classNameValue =
+      component.kind === "htmlTag"
+        ? cls
+        : `[${component.value}.className, ${cls}].filter(Boolean).join(" ")`;
 
-    return {
-      code: `Object.assign((${propsDestructure}) => { let c = ${cls}; ${variantLogic}return createElement(${componentRef}, {...p, className: m(c, className)}); }, { className: ${classNameValue} })`,
-      hoisted,
-    };
+    return `Object.assign((${propsDestructure}) => { let ${classNames} = ${cls}; ${variantLogic}return ${createElement}(${componentRef}, {...${remainingProps}, className: ${mergeClassNames}(${classNames}, ${userClassName})}); }, { className: ${classNameValue} })`;
   }
 
   // cssVariants: returns a function that generates class string
   // Apply defaultVariants by merging defaults with provided variants
-  let defaultsPrefix = "";
-  if (isCssVariants && variant.defaultVariants && variant.defaultVariants.size > 0) {
-    const defaultEntries = Array.from(variant.defaultVariants.entries())
-      .map(([k, v]) => `${safeStringLiteral(k)}:${safeStringLiteral(v)}`)
-      .join(",");
-    defaultsPrefix = `variants = {...{${defaultEntries}}, ...variants}; `;
-  }
-  return {
-    code: `(variants) => { ${defaultsPrefix}let c = ${cls}; ${variantLogic}return c; }`,
-    hoisted,
-  };
+  const defaultEntries = Array.from(variant.defaultVariants?.entries() ?? [])
+    .map(([key, value]) => `[${safeStringLiteral(key)}]: ${safeStringLiteral(value)}`)
+    .join(", ");
+  const defaultsPrefix = defaultEntries ? `variants = {${defaultEntries}, ...variants}; ` : "";
+  const selectionDeclarations = variantKeys
+    .map((key, index) => {
+      const keyLiteral = safeStringLiteral(key);
+      const localName = variantValues?.[index] ?? createVariantValueName(key, index);
+      return `const ${localName} = Object.hasOwn(variants, ${keyLiteral}) ? variants[${keyLiteral}] : undefined;`;
+    })
+    .join(" ");
+  return `(variants = {}) => { ${defaultsPrefix}${selectionDeclarations} let ${classNames} = ${cls}; ${variantLogic}return ${classNames}; }`;
 }
 
 // ============================================================================
@@ -213,8 +240,8 @@ export function generateVariantReplacement(
  * Used in dev mode to generate readable class names.
  */
 export function getFileBaseName(filePath: string): string {
-  const base = filePath.split("/").pop() || "unknown";
-  return base.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9]/g, "");
+  const base = filePath.split(/[/\\]/).pop() || "unknown";
+  return toClassNameSegment(base.replace(/\.[^.]+$/, ""));
 }
 
 /**
@@ -229,17 +256,36 @@ export function normalizePath(p: string): string {
  * Rewrite CSS imports in chunk code for library builds.
  * Removes virtual CSS imports and adds a single relative CSS file import.
  */
-export function rewriteCssImports(code: string, cssFileName: string): string {
-  // Remove all virtual:styled-static imports
-  code = code.replace(/import\s*["']virtual:styled-static[^"']*["'];?\n?/g, "");
+export function rewriteCssImports(
+  code: string,
+  cssFileName: string,
+  ast: import("estree").Program,
+): string {
+  const importRanges = ast.body
+    .filter(
+      (node): node is import("estree").ImportDeclaration =>
+        node.type === "ImportDeclaration" &&
+        node.specifiers.length === 0 &&
+        typeof node.source.value === "string" &&
+        (node.source.value.startsWith("virtual:styled-static/") ||
+          node.source.value === "@alex.radulescu/styled-static"),
+    )
+    .map((node) => ({
+      start: (node as typeof node & { start: number }).start,
+      end: (node as typeof node & { end: number }).end,
+    }))
+    .sort((left, right) => right.start - left.start);
+
+  for (const range of importRanges) {
+    code = code.slice(0, range.start) + code.slice(range.end);
+  }
+
   // Remove /* empty css */ comments Vite adds
   code = code.replace(/\/\*\s*empty css\s*\*\/\s*/g, "");
-  // Remove useless side-effect import of styled-static package
-  code = code.replace(/import\s*["']@alex\.radulescu\/styled-static["'];?\n?/g, "");
 
   // Get just the filename for relative import (same directory)
   const baseName = cssFileName.split("/").pop() || cssFileName;
 
   // Add single relative CSS import at top
-  return `import "./${baseName}";\n${code}`;
+  return `import ${safeStringLiteral(`./${baseName}`)};\n${code}`;
 }

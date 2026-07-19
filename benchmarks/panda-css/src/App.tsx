@@ -3,7 +3,6 @@ import {
   Atom,
   Ban,
   Code2,
-  Github,
   Globe,
   HeartCrack,
   Info,
@@ -18,7 +17,9 @@ import {
   Target,
   Zap,
 } from "lucide-react";
-import { css, cx, cva } from "../styled-system/css";
+import { css } from "../styled-system/css/css";
+import { cva } from "../styled-system/css/cva";
+import { cx } from "../styled-system/css/cx";
 import { getTheme, initTheme, onSystemThemeChange, setTheme } from "./theme";
 import { CodeBlock } from "./sections/shared";
 import { KeyframeStyles } from "./sections/keyframes-demo";
@@ -93,6 +94,8 @@ const headerTitleStyle = css({
 
 const overlayStyle = css({
   display: "none",
+  padding: 0,
+  border: 0,
   "@media (max-width: 767px)": {
     display: "block",
     position: "fixed",
@@ -718,6 +721,8 @@ export function App() {
     });
 
     return () => {
+      for (const element of observedElements) intersectionObserver.unobserve(element);
+      observedElements.clear();
       intersectionObserver.disconnect();
       mutationObserver.disconnect();
     };
@@ -752,6 +757,7 @@ export function App() {
         <header className={mobileHeaderStyle}>
           <span className={headerTitleStyle}>styled-static</span>
           <button
+            type="button"
             className={burgerButtonStyle}
             onClick={() => setSidebarOpen((prev) => !prev)}
             aria-label="Toggle menu"
@@ -760,7 +766,13 @@ export function App() {
             <span />
           </button>
         </header>
-        <div className={overlayStyle} data-visible={sidebarOpen} onClick={closeSidebar} />
+        <button
+          type="button"
+          className={overlayStyle}
+          data-visible={sidebarOpen}
+          onClick={closeSidebar}
+          aria-label="Close navigation"
+        />
         <aside className={sidebarStyle} data-open={sidebarOpen}>
           <div className={sidebarHeaderStyle}>
             <a href="#" className={logoStyle}>
@@ -810,7 +822,12 @@ export function App() {
           </nav>
 
           <div className={sidebarFooterStyle}>
-            <button className={themeToggleStyle} onClick={toggleTheme} aria-label="Toggle theme">
+            <button
+              type="button"
+              className={themeToggleStyle}
+              onClick={toggleTheme}
+              aria-label="Toggle theme"
+            >
               {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
             </button>
             <a
@@ -820,7 +837,7 @@ export function App() {
               aria-label="GitHub repository"
               className={iconLinkStyle}
             >
-              <Github size={18} />
+              <Code2 size={18} />
             </a>
           </div>
         </aside>
@@ -926,7 +943,8 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
                   <Shield size={20} />
                 </span>
                 <div className={calloutContentStyle}>
-                  <strong>Zero dependencies.</strong> Minimal attack surface. Nothing to audit.
+                  <strong>No browser-runtime dependencies.</strong> One small build dependency to
+                  audit.
                 </div>
               </div>
 
@@ -1007,7 +1025,7 @@ import react from '@vitejs/plugin-react';
 import { styledStatic } from 'styled-static/vite';
 
 export default defineConfig({
-  plugins: [styledStatic(), react()],
+  plugins: [react(), styledStatic()],
 });`}</CodeBlock>
               <div className={calloutVariants({ type: "note" })}>
                 <span className={calloutIconStyle}>
@@ -1030,7 +1048,7 @@ import { styledStatic } from 'styled-static/vite';
 
 export default defineConfig({
   css: { transformer: 'lightningcss' },
-  plugins: [styledStatic(), react()],
+  plugins: [react(), styledStatic()],
 });`}</CodeBlock>
               <div className={calloutVariants({ type: "tip" })}>
                 <span className={calloutIconStyle}>

@@ -350,32 +350,29 @@ cx('a', null, undefined, false, 'b') // → 'a b'`}</CodeBlock>
         <Breadcrumb>API</Breadcrumb>
         <SectionTitle>keyframes</SectionTitle>
         <Paragraph>
-          Define keyframe animations via <InlineCode>createGlobalStyle</InlineCode> and reference
-          them by name in styled components. The <InlineCode>keyframes</InlineCode> helper generates
-          a hashed name — see the note below about interpolation support.
+          Define scoped animations with <InlineCode>keyframes</InlineCode>. Direct keyframe
+          variables can be interpolated into styled templates and are replaced with their generated
+          names.
         </Paragraph>
-        <CodeBlock>{`import { createGlobalStyle, styled } from '@alex.radulescu/styled-static';
+        <CodeBlock>{`import { keyframes, styled } from '@alex.radulescu/styled-static';
 
-// Define named @keyframes via createGlobalStyle (extracted at build time)
-const GlobalAnimations = createGlobalStyle\`
-  @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-  }
+const spin = keyframes\`
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 \`;
 
-// Reference animation by name in styled components
+const pulse = keyframes\`
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+\`;
+
 const Spinner = styled.div\`
   width: 24px;
   height: 24px;
   border: 2px solid #3b82f6;
   border-top-color: transparent;
   border-radius: 50%;
-  animation: spin 1s linear infinite;
+  animation: \${spin} 1s linear infinite;
 \`;
 
 const PulsingDot = styled.div\`
@@ -383,12 +380,9 @@ const PulsingDot = styled.div\`
   height: 8px;
   background: #10b981;
   border-radius: 50%;
-  animation: pulse 2s ease-in-out infinite;
+  animation: \${pulse} 2s ease-in-out infinite;
 \`;
-
-// Render GlobalAnimations once at app root
-<GlobalAnimations />
-<App />`}</CodeBlock>
+`}</CodeBlock>
         <DemoArea>
           <DemoLabel>Result</DemoLabel>
           <ButtonGroup>
@@ -402,12 +396,9 @@ const PulsingDot = styled.div\`
             </FlexRow>
           </ButtonGroup>
         </DemoArea>
-        <Callout type="warning" icon={<AlertTriangle size={20} />}>
-          <InlineCode>{`\${keyframeVar}`}</InlineCode> interpolation inside{" "}
-          <InlineCode>styled</InlineCode> templates is not supported — the CSS extractor captures
-          raw source text and the variable reference would end up literally in the CSS. Define named{" "}
-          <InlineCode>@keyframes</InlineCode> via <InlineCode>createGlobalStyle</InlineCode> and
-          reference them by string name instead.
+        <Callout type="tip" icon={<AlertTriangle size={20} />}>
+          Only direct <InlineCode>keyframes</InlineCode> variables can be interpolated. Runtime
+          expressions fail the build; use variants or CSS variables for dynamic styles.
         </Callout>
       </Section>
 

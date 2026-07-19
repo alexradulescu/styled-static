@@ -25,9 +25,13 @@ We aim to respond within 48 hours and will work with you to understand and addre
 This library implements several security measures:
 
 - **Build-time CSS extraction** - No runtime CSS parsing reduces XSS attack surface
-- **Input sanitization** - User-controlled values are sanitized before use
+- **Static variant lookup** - Runtime variant values are matched only against build-time values
+- **Generated-code escaping** - Generated string literals and CSS class segments are escaped or normalized
+- **Configuration validation** - Unsafe class-name prefixes fail during configuration
 - **Defense-in-depth** - Multiple layers of protection against common web vulnerabilities
 - **Minimal runtime** - Small attack surface
+
+Application CSS is trusted developer input. styled-static does not sanitize CSS source code and must not be used to compile untrusted templates.
 
 ## Security Updates
 

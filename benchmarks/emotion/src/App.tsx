@@ -3,7 +3,6 @@ import {
   Atom,
   Ban,
   Code2,
-  Github,
   Globe,
   HeartCrack,
   Info,
@@ -882,6 +881,8 @@ export function App() {
     });
 
     return () => {
+      for (const element of observedElements) intersectionObserver.unobserve(element);
+      observedElements.clear();
       intersectionObserver.disconnect();
       mutationObserver.disconnect();
     };
@@ -979,7 +980,7 @@ export function App() {
               rel="noopener noreferrer"
               aria-label="GitHub repository"
             >
-              <Github size={18} />
+              <Code2 size={18} />
             </IconLink>
           </SidebarFooter>
         </Sidebar>
@@ -1085,7 +1086,8 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
                   <Shield size={20} />
                 </CalloutIcon>
                 <CalloutContent>
-                  <strong>Zero dependencies.</strong> Minimal attack surface. Nothing to audit.
+                  <strong>No browser-runtime dependencies.</strong> One small build dependency to
+                  audit.
                 </CalloutContent>
               </div>
 
@@ -1164,7 +1166,7 @@ import react from '@vitejs/plugin-react';
 import { styledStatic } from 'styled-static/vite';
 
 export default defineConfig({
-  plugins: [styledStatic(), react()],
+  plugins: [react(), styledStatic()],
 });`}</CodeBlock>
               <div className={calloutStyles({ type: "note" })}>
                 <CalloutIcon>
@@ -1187,7 +1189,7 @@ import { styledStatic } from 'styled-static/vite';
 
 export default defineConfig({
   css: { transformer: 'lightningcss' },
-  plugins: [styledStatic(), react()],
+  plugins: [react(), styledStatic()],
 });`}</CodeBlock>
               <div className={calloutStyles({ type: "tip" })}>
                 <CalloutIcon>

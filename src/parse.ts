@@ -22,6 +22,10 @@ export interface TemplateLiteralWithPosition extends ESTree.TemplateLiteral {
   end: number;
 }
 
+export type ComponentReference =
+  | { kind: "htmlTag"; value: string }
+  | { kind: "component"; value: string };
+
 /** Import tracking for styled-static */
 export interface StyledStaticImports {
   styled?: string;
@@ -31,8 +35,6 @@ export interface StyledStaticImports {
   styledVariants?: string;
   cssVariants?: string;
   withComponent?: string;
-  /** The source path of the import (e.g., "styled-static" or "./index") */
-  source?: string;
 }
 
 /** Types of styled templates we can transform */
@@ -51,7 +53,7 @@ export type VariantType = "styledVariants" | "cssVariants";
 export interface FoundWithComponent {
   start: number;
   end: number;
-  toComponent: string;
+  toComponent: ComponentReference;
   fromComponent: string;
   variableName?: string;
 }
@@ -71,7 +73,7 @@ export interface FoundVariant {
   type: VariantType;
   start: number;
   end: number;
-  component: string | undefined;
+  component: ComponentReference | undefined;
   baseCss: string | undefined;
   variants: Map<string, Map<string, string>>;
   variableName: string;
@@ -107,6 +109,43 @@ function walkVariableDeclarations(
   }
 }
 
+/** Read a static object property name, including quoted, numeric, and computed literal keys. */
+function getStaticPropertyName(property: ESTree.Property): string | undefined {
+  if (property.key.type === "Identifier" && !property.computed) return property.key.name;
+  if (property.key.type === "Literal") {
+    if (typeof property.key.value === "string" || typeof property.key.value === "number") {
+      return String(property.key.value);
+    }
+  }
+  return undefined;
+}
+
+function getStaticMemberName(member: ESTree.MemberExpression): string | undefined {
+  if (!member.computed && member.property.type === "Identifier") return member.property.name;
+  if (
+    member.computed &&
+    member.property.type === "Literal" &&
+    typeof member.property.value === "string"
+  ) {
+    return member.property.value;
+  }
+  return undefined;
+}
+
+function isStaticComponentExpression(node: ESTree.Node): boolean {
+  if (node.type === "Identifier") return true;
+  if (node.type !== "MemberExpression" || node.computed || node.property.type !== "Identifier") {
+    return false;
+  }
+  return isStaticComponentExpression(node.object);
+}
+
+function getComponentExpression(node: ESTree.Node | undefined, code: string): string | undefined {
+  if (!node || !isStaticComponentExpression(node)) return undefined;
+  const positionedNode = node as ESTree.Node & { start: number; end: number };
+  return code.slice(positionedNode.start, positionedNode.end);
+}
+
 // ============================================================================
 // CSS Extraction
 // ============================================================================
@@ -115,8 +154,37 @@ function walkVariableDeclarations(
  * Extract raw CSS content from a template literal.
  * Handles the content between the backticks.
  */
-export function extractTemplateContent(code: string, quasi: TemplateLiteralWithPosition): string {
-  return code.slice(quasi.start + 1, quasi.end - 1);
+export function extractTemplateContent(
+  code: string,
+  quasi: TemplateLiteralWithPosition,
+  interpolationValues?: ReadonlyMap<string, string>,
+): string {
+  let result = "";
+
+  for (let index = 0; index < quasi.quasis.length; index++) {
+    const element = quasi.quasis[index] as ESTree.TemplateElement & {
+      start: number;
+      end: number;
+    };
+    result += code.slice(element.start, element.end);
+
+    const expression = quasi.expressions[index];
+    if (!expression) continue;
+
+    if (expression.type === "Identifier") {
+      const value = interpolationValues?.get(expression.name);
+      if (value) {
+        result += value;
+        continue;
+      }
+    }
+
+    throw new Error(
+      "[styled-static] Runtime CSS interpolation is not supported. Only direct keyframes references such as ${spin} are allowed.",
+    );
+  }
+
+  return result;
 }
 
 /**
@@ -136,6 +204,11 @@ export function extractCssFromValueNode(
     return node.value;
   }
   if (node.type === "TemplateLiteral") {
+    if (node.expressions.length > 0) {
+      throw new Error(
+        "[styled-static] CSS interpolation inside a variants definition is not supported. Move the animation declaration to a styled or css template.",
+      );
+    }
     const tpl = node as ESTree.TemplateLiteral & {
       start: number;
       end: number;
@@ -147,6 +220,11 @@ export function extractCssFromValueNode(
       quasi: ESTree.TemplateLiteral & { start: number; end: number };
     };
     if (tagged.tag.type === "Identifier" && tagged.tag.name === cssImportName) {
+      if (tagged.quasi.expressions.length > 0) {
+        throw new Error(
+          "[styled-static] CSS interpolation inside a variants definition is not supported. Move the animation declaration to a styled or css template.",
+        );
+      }
       return code.slice(tagged.quasi.start + 1, tagged.quasi.end - 1);
     }
   }
@@ -167,12 +245,9 @@ export function findStyledStaticImports(ast: ESTree.Program): StyledStaticImport
   for (const node of ast.body) {
     if (node.type === "ImportDeclaration") {
       const source = node.source.value as string;
-      const isStyledStaticImport =
-        source === "@alex.radulescu/styled-static" || source === "./index" || source === "../index";
+      const isStyledStaticImport = source === "@alex.radulescu/styled-static";
 
       if (isStyledStaticImport) {
-        imports.source = source;
-
         for (const spec of node.specifiers) {
           if (spec.type === "ImportSpecifier") {
             const imported = (spec.imported as ESTree.Identifier).name;
@@ -238,13 +313,14 @@ function classifyTemplate(
   if (
     tag.type === "MemberExpression" &&
     tag.object.type === "Identifier" &&
-    tag.object.name === imports.styled &&
-    tag.property.type === "Identifier"
+    tag.object.name === imports.styled
   ) {
+    const elementTag = getStaticMemberName(tag);
+    if (!elementTag) return null;
     return {
       type: "styled",
       node,
-      tag: tag.property.name,
+      tag: elementTag,
       variableName,
     };
   }
@@ -253,14 +329,27 @@ function classifyTemplate(
   if (
     tag.type === "CallExpression" &&
     tag.callee.type === "Identifier" &&
-    tag.callee.name === imports.styled &&
-    tag.arguments[0]?.type === "Identifier"
+    tag.callee.name === imports.styled
   ) {
+    const argument = tag.arguments[0];
+    if (tag.arguments.length !== 1 || !argument) return null;
+
+    if (argument.type === "Literal" && typeof argument.value === "string") {
+      return {
+        type: "styled",
+        node,
+        tag: argument.value,
+        variableName,
+      };
+    }
+
+    const baseComponent = getComponentExpression(argument, code);
+    if (!baseComponent) return null;
     return {
       type: "styledExtend",
       node,
       tag: "",
-      baseComponent: (tag.arguments[0] as ESTree.Identifier).name,
+      baseComponent,
       variableName,
     };
   }
@@ -304,10 +393,15 @@ function classifyTemplate(
     tag.callee.object.type === "MemberExpression" &&
     tag.callee.object.object.type === "Identifier" &&
     tag.callee.object.object.name === imports.styled &&
-    tag.callee.object.property.type === "Identifier" &&
     tag.arguments.length === 1
   ) {
-    const elementTag = (tag.callee.object.property as ESTree.Identifier).name;
+    if (tag.arguments[0]?.type !== "ObjectExpression") {
+      throw new Error(
+        "[styled-static] attrs() only accepts a static object literal. Pass dynamic values as regular component props.",
+      );
+    }
+    const elementTag = getStaticMemberName(tag.callee.object);
+    if (!elementTag) return null;
     const attrsNode = tag.arguments[0] as ESTree.Node & {
       start: number;
       end: number;
@@ -374,82 +468,137 @@ function classifyVariantCall(
   if (!isStyledVariants && !isCssVariants) return null;
 
   if (node.arguments.length !== 1 || node.arguments[0]?.type !== "ObjectExpression") {
-    return null;
+    throw new Error(
+      `[styled-static] ${isStyledVariants ? "styledVariants" : "cssVariants"}() requires one inline object literal so its CSS can be extracted at build time.`,
+    );
   }
 
   const configObj = node.arguments[0] as ESTree.ObjectExpression;
 
-  let component: string | undefined;
+  let component: ComponentReference | undefined;
   let baseCss: string | undefined;
   const variants = new Map<string, Map<string, string>>();
   let defaultVariants: Map<string, string> | undefined;
   let compoundVariants: Array<{ conditions: Map<string, string>; css: string }> | undefined;
 
   for (const prop of configObj.properties) {
-    if (prop.type !== "Property" || prop.key.type !== "Identifier") continue;
+    if (prop.type !== "Property") {
+      throw new Error(
+        `[styled-static] ${isStyledVariants ? "styledVariants" : "cssVariants"}() does not support spread properties. Write the configuration fields inline.`,
+      );
+    }
 
-    const propName = prop.key.name;
+    const propName = getStaticPropertyName(prop);
+    if (!propName) {
+      throw new Error(
+        `[styled-static] ${isStyledVariants ? "styledVariants" : "cssVariants"}() configuration keys must be static property names.`,
+      );
+    }
 
     // component: 'button' or component: Button
     if (propName === "component") {
-      if (prop.value.type === "Literal" && typeof prop.value.value === "string") {
-        component = prop.value.value;
-      } else if (prop.value.type === "Identifier") {
-        component = prop.value.name;
+      const componentValue = prop.value;
+      if (componentValue.type === "Literal" && typeof componentValue.value === "string") {
+        component = { kind: "htmlTag", value: componentValue.value };
+      } else if (componentValue.type === "Identifier") {
+        component = { kind: "component", value: componentValue.name };
+      } else {
+        const expression = getComponentExpression(componentValue, code);
+        if (expression) component = { kind: "component", value: expression };
+      }
+      if (!component) {
+        throw new Error(
+          "[styled-static] styledVariants() component must be an HTML tag string or a static component reference such as Button or UI.Button.",
+        );
       }
     }
 
     // css: `...` or css: css`...`
     if (propName === "css") {
       baseCss = extractCssFromValueNode(prop.value as ESTree.Expression, code, imports.css);
+      if (baseCss === undefined) {
+        throw new Error(
+          `[styled-static] ${isStyledVariants ? "styledVariants" : "cssVariants"}() css must be a string or a static template literal.`,
+        );
+      }
     }
 
     // variants: { color: { primary: `...` }, size: { sm: `...` } }
-    if (propName === "variants" && prop.value.type === "ObjectExpression") {
-      for (const variantProp of prop.value.properties) {
-        if (variantProp.type !== "Property" || variantProp.key.type !== "Identifier") continue;
-        if (variantProp.value.type !== "ObjectExpression") continue;
+    if (propName === "variants") {
+      const variantsValue = prop.value;
+      if (variantsValue.type !== "ObjectExpression") {
+        throw new Error(
+          `[styled-static] ${isStyledVariants ? "styledVariants" : "cssVariants"}() variants must be an inline object literal.`,
+        );
+      }
+      for (const variantProp of variantsValue.properties) {
+        if (variantProp.type !== "Property" || variantProp.value.type !== "ObjectExpression") {
+          throw new Error(
+            "[styled-static] Each variant must be an inline object of value-to-CSS mappings.",
+          );
+        }
 
-        const variantName = variantProp.key.name;
+        const variantName = getStaticPropertyName(variantProp);
+        if (!variantName) {
+          throw new Error("[styled-static] Variant names must be static property names.");
+        }
         const variantValues = new Map<string, string>();
 
         for (const valueProp of variantProp.value.properties) {
-          if (valueProp.type !== "Property" || valueProp.key.type !== "Identifier") continue;
+          if (valueProp.type !== "Property") {
+            throw new Error(
+              `[styled-static] Variant ${JSON.stringify(variantName)} does not support spread values.`,
+            );
+          }
 
-          const valueName = valueProp.key.name;
+          const valueName = getStaticPropertyName(valueProp);
+          if (!valueName) {
+            throw new Error("[styled-static] Variant values must use static property names.");
+          }
           const cssContent = extractCssFromValueNode(
             valueProp.value as ESTree.Expression,
             code,
             imports.css,
           );
 
-          if (cssContent) {
-            variantValues.set(valueName, cssContent);
+          if (cssContent === undefined) {
+            throw new Error(
+              `[styled-static] Variant ${JSON.stringify(variantName)} value ${JSON.stringify(valueName)} must contain a string or static template literal.`,
+            );
           }
+          variantValues.set(valueName, cssContent);
         }
 
-        if (variantValues.size > 0) {
-          variants.set(variantName, variantValues);
+        if (variantValues.size === 0) {
+          throw new Error(
+            `[styled-static] Variant ${JSON.stringify(variantName)} must define at least one value.`,
+          );
         }
+        variants.set(variantName, variantValues);
       }
     }
 
     // defaultVariants: { size: 'md', intent: 'primary' }
-    if (propName === "defaultVariants" && prop.value.type === "ObjectExpression") {
+    if (propName === "defaultVariants") {
+      if (prop.value.type !== "ObjectExpression") {
+        throw new Error("[styled-static] defaultVariants must be an inline object literal.");
+      }
       const defaults = new Map<string, string>();
       for (const defaultProp of prop.value.properties) {
-        if (defaultProp.type !== "Property" || defaultProp.key.type !== "Identifier") continue;
-
-        const variantName = defaultProp.key.name;
-        let defaultValue: string | undefined;
-
-        if (defaultProp.value.type === "Literal" && typeof defaultProp.value.value === "string") {
-          defaultValue = defaultProp.value.value;
+        if (defaultProp.type !== "Property") {
+          throw new Error("[styled-static] defaultVariants does not support spread properties.");
         }
 
-        if (defaultValue) {
-          defaults.set(variantName, defaultValue);
+        const variantName = getStaticPropertyName(defaultProp);
+        if (!variantName) {
+          throw new Error("[styled-static] Default variant names must be static property names.");
         }
+        if (defaultProp.value.type !== "Literal" || typeof defaultProp.value.value !== "string") {
+          throw new Error(
+            `[styled-static] Default variant ${JSON.stringify(variantName)} must be a string literal.`,
+          );
+        }
+        defaults.set(variantName, defaultProp.value.value);
       }
       if (defaults.size > 0) {
         defaultVariants = defaults;
@@ -457,22 +606,36 @@ function classifyVariantCall(
     }
 
     // compoundVariants: [{ size: 'lg', intent: 'danger', css: `...` }]
-    if (propName === "compoundVariants" && prop.value.type === "ArrayExpression") {
+    if (propName === "compoundVariants") {
+      if (prop.value.type !== "ArrayExpression") {
+        throw new Error("[styled-static] compoundVariants must be an inline array literal.");
+      }
       const compounds: Array<{
         conditions: Map<string, string>;
         css: string;
       }> = [];
 
       for (const element of prop.value.elements) {
-        if (element?.type !== "ObjectExpression") continue;
+        if (element?.type !== "ObjectExpression") {
+          throw new Error(
+            "[styled-static] Every compoundVariants entry must be an inline object literal.",
+          );
+        }
 
         const conditions = new Map<string, string>();
         let cssContent: string | undefined;
 
         for (const cvProp of element.properties) {
-          if (cvProp.type !== "Property" || cvProp.key.type !== "Identifier") continue;
+          if (cvProp.type !== "Property") {
+            throw new Error(
+              "[styled-static] compoundVariants entries do not support spread properties.",
+            );
+          }
 
-          const key = cvProp.key.name;
+          const key = getStaticPropertyName(cvProp);
+          if (!key) {
+            throw new Error("[styled-static] Compound variant keys must be static property names.");
+          }
 
           if (key === "css") {
             cssContent = extractCssFromValueNode(
@@ -481,15 +644,21 @@ function classifyVariantCall(
               imports.css,
             );
           } else {
-            if (cvProp.value.type === "Literal" && typeof cvProp.value.value === "string") {
-              conditions.set(key, cvProp.value.value);
+            if (cvProp.value.type !== "Literal" || typeof cvProp.value.value !== "string") {
+              throw new Error(
+                `[styled-static] Compound variant condition ${JSON.stringify(key)} must be a string literal.`,
+              );
             }
+            conditions.set(key, cvProp.value.value);
           }
         }
 
-        if (cssContent && conditions.size > 0) {
-          compounds.push({ conditions, css: cssContent });
+        if (cssContent === undefined || conditions.size === 0) {
+          throw new Error(
+            "[styled-static] Every compoundVariants entry needs CSS and at least one variant condition.",
+          );
         }
+        compounds.push({ conditions, css: cssContent });
       }
 
       if (compounds.length > 0) {
@@ -498,6 +667,9 @@ function classifyVariantCall(
     }
   }
 
+  if (isStyledVariants && !component) {
+    throw new Error("[styled-static] styledVariants() requires a component field.");
+  }
   const result: FoundVariant = {
     type: isStyledVariants ? "styledVariants" : "cssVariants",
     start: node.start,
@@ -528,6 +700,7 @@ function classifyVariantCall(
 export function findWithComponentCalls(
   ast: ESTree.Program,
   imports: StyledStaticImports,
+  code: string,
 ): FoundWithComponent[] {
   const results: FoundWithComponent[] = [];
 
@@ -540,36 +713,41 @@ export function findWithComponentCalls(
         };
         const varName = decl.id.name;
 
-        if (
-          call.callee.type === "Identifier" &&
-          call.callee.name === imports.withComponent &&
-          call.arguments.length === 2
-        ) {
+        if (call.callee.type === "Identifier" && call.callee.name === imports.withComponent) {
+          if (call.arguments.length !== 2) {
+            throw new Error(
+              "[styled-static] withComponent() requires exactly two arguments: the target and the styled source component.",
+            );
+          }
           const toArg = call.arguments[0];
           const fromArg = call.arguments[1];
 
-          let toComponent: string | undefined;
+          let toComponent: ComponentReference | undefined;
           let fromComponent: string | undefined;
 
           if (toArg?.type === "Literal" && typeof toArg.value === "string") {
-            toComponent = toArg.value;
+            toComponent = { kind: "htmlTag", value: toArg.value };
           } else if (toArg?.type === "Identifier") {
-            toComponent = toArg.name;
+            toComponent = { kind: "component", value: toArg.name };
+          } else {
+            const expression = getComponentExpression(toArg, code);
+            if (expression) toComponent = { kind: "component", value: expression };
           }
 
-          if (fromArg?.type === "Identifier") {
-            fromComponent = fromArg.name;
-          }
+          fromComponent = getComponentExpression(fromArg, code);
 
-          if (toComponent && fromComponent) {
-            results.push({
-              start: call.start,
-              end: call.end,
-              toComponent,
-              fromComponent,
-              variableName: varName,
-            });
+          if (!toComponent || !fromComponent) {
+            throw new Error(
+              "[styled-static] withComponent() arguments must be an HTML tag string or static references such as Button or UI.Button.",
+            );
           }
+          results.push({
+            start: call.start,
+            end: call.end,
+            toComponent,
+            fromComponent,
+            variableName: varName,
+          });
         }
       }
     }

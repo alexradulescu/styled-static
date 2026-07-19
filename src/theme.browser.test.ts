@@ -44,9 +44,9 @@ describe("theme helpers (browser environment)", () => {
       expect(getTheme("color-mode")).toBe("sepia");
     });
 
-    it("should handle data-* prefix in custom attribute", () => {
+    it("should read a kebab-case data attribute", () => {
       document.documentElement.dataset.colorMode = "high-contrast";
-      expect(getTheme("data-colorMode")).toBe("high-contrast");
+      expect(getTheme("data-color-mode")).toBe("high-contrast");
     });
   });
 

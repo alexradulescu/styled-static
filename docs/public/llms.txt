@@ -15,6 +15,7 @@ Constraints:
 - No `css` prop -- use named `css` variables with `className`.
 - No `shouldForwardProp` -- not needed. Variants auto-strip their props.
 - No `as` prop -- replaced by `withComponent(To, From)` for build-time polymorphism.
+- APIs must be assigned to named, top-level variables. Variant configs must be inline object literals.
 
 Exports (from `@alex.radulescu/styled-static`):
 - `styled` -- create styled components with template literals
@@ -42,7 +43,7 @@ npm install @alex.radulescu/styled-static
 bun add @alex.radulescu/styled-static
 ```
 
-Configure the Vite plugin (must be placed before the React plugin):
+Configure the Vite plugin:
 
 ```ts
 // vite.config.ts
@@ -51,7 +52,7 @@ import { styledStatic } from "@alex.radulescu/styled-static/vite";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  plugins: [styledStatic(), react()],
+  plugins: [react(), styledStatic()],
 });
 ```
 
@@ -60,7 +61,7 @@ Optional: Add Lightning CSS for autoprefixing:
 ```ts
 export default defineConfig({
   css: { transformer: "lightningcss" },
-  plugins: [styledStatic(), react()],
+  plugins: [react(), styledStatic()],
 });
 ```
 
@@ -87,6 +88,10 @@ const Button = styled.button`
 `;
 
 <Button onClick={handleClick}>Click me</Button>
+
+// Equivalent forms
+const Anchor = styled("a")`color: blue;`;
+const DialogButton = styled(UI.Button)`font-weight: 700;`;
 ```
 
 ### Component Extension
@@ -434,8 +439,11 @@ const unsub = onSystemThemeChange((prefersDark) => {
 
 ```ts
 styledStatic({
-  // Prefix for generated class names (default: "ss")
+  // Prefix: letters, numbers, underscores, and hyphens (default: "ss")
   classPrefix: "my-app",
+
+  // Diagnostics can expose local file paths (default: false)
+  debug: false,
 
   // CSS output mode (default: "auto")
   // - "auto": Uses "file" for library builds (build.lib set), "virtual" for apps
@@ -523,10 +531,10 @@ Output:
 ```tsx
 import { createElement } from "react";
 import { m } from "@alex.radulescu/styled-static/runtime";
-import "@alex.radulescu/styled-static:abc123-0.css";
+import "virtual:styled-static/src/Button.tsx/0.css";
 
 const Button = Object.assign(
-  (p) => createElement("button", {...p, className: m("ss-abc123", p.className)}),
+  (props) => createElement("button", {...props, className: m("ss-abc123", props.className)}),
   { className: "ss-abc123" }
 );
 ```
@@ -542,11 +550,11 @@ const Primary = styled(Button)`background: blue;`;
 
 // Output
 const Button = Object.assign(
-  (p) => createElement("button", {...p, className: m("ss-btn", p.className)}),
+  (props) => createElement("button", {...props, className: m("ss-btn", props.className)}),
   { className: "ss-btn" }
 );
 const Primary = Object.assign(
-  (p) => createElement(Button, {...p, className: m("ss-primary", p.className)}),
+  (props) => createElement(Button, {...props, className: m("ss-primary", props.className)}),
   { className: Button.className + " ss-primary" }
 );
 // Primary.className === "ss-btn ss-primary"
@@ -554,7 +562,7 @@ const Primary = Object.assign(
 
 ### Virtual CSS Modules
 
-Each styled component gets its own virtual CSS module (e.g., `styled-static:abc123-0.css`). Benefits:
+Each styled component gets its own virtual CSS module (e.g., `virtual:styled-static/src/Button.tsx/0.css`). Benefits:
 - Deduplication via Vite's CSS pipeline
 - Code splitting -- CSS loads only with the components that use it
 - Hot Module Replacement for instant style updates
@@ -587,7 +595,7 @@ const GlobalStyles = createGlobalStyle`* { box-sizing: border-box; }`;
 
 // withComponent is resolved at build time
 const LinkButton = withComponent(Link, Button);
-// Generated: Object.assign((p) => createElement(Link, {...p, className: m(Button.className, p.className)}), { className: Button.className })
+// Generated: Object.assign((props) => createElement(Link, {...props, className: m(Button.className, props.className)}), { className: Button.className })
 ```
 
 ### Comparison

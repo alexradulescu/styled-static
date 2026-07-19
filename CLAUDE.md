@@ -11,7 +11,7 @@
 - **Language**: TypeScript (strict mode)
 - **Package Manager**: Bun
 - **Testing**: Vitest
-- **Dependencies**: Zero runtime dependencies (uses Vite's built-in tools)
+- **Dependencies**: Zero browser-runtime dependencies; the Vite plugin uses `magic-string`
 
 ## Project Structure
 
@@ -22,7 +22,7 @@ src/
     index.ts    # Minimal runtime (~45 bytes) - just className merging
   index.ts      # Public API exports (styled, css, createGlobalStyle, withComponent)
   types.ts      # TypeScript types (StyledComponent, StyledFunction, etc.)
-  hash.ts       # Murmurhash for class name generation
+  hash.ts       # 64-bit FNV-1a hash for class name generation
   vite.test.ts  # Comprehensive test suite
 example/        # Working demo app
 ```
@@ -72,7 +72,7 @@ const PasswordInput = styled.input.attrs({ type: "password" })`...`;
 3. **No forwardRef** - React 19 handles ref forwarding automatically
 4. **className order** - Base → Extension → User for correct cascade
 5. **Virtual CSS modules** - Each styled block becomes a virtual .css import
-6. **Zero dependencies** - Delegates CSS processing to Vite's pipeline; use Lightning CSS for autoprefixing
+6. **Zero browser dependencies** - Delegates CSS processing to Vite's pipeline; uses `magic-string` for source-map-safe transforms
 7. **No `css` prop** - Intentionally omitted. Named `css` variables encourage reusable styles and add zero plugin complexity
 8. **No `shouldForwardProp`** - Not needed. No runtime interpolation means no custom styling props to filter. Variants auto-strip their props; use destructuring or data attributes for edge cases
 9. **No `as` prop** - Replaced by `withComponent(To, From)` for build-time polymorphism
@@ -82,7 +82,7 @@ const PasswordInput = styled.input.attrs({ type: "password" })`...`;
 ```bash
 bun install          # Install dependencies
 bun run build        # Build the library
-bun test             # Run tests
+bun run test         # Run Node and browser tests
 cd example && bun dev # Run example app
 ```
 
@@ -101,10 +101,10 @@ const Button = styled.button`
 ```tsx
 import { createElement } from "react";
 import { m } from "@alex.radulescu/styled-static/runtime";
-import "@alex.radulescu/styled-static:abc123-0.css";
+import "virtual:styled-static/src/Button.tsx/0.css";
 
 const Button = Object.assign(
-  (p) => createElement("button", { ...p, className: m("ss-abc123", p.className) }),
+  (props) => createElement("button", { ...props, className: m("ss-abc123", props.className) }),
   { className: "ss-abc123" },
 );
 ```
@@ -124,11 +124,11 @@ const Primary = styled(Button)`
 
 // Output
 const Button = Object.assign(
-  (p) => createElement("button", { ...p, className: m("ss-btn", p.className) }),
+  (props) => createElement("button", { ...props, className: m("ss-btn", props.className) }),
   { className: "ss-btn" },
 );
 const Primary = Object.assign(
-  (p) => createElement(Button, { ...p, className: m("ss-primary", p.className) }),
+  (props) => createElement(Button, { ...props, className: m("ss-primary", props.className) }),
   { className: Button.className + " ss-primary" }, // "ss-btn ss-primary"
 );
 ```
@@ -150,7 +150,7 @@ We use `Object.assign` to create inline component functions with static properti
 ```tsx
 // This creates a valid React component with a .className property
 const Button = Object.assign(
-  (p) => createElement("button", { ...p, className: m("ss-btn", p.className) }),
+  (props) => createElement("button", { ...props, className: m("ss-btn", props.className) }),
   { className: "ss-btn" },
 );
 ```

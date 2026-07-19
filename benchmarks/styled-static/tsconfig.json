@@ -14,7 +14,12 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "@alex.radulescu/styled-static": ["../../src/index.ts"],
+      "@alex.radulescu/styled-static/runtime": ["../../src/runtime/index.ts"],
+      "@alex.radulescu/styled-static/vite": ["../../src/vite.ts"]
+    }
   },
   "include": ["src"]
 }

@@ -3,7 +3,6 @@ import {
   Atom,
   Ban,
   Code2,
-  Github,
   Globe,
   HeartCrack,
   Info,
@@ -765,6 +764,8 @@ export function App() {
     });
 
     return () => {
+      for (const element of observedElements) intersectionObserver.unobserve(element);
+      observedElements.clear();
       intersectionObserver.disconnect();
       mutationObserver.disconnect();
     };
@@ -954,7 +955,7 @@ export function App() {
               rel="noopener noreferrer"
               aria-label="GitHub repository"
             >
-              <Github size={18} />
+              <Code2 size={18} />
             </IconLink>
           </SidebarFooter>
         </Sidebar>
@@ -1041,7 +1042,8 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
               </AppCallout>
 
               <AppCallout type="warning" icon={<Shield size={20} />}>
-                <strong>Zero dependencies.</strong> Minimal attack surface. Nothing to audit.
+                <strong>No browser-runtime dependencies.</strong> One small build dependency to
+                audit.
               </AppCallout>
 
               <AppCallout type="tip" icon={<Target size={20} />}>
@@ -1094,7 +1096,7 @@ import react from '@vitejs/plugin-react';
 import { styledStatic } from 'styled-static/vite';
 
 export default defineConfig({
-  plugins: [styledStatic(), react()],
+  plugins: [react(), styledStatic()],
 });`}</CodeBlock>
               <AppCallout type="note" icon={<Info size={20} />}>
                 The plugin must be placed <strong>before</strong> the React plugin in the plugins
@@ -1112,7 +1114,7 @@ import { styledStatic } from 'styled-static/vite';
 
 export default defineConfig({
   css: { transformer: 'lightningcss' },
-  plugins: [styledStatic(), react()],
+  plugins: [react(), styledStatic()],
 });`}</CodeBlock>
               <AppCallout type="tip" icon={<Zap size={20} />}>
                 Lightning CSS provides automatic vendor prefixes, better minification, and faster

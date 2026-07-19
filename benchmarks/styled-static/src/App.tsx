@@ -3,7 +3,6 @@ import {
   Atom,
   Ban,
   Code2,
-  Github,
   Globe,
   HeartCrack,
   Info,
@@ -887,6 +886,8 @@ export function App() {
     });
 
     return () => {
+      for (const element of observedElements) intersectionObserver.unobserve(element);
+      observedElements.clear();
       intersectionObserver.disconnect();
       mutationObserver.disconnect();
     };
@@ -984,7 +985,7 @@ export function App() {
               rel="noopener noreferrer"
               aria-label="GitHub repository"
             >
-              <Github size={18} />
+              <Code2 size={18} />
             </IconLink>
           </SidebarFooter>
         </Sidebar>
@@ -1090,7 +1091,8 @@ const LinkButton = withComponent(Link, Button);`}</CodeBlock>
                   <Shield size={20} />
                 </CalloutIcon>
                 <CalloutContent>
-                  <strong>Zero dependencies.</strong> Minimal attack surface. Nothing to audit.
+                  <strong>Zero browser dependencies.</strong> The build plugin uses magic-string for
+                  source-map-safe transforms.
                 </CalloutContent>
               </div>
 
@@ -1166,18 +1168,18 @@ bun add styled-static`}</CodeBlock>
               <Paragraph>Configure the Vite plugin:</Paragraph>
               <CodeBlock filename="vite.config.ts">{`import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { styledStatic } from 'styled-static/vite';
+import { styledStatic } from '@alex.radulescu/styled-static/vite';
 
 export default defineConfig({
-  plugins: [styledStatic(), react()],
+  plugins: [react(), styledStatic()],
 });`}</CodeBlock>
               <div className={calloutStyles({ type: "note" })}>
                 <CalloutIcon>
                   <Info size={20} />
                 </CalloutIcon>
                 <CalloutContent>
-                  The plugin must be placed <strong>before</strong> the React plugin in the plugins
-                  array.
+                  The plugin runs in Vite&apos;s post phase. Array order does not control execution;
+                  putting React first is the clearest convention.
                 </CalloutContent>
               </div>
 
@@ -1188,11 +1190,11 @@ export default defineConfig({
               <CodeBlock filename="terminal">{`npm install lightningcss`}</CodeBlock>
               <CodeBlock filename="vite.config.ts">{`import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { styledStatic } from 'styled-static/vite';
+import { styledStatic } from '@alex.radulescu/styled-static/vite';
 
 export default defineConfig({
   css: { transformer: 'lightningcss' },
-  plugins: [styledStatic(), react()],
+  plugins: [react(), styledStatic()],
 });`}</CodeBlock>
               <div className={calloutStyles({ type: "tip" })}>
                 <CalloutIcon>

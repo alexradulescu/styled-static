@@ -6,7 +6,7 @@ with Vite. CSS is extracted at build time; minimal runtime handles dynamic featu
 
 Key APIs: styled, css, createGlobalStyle, styledVariants, cssVariants, cx
 Theme helpers: initTheme, setTheme, getTheme, onSystemThemeChange
-Runtime: Minimal | Dependencies: 0 | React 19+ required | Vite only
+Browser runtime: Minimal | Browser dependencies: 0 | Build dependency: magic-string | React 19+ | Vite only
 
 For implementation details, see CLAUDE.md or the source files in src/
 ═══════════════════════════════════════════════════════════════════════════════
@@ -24,7 +24,7 @@ Near-zero-runtime CSS-in-JS for React 19+ with Vite. Write styled-components syn
 - 🎯 **Type-Safe** - Full TypeScript support with proper prop inference
 - 🎨 **Familiar API** - styled-components syntax you already know
 - 📦 **Tiny** - Minimal ~45 byte runtime for className merging only
-- 🔧 **Zero Dependencies** - Uses native CSS features and Vite's built-in tools
+- 🔧 **Zero Browser Dependencies** - The generated browser runtime has no dependencies
 - 🌳 **Inline Components** - Components generated at build time, no runtime factories
 - 🌓 **Theme Helpers** - Simple utilities for dark mode and custom themes
 
@@ -126,7 +126,7 @@ const LinkButton = withComponent(Link, Button);
 - [Quick Overview](#quick-overview) · [Why](#why-styled-static) · [What We Don't Do](#what-we-dont-do) · [Installation](#installation)
 - **API:** [styled](#styled) · [Extension](#component-extension) · [css](#css-helper) · [keyframes](#keyframes) · [attrs](#attrs) · [cx](#cx-utility) · [Global Styles](#global-styles) · [Variants](#variants-api)
 - **Features:** [Polymorphism](#polymorphism-with-withcomponent) · [.className](#manual-composition-with-classname) · [CSS Nesting](#css-nesting) · [Dynamic Styling](#dynamic-styling) · [Theming](#theming)
-- **Internals:** [Troubleshooting](#troubleshooting) · [How It Works](#how-it-works) · [Config](#configuration) · [TypeScript](#typescript) · [Zero Deps](#zero-dependencies) · [Comparison](#comparison)
+- **Internals:** [Troubleshooting](#troubleshooting) · [How It Works](#how-it-works) · [Config](#configuration) · [TypeScript](#typescript) · [Runtime Dependencies](#runtime-dependencies) · [Comparison](#comparison)
 
 ---
 
@@ -135,7 +135,7 @@ const LinkButton = withComponent(Link, Button);
 - 🌐 **CSS evolved.** Native nesting, CSS variables, container queries—the gap between CSS and CSS-in-JS is smaller than ever.
 - 😵 **CSS-in-JS fatigue.** Most libraries are obsolete, complex, or have large runtime overhead.
 - ✨ **Syntactic sugar over CSS modules.** Better DX for writing CSS, without runtime interpolation.
-- 🔒 **Zero dependencies.** Minimal attack surface. Nothing to audit.
+- 🔒 **Tiny browser surface.** The generated runtime only merges class names. The build plugin uses `magic-string` for source maps.
 - 🎯 **Intentionally simple.** 95% native browser + 5% sprinkles.
 - 🎉 **Built for fun.** Curiosity-driven, useful code.
 
@@ -148,6 +148,7 @@ const LinkButton = withComponent(Link, Button);
 - ⚡ **Vite only** — Uses Vite's AST parser and virtual modules. No Webpack/Rollup.
 - 🚫 **No `css` prop** — Use named `css` variables with `className`.
 - 🚫 **No `shouldForwardProp`** — Not needed. Variants auto-strip props.
+- 📍 **Static declarations** — Declare APIs in named, top-level variables. Variant configuration must be one inline object literal.
 
 Each constraint removes complexity—no CSS parsing, no forwardRef, one great integration.
 
@@ -170,11 +171,11 @@ import { styledStatic } from "@alex.radulescu/styled-static/vite";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  plugins: [styledStatic(), react()],
+  plugins: [react(), styledStatic()],
 });
 ```
 
-> **Note:** The plugin must be placed **before** the React plugin in the plugins array.
+The plugin uses Vite's `post` phase, so array order does not control execution. Putting `react()` first is the clearest convention.
 
 ---
 
@@ -202,6 +203,16 @@ const Button = styled.button`
 
 // Usage
 <Button onClick={handleClick}>Click me</Button>;
+
+// Equivalent string-tag form
+const Link = styled("a")`
+  color: blue;
+`;
+
+// Static member expressions are supported too
+const DialogButton = styled(UI.Button)`
+  font-weight: 700;
+`;
 ```
 
 ### Component Extension
@@ -302,6 +313,8 @@ const PulsingDot = styled.div`
 
 Animation names are hashed at build time to avoid conflicts.
 
+Only direct `keyframes` variables may be interpolated. Other `${...}` expressions fail the build with a clear error. Use variants, CSS variables, or data attributes for dynamic values.
+
 ### attrs
 
 Set default HTML attributes using `.attrs()`:
@@ -373,6 +386,8 @@ createRoot(document.getElementById("root")!).render(
 For type-safe variant handling, use `styledVariants` to create components with variant props, or `cssVariants` to get class functions.
 
 > **Tip:** Wrap CSS strings in `css\`...\`` to get IDE syntax highlighting from the styled-components VSCode extension.
+
+The configuration must be an inline object literal so the plugin can extract it. `cssVariants(configVariable)` fails the build with an actionable error.
 
 #### styledVariants
 
@@ -447,6 +462,9 @@ const badgeCss = cssVariants({
 // Usage - returns class string
 <span className={badgeCss({ variant: 'info' })}>Info</span>
 // Returns: "ss-xyz ss-xyz--variant-info"
+
+// The argument is optional. Defaults still apply.
+badgeCss()
 
 // Combine with cx for conditional classes
 <span className={cx(badgeCss({ variant: 'info' }), isActive && activeClass)}>
@@ -659,10 +677,10 @@ const Button = styled.button`
 // 2. What gets generated:
 import { createElement } from "react";
 import { m } from "@alex.radulescu/styled-static/runtime";
-import "@alex.radulescu/styled-static:abc123-0.css";
+import "virtual:styled-static/src/Button.tsx/0.css";
 
 const Button = Object.assign(
-  (p) => createElement("button", { ...p, className: m("ss-abc123", p.className) }),
+  (props) => createElement("button", { ...props, className: m("ss-abc123", props.className) }),
   { className: "ss-abc123" },
 );
 ```
@@ -671,7 +689,7 @@ The CSS is completely removed from your JavaScript bundle and extracted to a vir
 
 ### Virtual CSS Modules
 
-Each styled component gets its own virtual CSS module with a unique ID like `styled-static:abc123-0.css`. This approach enables:
+Each styled component gets its own virtual CSS module with a unique ID like `virtual:styled-static/src/Button.tsx/0.css`. This approach enables:
 
 - ✅ **Deduplication** - CSS is optimized by Vite's pipeline
 - ✅ **Code splitting** - CSS loads only with the components that use it
@@ -679,7 +697,7 @@ Each styled component gets its own virtual CSS module with a unique ID like `sty
 - ✅ **Production optimization** - CSS can be extracted to a single file
 
 ```css
-/* Virtual module: styled-static:abc123-0.css */
+/* Virtual module: virtual:styled-static/src/Button.tsx/0.css */
 .ss-abc123 {
   padding: 1rem;
   background: blue;
@@ -721,7 +739,7 @@ const GlobalStyles = createGlobalStyle`* { box-sizing: border-box; }`;
 
 // withComponent - zero runtime (build-time transformation)
 const LinkButton = withComponent(Link, Button);
-// Generated: Object.assign((p) => createElement(Link, {...p, className: m(Button.className, p.className)}), { className: Button.className })
+// Generated: Object.assign((props) => createElement(Link, {...props, className: m(Button.className, props.className)}), { className: Button.className })
 ```
 
 ---
@@ -730,8 +748,12 @@ const LinkButton = withComponent(Link, Button);
 
 ```ts
 styledStatic({
-  // Prefix for generated class names (default: 'ss')
+  // Prefix for generated class names (default: 'ss').
+  // Allowed: letters, numbers, underscores, and hyphens.
   classPrefix: "my-app",
+
+  // Build diagnostics. May expose local file paths.
+  debug: false,
 
   // CSS output mode (default: 'auto')
   // - 'auto': Uses 'file' for library builds (build.lib set), 'virtual' for apps
@@ -789,9 +811,9 @@ const classes = Button.className; // string
 
 ---
 
-## Zero Dependencies
+## Runtime Dependencies
 
-Zero runtime dependencies. Uses native CSS nesting (Chrome 112+, Safari 16.5+, Firefox 117+) and Vite's CSS pipeline. See [Installation](#installation) for optional Lightning CSS integration.
+The generated browser runtime has zero dependencies and is about 45 bytes minified. The Vite build plugin depends on `magic-string` to make safe replacements with source maps. CSS uses native nesting (Chrome 112+, Safari 16.5+, Firefox 117+) and Vite's CSS pipeline.
 
 ---
 
@@ -802,7 +824,7 @@ Zero runtime dependencies. Uses native CSS nesting (Chrome 112+, Safari 16.5+, F
 |                       | styled-static | Emotion | Linaria | [Restyle](https://restyle.dev) | Panda CSS |
 | --------------------- | ------------- | ------- | ------- | ------------------------------ | --------- |
 | Runtime               | **~50 B**     | ~11 KB  | ~1.5 KB | ~2.2 KB                        | 0 B       |
-| Dependencies          | 0             | 5+      | 10+     | 0                              | 5+        |
+| Browser dependencies  | 0             | 5+      | 10+     | 0                              | 5+        |
 | React                 | 19+           | 16+     | 16+     | 19+                            | 16+       |
 | Bundler               | Vite          | Any     | Many    | Any                            | Any       |
 | `styled.el`           | ✓             | ✓       | ✓       | ✓                              | ◐         |

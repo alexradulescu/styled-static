@@ -132,10 +132,10 @@ const Button = styled.button\`
         <CodeBlock>{`// What gets generated:
 import { createElement } from "react";
 import { m } from "styled-static/runtime";
-import "styled-static:abc123-0.css";
+import "virtual:styled-static/src/Button.tsx/0.css";
 
 const Button = Object.assign(
-  (p) => createElement("button", {...p, className: m("ss-abc123", p.className)}),
+  (props) => createElement("button", {...props, className: m("ss-abc123", props.className)}),
   { className: "ss-abc123" }
 );`}</CodeBlock>
 
@@ -152,10 +152,10 @@ const Button = Object.assign(
         <Paragraph>
           The extracted CSS is served through Vite's virtual module system. Each styled component
           gets a unique virtual CSS module with a name like{" "}
-          <InlineCode>styled-static:abc123-0.css</InlineCode>.
+          <InlineCode>virtual:styled-static/src/Button.tsx/0.css</InlineCode>.
         </Paragraph>
 
-        <CodeBlock>{`/* Virtual module: styled-static:abc123-0.css */
+        <CodeBlock>{`/* Virtual module: virtual:styled-static/src/Button.tsx/0.css */
 .ss-abc123 {
   padding: 1rem 2rem;
   background: blue;
@@ -386,7 +386,7 @@ import { createElement } from "react";
 import { m } from "styled-static/runtime";
 
 const Primary = Object.assign(
-  (p) => createElement(Button, {...p, className: m("ss-xyz789", p.className)}),
+  (props) => createElement(Button, {...props, className: m("ss-xyz789", props.className)}),
   { className: Button.className + " ss-xyz789" }
 );
 
@@ -405,7 +405,8 @@ const Primary = Object.assign(
         <SubsectionTitle>Variants Implementation</SubsectionTitle>
         <Paragraph>
           Variant components build class strings dynamically at runtime based on prop values. All
-          variant values are sanitized to prevent CSS injection attacks.
+          variant values are compared with known strings. Unknown values add no class and can never
+          become CSS.
         </Paragraph>
 
         <CodeBlock>{`// Source
@@ -422,11 +423,11 @@ const Button = styledVariants({
 
 // Generated (inline component with explicit variant checks)
 const Button = Object.assign(
-  ({ color, className, ...p }) => {
-    let c = "ss-abc123";
-    if (color === "primary") c += " ss-abc123--color-primary";
-    else if (color === "danger") c += " ss-abc123--color-danger";
-    return createElement("button", {...p, className: m(c, className)});
+  ({ color, className: userClassName, ...remainingProps }) => {
+    let classNames = "ss-abc123";
+    if (color === "primary") classNames += " ss-abc123--color-primary";
+    else if (color === "danger") classNames += " ss-abc123--color-danger";
+    return createElement("button", {...remainingProps, className: m(classNames, userClassName)});
   },
   { className: "ss-abc123" }
 );
@@ -440,16 +441,17 @@ const Button = Object.assign(
         <Breadcrumb>Internals</Breadcrumb>
         <SubsectionTitle>Development-Only Features</SubsectionTitle>
         <Paragraph>
-          The generated code is identical in development and production builds. Debug logging is
-          available via an environment variable:
+          Development uses readable, path-qualified class names and JavaScript-backed virtual CSS
+          for HMR. Production uses content hashes and extracted CSS. Debug logging is available via
+          an environment variable:
         </Paragraph>
 
         <CodeBlock>{`# Enable debug logging during development
 DEBUG_STYLED_STATIC=true bun dev
 
-# The generated component is the same in dev and prod:
+# Representative generated component:
 const Button = Object.assign(
-  (p) => createElement("button", {...p, className: m("ss-abc123", p.className)}),
+  (props) => createElement("button", {...props, className: m("ss-abc123", props.className)}),
   { className: "ss-abc123" }
 );`}</CodeBlock>
 

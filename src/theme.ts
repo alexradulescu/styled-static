@@ -23,11 +23,6 @@
 const DEFAULT_STORAGE_KEY = "theme";
 const DEFAULT_THEME = "light";
 
-/** Convert a `data-*` attribute name to a camelCase dataset key. */
-function dataToCamelCase(attribute: string): string {
-  return attribute.slice(5).replace(/-([a-z])/g, (_, l: string) => l.toUpperCase());
-}
-
 /**
  * Options for initializing the theme system.
  */
@@ -70,11 +65,6 @@ export interface InitThemeOptions {
 export function getTheme(attribute = "data-theme"): string {
   if (typeof document === "undefined") return DEFAULT_THEME;
 
-  // Handle both data-* and regular attributes
-  if (attribute.startsWith("data-")) {
-    // dataset uses camelCase keys: data-color-mode → colorMode
-    return document.documentElement.dataset[dataToCamelCase(attribute)] || DEFAULT_THEME;
-  }
   return document.documentElement.getAttribute(attribute) || DEFAULT_THEME;
 }
 
@@ -101,13 +91,7 @@ export function setTheme(
 
   if (typeof document === "undefined") return;
 
-  // Handle both data-* and regular attributes
-  if (attribute.startsWith("data-")) {
-    // dataset uses camelCase keys: data-color-mode → colorMode
-    document.documentElement.dataset[dataToCamelCase(attribute)] = theme;
-  } else {
-    document.documentElement.setAttribute(attribute, theme);
-  }
+  document.documentElement.setAttribute(attribute, theme);
 
   if (persist && typeof localStorage !== "undefined") {
     try {

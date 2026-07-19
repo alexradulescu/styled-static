@@ -15,11 +15,10 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "baseUrl": ".",
     "paths": {
-      "styled-static": ["../src/index.ts"],
-      "styled-static/runtime": ["../src/runtime.tsx"],
-      "styled-static/vite": ["../src/vite.ts"]
+      "@alex.radulescu/styled-static": ["../src/index.ts"],
+      "@alex.radulescu/styled-static/runtime": ["../src/runtime/index.ts"],
+      "@alex.radulescu/styled-static/vite": ["../src/vite.ts"]
     }
   },
   "include": ["src"]

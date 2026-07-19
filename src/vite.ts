@@ -4,9 +4,9 @@
  * Transforms styled-static syntax into optimized React components with
  * static CSS extraction.
  *
- * ## Zero Dependencies
+ * ## Minimal Dependencies
  *
- * This plugin has NO direct dependencies! It uses:
+ * The plugin uses `magic-string` for source-map-safe replacements and:
  * - Vite's built-in parser (via Rollup's acorn)
  * - Native CSS nesting (Chrome 112+, Safari 16.5+, Firefox 117+, Edge 112+)
  * - Vite's CSS pipeline for processing
@@ -60,15 +60,18 @@
  */
 import type * as ESTree from "estree";
 import MagicString from "magic-string";
-import type { Plugin, ResolvedConfig } from "vite";
+import type { Plugin } from "vite";
 import {
+  createVariantClassName,
+  createVariantValueName,
   generateReplacement,
   generateVariantReplacement,
   getFileBaseName,
-  isValidIdentifier,
+  isValidComponentReference,
   normalizePath,
   rewriteCssImports,
   safeStringLiteral,
+  toClassNameSegment,
 } from "./codegen.js";
 import { hash } from "./hash.js";
 import {
@@ -106,6 +109,58 @@ export interface StyledStaticOptions {
   cssOutput?: "auto" | "virtual" | "file";
 }
 
+function createUniqueIdentifier(code: string, preferredName: string): string {
+  let candidate = preferredName;
+  while (new RegExp(`\\b${candidate}\\b`).test(code)) {
+    candidate += "_";
+  }
+  return candidate;
+}
+
+function removeQueryString(moduleId: string): string {
+  return moduleId.split("?", 1)[0] ?? moduleId;
+}
+
+function createDevClassName(prefix: string, variableName: string, filePath: string): string {
+  const pathHash = hash(normalizePath(filePath)).slice(0, 5);
+  return `${prefix}-${toClassNameSegment(variableName)}-${getFileBaseName(filePath)}-${pathHash}`;
+}
+
+function escapeCssComment(value: string): string {
+  return value.replace(/\*\//g, "*\\/").replace(/[\r\n]/g, "");
+}
+
+function createVariantFingerprint(variant: ReturnType<typeof findVariantCalls>[number]): string {
+  return JSON.stringify({
+    base: variant.baseCss ?? "",
+    variants: Array.from(variant.variants, ([name, values]) => [name, Array.from(values)]),
+    compounds: variant.compoundVariants?.map(({ conditions, css }) => [
+      Array.from(conditions),
+      css,
+    ]),
+  });
+}
+
+function validateVariantReferences(variant: ReturnType<typeof findVariantCalls>[number]): void {
+  for (const [name, value] of variant.defaultVariants ?? []) {
+    if (!variant.variants.get(name)?.has(value)) {
+      throw new Error(
+        `[styled-static] Unknown default variant ${JSON.stringify(name)}: ${JSON.stringify(value)} in ${variant.variableName}.`,
+      );
+    }
+  }
+
+  for (const compound of variant.compoundVariants ?? []) {
+    for (const [name, value] of compound.conditions) {
+      if (!variant.variants.get(name)?.has(value)) {
+        throw new Error(
+          `[styled-static] Unknown compound variant ${JSON.stringify(name)}: ${JSON.stringify(value)} in ${variant.variableName}.`,
+        );
+      }
+    }
+  }
+}
+
 // ============================================================================
 // Plugin
 // ============================================================================
@@ -116,47 +171,48 @@ export interface StyledStaticOptions {
  * @example
  * import { defineConfig } from 'vite';
  * import react from '@vitejs/plugin-react';
- * import { styledStatic } from 'styled-static/vite';
+ * import { styledStatic } from '@alex.radulescu/styled-static/vite';
  *
  * export default defineConfig({
- *   plugins: [styledStatic(), react()],
+ *   plugins: [react(), styledStatic()],
  * });
  */
 export function styledStatic(options: StyledStaticOptions = {}): Plugin {
   const { classPrefix = "ss", debug: debugOption, cssOutput = "auto" } = options;
 
+  if (!/^[a-zA-Z_][a-zA-Z0-9_-]*$/.test(classPrefix)) {
+    throw new Error(
+      `[styled-static] classPrefix must start with a letter or underscore and contain only letters, numbers, underscores, or hyphens. Received: ${JSON.stringify(classPrefix)}`,
+    );
+  }
+
   // SECURITY: Debug logging can expose file paths and internal state.
   // Only enable via explicit option or environment variable.
-  const DEBUG = debugOption ?? process.env.DEBUG_STYLED_STATIC === "true";
+  const debugEnabled = debugOption ?? process.env.DEBUG_STYLED_STATIC === "true";
 
   // Virtual CSS modules: filename -> CSS content + source file
   const cssModules = new Map<string, { css: string; sourceFile: string }>();
 
-  let config: ResolvedConfig;
   let isDev = false;
   let actualCssOutput: "virtual" | "file" = "virtual";
-  // Per-plugin-instance counter for unique hoisted variant map names
-  let variantMapId = 0;
-
   return {
     name: "styled-static",
     enforce: "post", // Run AFTER React plugin (JSX already transformed)
 
     configResolved(resolvedConfig) {
-      config = resolvedConfig;
-      isDev = config.command === "serve";
+      isDev = resolvedConfig.command === "serve";
 
       // Resolve 'auto' CSS output mode based on build type
       if (cssOutput === "auto") {
         // Library builds get file mode for tree-shaking, apps get virtual mode
-        actualCssOutput = config.build?.lib ? "file" : "virtual";
+        actualCssOutput = resolvedConfig.build?.lib ? "file" : "virtual";
       } else {
         actualCssOutput = cssOutput;
       }
 
-      if (DEBUG) {
+      if (debugEnabled) {
         console.log(
-          `[styled-static] CSS output mode: ${actualCssOutput} (config: ${cssOutput}, isLib: ${!!config.build?.lib})`,
+          `[styled-static] CSS output mode: ${actualCssOutput} (config: ${cssOutput}, isLib: ${!!resolvedConfig.build?.lib})`,
         );
       }
     },
@@ -185,7 +241,7 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
 
         if (isDev) {
           // Add sourceURL comment for DevTools source mapping
-          const sourceFile = data?.sourceFile ?? "";
+          const sourceFile = data?.sourceFile ? escapeCssComment(data.sourceFile) : "";
           const cssWithSource = sourceFile ? `${css}\n/*# sourceURL=${sourceFile} */` : css;
 
           // Dev mode: return JS that injects CSS into DOM with HMR support
@@ -193,8 +249,11 @@ export function styledStatic(options: StyledStaticOptions = {}): Plugin {
 const id = ${JSON.stringify(basePath)};
 const css = ${JSON.stringify(cssWithSource)};
 
-// Remove existing style for this module (HMR cleanup)
-const existing = document.querySelector(\`style[data-ss-id="\${id}"]\`);
+// Remove existing style for this module (HMR cleanup). Avoid interpolating the
+// module id into a CSS selector because valid file names can contain quotes.
+const existing = Array.from(document.querySelectorAll("style[data-ss-id]")).find(
+  (element) => element.getAttribute("data-ss-id") === id,
+);
 if (existing) existing.remove();
 
 const style = document.createElement('style');
@@ -230,8 +289,8 @@ export default css;
         // Invalidate all virtual CSS modules from this source file.
         // Use normalizedPath + "/" to avoid matching files with a common prefix
         // (e.g., "Button.tsx" must not invalidate "ButtonGroup.tsx" CSS modules).
-        for (const [moduleId] of cssModules) {
-          if (moduleId.includes(normalizedPath + "/")) {
+        for (const [moduleId, data] of cssModules) {
+          if (normalizePath(removeQueryString(data.sourceFile)) === normalizedPath) {
             const mod = server.moduleGraph.getModuleById(`\0${moduleId}`);
             if (mod) {
               server.moduleGraph.invalidateModule(mod);
@@ -242,101 +301,113 @@ export default css;
     },
 
     async transform(code, id) {
+      const filePath = removeQueryString(id);
       // Process all JS/TS files, skip node_modules
       // Matches: .js, .jsx, .ts, .tsx, .mjs, .cjs, .mts, .cts
-      if (!/\.[cm]?[jt]sx?$/.test(id) || /node_modules/.test(id)) {
+      if (
+        !/\.[cm]?[jt]sx?$/.test(filePath) ||
+        /(?:^|[/\\])node_modules(?:[/\\]|$)/.test(filePath)
+      ) {
         return null;
       }
 
-      // Quick check: does file import from styled-static or local index?
+      // Quick check: does the file import from styled-static?
       // This avoids parsing files that don't use the library
       const hasStyledStaticImport = code.includes("styled-static");
-      const hasLocalIndexImport =
-        code.includes('from "./index"') ||
-        code.includes("from './index'") ||
-        code.includes('from "../index"') ||
-        code.includes("from '../index'");
-      if (!hasStyledStaticImport && !hasLocalIndexImport) {
+      if (!hasStyledStaticImport) {
         return null;
       }
 
-      if (DEBUG) console.log("[styled-static] Transforming:", id);
+      if (debugEnabled) console.log("[styled-static] Transforming:", id);
 
       // Parse AST using Vite's built-in parser
       // Since we run after React plugin (enforce: 'post'), JSX is already transformed
       let ast: ESTree.Program;
       try {
         ast = this.parse(code) as ESTree.Program;
-        if (DEBUG) {
+        if (debugEnabled) {
           console.log("[styled-static] AST parsed successfully, body length:", ast.body.length);
         }
       } catch (e) {
         // Parse error - this might be a partial file or syntax error
-        if (DEBUG) console.log("[styled-static] AST parse error:", e);
+        if (debugEnabled) console.log("[styled-static] AST parse error:", e);
         return null;
       }
 
       // Find styled-static imports and their local names
       const imports = findStyledStaticImports(ast);
-      if (DEBUG) console.log("[styled-static] Found imports:", imports);
+      if (debugEnabled) console.log("[styled-static] Found imports:", imports);
       const hasTemplateImports =
         imports.css || imports.styled || imports.createGlobalStyle || imports.keyframes;
       const hasVariantImports = imports.styledVariants || imports.cssVariants;
       const hasWithComponent = !!imports.withComponent;
       if (!hasTemplateImports && !hasVariantImports && !hasWithComponent) {
-        if (DEBUG) console.log("[styled-static] No imports found, skipping");
+        if (debugEnabled) console.log("[styled-static] No imports found, skipping");
         return null;
       }
 
       // Find all tagged template literals using our imports
       const templates = hasTemplateImports ? findTaggedTemplates(ast, imports, code) : [];
-      if (DEBUG) console.log("[styled-static] Found templates:", templates.length);
+      if (debugEnabled) console.log("[styled-static] Found templates:", templates.length);
 
       // Find all variant calls using our imports
       const variantCalls = hasVariantImports ? findVariantCalls(ast, code, imports) : [];
-      if (DEBUG) console.log("[styled-static] Found variant calls:", variantCalls.length);
+      if (debugEnabled) console.log("[styled-static] Found variant calls:", variantCalls.length);
 
       // Find all withComponent calls
-      const withComponentCalls = hasWithComponent ? findWithComponentCalls(ast, imports) : [];
-      if (DEBUG)
+      const withComponentCalls = hasWithComponent ? findWithComponentCalls(ast, imports, code) : [];
+      if (debugEnabled)
         console.log("[styled-static] Found withComponent calls:", withComponentCalls.length);
 
       if (templates.length === 0 && variantCalls.length === 0 && withComponentCalls.length === 0) {
-        if (DEBUG)
+        if (debugEnabled)
           console.log("[styled-static] No templates, variants, or withComponent found, skipping");
         return null;
       }
 
-      const s = new MagicString(code);
+      const transformedCode = new MagicString(code);
       const cssImports: string[] = [];
       // Track if we need React's createElement and our merge helper
       let needsCreateElement = false;
+      const runtimeNames = {
+        createElement: createUniqueIdentifier(code, "createElement"),
+        mergeClassNames: createUniqueIdentifier(code, "m"),
+        props: createUniqueIdentifier(code, "props"),
+        remainingProps: createUniqueIdentifier(code, "remainingProps"),
+        userClassName: createUniqueIdentifier(code, "userClassName"),
+        classNames: createUniqueIdentifier(code, "classNames"),
+      };
 
       // Clean up stale CSS modules from previous transforms of this file.
       // Prevents unbounded memory growth during long dev sessions with HMR.
       // Use normalizedId + "/" to avoid false matches with files sharing a common prefix.
-      const normalizedId = normalizePath(id);
-      for (const key of cssModules.keys()) {
-        if (key.includes(normalizedId + "/")) {
+      const normalizedFilePath = normalizePath(filePath);
+      for (const [key, data] of cssModules) {
+        if (normalizePath(removeQueryString(data.sourceFile)) === normalizedFilePath) {
           cssModules.delete(key);
         }
       }
 
       let cssIndex = 0;
 
-      for (let i = 0; i < templates.length; i++) {
-        const t = templates[i];
-        if (!t) continue; // Guard against undefined (noUncheckedIndexedAccess)
-        const cssContent = extractTemplateContent(code, t.node.quasi);
+      const keyframeClasses = new Map<string, string>();
+      for (const template of templates) {
+        if (template.type !== "keyframes" || !template.variableName) continue;
+        const cssContent = extractTemplateContent(code, template.node.quasi);
+        const className = isDev
+          ? createDevClassName(classPrefix, template.variableName, filePath)
+          : `${classPrefix}-${hash(cssContent)}`;
+        keyframeClasses.set(template.variableName, className);
+      }
+
+      for (const template of templates) {
+        const cssContent = extractTemplateContent(code, template.node.quasi, keyframeClasses);
         // In dev mode, use readable class names; in prod, use hash for minimal size
         let className: string;
-        if (isDev && t.variableName) {
-          const fileBase = getFileBaseName(id);
-          className = `${classPrefix}-${t.variableName}-${fileBase}`;
+        if (isDev && template.variableName) {
+          className = createDevClassName(classPrefix, template.variableName, filePath);
         } else {
-          // SECURITY: Use longer hash in production for lower collision probability
-          const hashLength = isDev ? 6 : 8;
-          const cssHash = hash(cssContent).slice(0, hashLength);
+          const cssHash = hash(cssContent);
           className = `${classPrefix}-${cssHash}`;
         }
 
@@ -346,42 +417,45 @@ export default css;
         // - styled/css: wrapped in class selector
         // Lightning CSS (via Vite's CSS pipeline) handles nesting, prefixes, etc.
         const processedCss =
-          t.type === "createGlobalStyle"
+          template.type === "createGlobalStyle"
             ? cssContent
-            : t.type === "keyframes"
+            : template.type === "keyframes"
               ? `@keyframes ${className} { ${cssContent} }`
               : `.${className} { ${cssContent} }`;
 
         // Create virtual CSS module with source file path for proper chunk association
         // Use .js extension in dev mode (to avoid Vite's CSS plugin processing)
         // Use .css extension in build mode (for proper CSS extraction)
-        const cssModuleBase = `virtual:styled-static/${normalizePath(id)}/${cssIndex++}`;
+        const cssModuleBase = `virtual:styled-static/${normalizePath(filePath)}/${cssIndex++}`;
         const cssModuleId = `${cssModuleBase}.css`; // Always store with .css
         const importId = isDev ? `${cssModuleBase}.js` : cssModuleId;
-        cssModules.set(cssModuleId, { css: processedCss, sourceFile: id });
+        cssModules.set(cssModuleId, { css: processedCss, sourceFile: filePath });
         cssImports.push(`import "${importId}";`);
 
         // Generate replacement code and track runtime needs
-        const replacement = generateReplacement(t, className);
-        s.overwrite(t.node.start, t.node.end, replacement);
+        const replacement = generateReplacement(template, className, runtimeNames);
+        transformedCode.overwrite(template.node.start, template.node.end, replacement);
 
         // styled, styledExtend, styledAttrs need createElement and m
-        if (t.type === "styled" || t.type === "styledExtend" || t.type === "styledAttrs") {
+        if (
+          template.type === "styled" ||
+          template.type === "styledExtend" ||
+          template.type === "styledAttrs"
+        ) {
           needsCreateElement = true;
         }
         // css, keyframes, createGlobalStyle don't need runtime
       }
 
       // Process variant calls
-      const hoistedDeclarations: string[] = [];
-      for (const v of variantCalls) {
+      for (const variant of variantCalls) {
+        validateVariantReferences(variant);
         // In dev mode, use readable class names; in prod, use hash for minimal size
         let baseClass: string;
-        if (isDev && v.variableName) {
-          const fileBase = getFileBaseName(id);
-          baseClass = `${classPrefix}-${v.variableName}-${fileBase}`;
+        if (isDev && variant.variableName) {
+          baseClass = createDevClassName(classPrefix, variant.variableName, filePath);
         } else {
-          const baseHash = hash(v.baseCss || "").slice(0, isDev ? 6 : 8);
+          const baseHash = hash(createVariantFingerprint(variant));
           baseClass = `${classPrefix}-${baseHash}`;
         }
 
@@ -389,111 +463,122 @@ export default css;
         let allCss = "";
 
         // Base CSS
-        if (v.baseCss) {
-          allCss += `.${baseClass} { ${v.baseCss} }\n`;
+        if (variant.baseCss) {
+          allCss += `.${baseClass} { ${variant.baseCss} }\n`;
         }
 
         // Variant CSS (modifiers)
-        for (const [variantName, values] of v.variants) {
+        for (const [variantName, values] of variant.variants) {
           for (const [valueName, cssContent] of values) {
-            const modifierClass = `${baseClass}--${variantName}-${valueName}`;
+            const modifierClass = createVariantClassName(baseClass, variantName, valueName);
             allCss += `.${modifierClass} { ${cssContent} }\n`;
           }
         }
 
         // Compound variant CSS (combined selectors for higher specificity)
-        if (v.compoundVariants) {
-          for (const cv of v.compoundVariants) {
+        if (variant.compoundVariants) {
+          for (const compoundVariant of variant.compoundVariants) {
             // Build combined selector: .ss-btn--size-lg.ss-btn--intent-danger
-            const selectors = Array.from(cv.conditions.entries())
-              .map(([variantName, value]) => `.${baseClass}--${variantName}-${value}`)
+            const selectors = Array.from(compoundVariant.conditions.entries())
+              .map(
+                ([variantName, value]) =>
+                  `.${createVariantClassName(baseClass, variantName, value)}`,
+              )
               .join("");
-            allCss += `${selectors} { ${cv.css} }\n`;
+            allCss += `${selectors} { ${compoundVariant.css} }\n`;
           }
         }
 
         // Create virtual CSS module with source file path for proper chunk association
         // Use .js extension in dev mode, .css in build mode
-        const cssModuleBase = `virtual:styled-static/${normalizePath(id)}/${cssIndex++}`;
+        const cssModuleBase = `virtual:styled-static/${normalizePath(filePath)}/${cssIndex++}`;
         const cssModuleId = `${cssModuleBase}.css`;
         const importId = isDev ? `${cssModuleBase}.js` : cssModuleId;
-        cssModules.set(cssModuleId, { css: allCss, sourceFile: id });
+        cssModules.set(cssModuleId, { css: allCss, sourceFile: filePath });
         cssImports.push(`import "${importId}";`);
 
         // Generate replacement code
-        const variantKeys = Array.from(v.variants.keys());
-        const result = generateVariantReplacement(v, baseClass, variantKeys, () => variantMapId++);
-        s.overwrite(v.start, v.end, result.code);
-
-        // Collect hoisted declarations for complex variants
-        if (result.hoisted) {
-          hoistedDeclarations.push(result.hoisted);
-        }
+        const variantKeys = Array.from(variant.variants.keys());
+        const variantRuntimeNames = {
+          ...runtimeNames,
+          variantValues: variantKeys.map((key, index) =>
+            createUniqueIdentifier(code, createVariantValueName(key, index)),
+          ),
+        };
+        const replacement = generateVariantReplacement(
+          variant,
+          baseClass,
+          variantKeys,
+          variantRuntimeNames,
+        );
+        transformedCode.overwrite(variant.start, variant.end, replacement);
 
         // styledVariants needs createElement and m
-        if (v.type === "styledVariants") {
+        if (variant.type === "styledVariants") {
           needsCreateElement = true;
         }
         // cssVariants doesn't need runtime (inline function)
       }
 
       // Process withComponent calls
-      for (const wc of withComponentCalls) {
+      for (const componentCall of withComponentCalls) {
         // SECURITY: Validate component references
-        if (!isValidIdentifier(wc.fromComponent)) {
-          /* unreachable: unreachable: fromComponent is an AST Identifier node, always valid */
-          throw new Error(`[styled-static] Invalid fromComponent name: ${wc.fromComponent}`);
+        if (!isValidComponentReference(componentCall.fromComponent)) {
+          /* unreachable: component references are validated during parsing */
+          throw new Error(
+            `[styled-static] Invalid fromComponent name: ${componentCall.fromComponent}`,
+          );
         }
 
         // Generate replacement code
-        // withComponent(To, From) → Object.assign((p) => createElement(To, {...p, className: m(From.className, p.className)}), { className: From.className })
-        const isHtmlTag = /^[a-z]/.test(wc.toComponent);
+        // withComponent(To, From) preserves the source component's classes while changing its target.
+        const isHtmlTag = componentCall.toComponent.kind === "htmlTag";
+        const targetComponent = componentCall.toComponent.value;
         let replacement: string;
 
         if (isHtmlTag) {
           // HTML tag: withComponent('a', Button)
-          replacement = `Object.assign((p) => createElement(${safeStringLiteral(wc.toComponent)}, {...p, className: m(${wc.fromComponent}.className, p.className)}), { className: ${wc.fromComponent}.className })`;
+          replacement = `Object.assign((${runtimeNames.props}) => ${runtimeNames.createElement}(${safeStringLiteral(targetComponent)}, {...${runtimeNames.props}, className: ${runtimeNames.mergeClassNames}(${componentCall.fromComponent}.className, ${runtimeNames.props}.className)}), { className: ${componentCall.fromComponent}.className })`;
         } else {
           // Component reference: withComponent(Link, Button)
-          if (!isValidIdentifier(wc.toComponent)) {
-            /* unreachable: unreachable: toComponent is an AST Identifier node, always valid */
-            throw new Error(`[styled-static] Invalid toComponent name: ${wc.toComponent}`);
+          if (!isValidComponentReference(targetComponent)) {
+            /* unreachable: component references are validated during parsing */
+            throw new Error(`[styled-static] Invalid toComponent name: ${targetComponent}`);
           }
-          replacement = `Object.assign((p) => createElement(${wc.toComponent}, {...p, className: m(${wc.fromComponent}.className, p.className)}), { className: ${wc.fromComponent}.className })`;
+          replacement = `Object.assign((${runtimeNames.props}) => ${runtimeNames.createElement}(${targetComponent}, {...${runtimeNames.props}, className: ${runtimeNames.mergeClassNames}(${componentCall.fromComponent}.className, ${runtimeNames.props}.className)}), { className: ${componentCall.fromComponent}.className })`;
         }
 
-        s.overwrite(wc.start, wc.end, replacement);
+        transformedCode.overwrite(componentCall.start, componentCall.end, replacement);
         needsCreateElement = true;
       }
 
       // Build imports for the new minimal runtime
       // Only need createElement from React and m from our runtime
-      const runtimeBasePath =
-        imports.source === "./index" || imports.source === "../index"
-          ? imports.source.replace("/index", "/runtime")
-          : "@alex.radulescu/styled-static/runtime";
+      const runtimeBasePath = "@alex.radulescu/styled-static/runtime";
 
-      // Prepend imports: CSS first, then runtime, then hoisted declarations
+      // Prepend CSS imports first, followed by the small generated-component runtime imports.
       let prepend = "";
       if (cssImports.length > 0) {
         prepend += cssImports.join("\n") + "\n";
       }
       if (needsCreateElement) {
-        prepend += `import { createElement } from "react";\n`;
-        prepend += `import { m } from "${runtimeBasePath}";\n`;
-      }
-      // Add hoisted variant maps for complex variants (> 4 values)
-      if (hoistedDeclarations.length > 0) {
-        prepend += hoistedDeclarations.join("\n") + "\n";
+        const createElementImport =
+          runtimeNames.createElement === "createElement"
+            ? "createElement"
+            : `createElement as ${runtimeNames.createElement}`;
+        const mergeImport =
+          runtimeNames.mergeClassNames === "m" ? "m" : `m as ${runtimeNames.mergeClassNames}`;
+        prepend += `import { ${createElementImport} } from "react";\n`;
+        prepend += `import { ${mergeImport} } from "${runtimeBasePath}";\n`;
       }
       if (prepend) {
         // Add extra newline after imports for better readability
-        s.prepend(prepend + "\n");
+        transformedCode.prepend(prepend + "\n");
       }
 
       return {
-        code: s.toString(),
-        map: s.generateMap({ hires: true }),
+        code: transformedCode.toString(),
+        map: transformedCode.generateMap({ hires: true }),
       };
     },
 
@@ -504,10 +589,11 @@ export default css;
       // Build reverse index: sourceFile → CSS strings for O(1) lookup per module
       const cssBySource = new Map<string, string[]>();
       for (const [, data] of cssModules) {
-        let arr = cssBySource.get(data.sourceFile);
+        const sourceKey = normalizePath(removeQueryString(data.sourceFile));
+        let arr = cssBySource.get(sourceKey);
         if (!arr) {
           arr = [];
-          cssBySource.set(data.sourceFile, arr);
+          cssBySource.set(sourceKey, arr);
         }
         arr.push(data.css);
       }
@@ -520,7 +606,7 @@ export default css;
         let aggregatedCss = "";
 
         for (const moduleId of moduleIds) {
-          const cssEntries = cssBySource.get(moduleId);
+          const cssEntries = cssBySource.get(normalizePath(removeQueryString(moduleId)));
           if (cssEntries) {
             for (const css of cssEntries) {
               aggregatedCss += css + "\n";
@@ -531,7 +617,9 @@ export default css;
         if (!aggregatedCss.trim()) continue;
 
         // Emit CSS file with same path as JS chunk
-        const cssFileName = fileName.replace(/\.js$/, ".css");
+        const cssFileName = /\.[cm]?js$/.test(fileName)
+          ? fileName.replace(/\.[cm]?js$/, ".css")
+          : `${fileName}.css`;
         this.emitFile({
           type: "asset",
           fileName: cssFileName,
@@ -539,9 +627,10 @@ export default css;
         });
 
         // Rewrite the chunk's code to use relative CSS import
-        chunk.code = rewriteCssImports(chunk.code, cssFileName);
+        const chunkAst = this.parse(chunk.code) as ESTree.Program;
+        chunk.code = rewriteCssImports(chunk.code, cssFileName, chunkAst);
 
-        if (DEBUG) {
+        if (debugEnabled) {
           console.log(`[styled-static] Emitted CSS file: ${cssFileName}`);
         }
       }

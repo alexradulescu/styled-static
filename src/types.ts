@@ -80,7 +80,7 @@ export type VariantProps<V extends VariantsConfig> = {
  * **Features:**
  * - Type-safe variant props (autocomplete for variant names and values)
  * - Automatic sanitization of variant values (prevents CSS injection)
- * - Supports all standard component features (as, className, __debug)
+ * - Supports the target component's props plus `className`
  * - Variant classes follow BEM-like pattern: `base--variantName-value`
  *
  * @example
@@ -104,8 +104,6 @@ export type VariantProps<V extends VariantsConfig> = {
  * // Use with type-safe props
  * <Button color="primary" size="lg">Large Primary Button</Button>
  *
- * // Debug variants in development
- * <Button color="danger" __debug>Shows active variants</Button>
  * ```
  *
  * @template T - The HTML tag or component being styled
@@ -114,11 +112,14 @@ export type VariantProps<V extends VariantsConfig> = {
 export type StyledVariantComponent<
   T extends HTMLTag | ComponentType<any>,
   V extends VariantsConfig,
-> = T extends HTMLTag
+> = (T extends HTMLTag
   ? ComponentType<JSX.IntrinsicElements[T] & VariantProps<V>>
   : T extends ComponentType<infer P>
     ? ComponentType<P & VariantProps<V>>
-    : never;
+    : never) & {
+  /** The static base class name(s), for manual composition. */
+  className: string;
+};
 
 /**
  * Function returned by cssVariants.
@@ -158,9 +159,7 @@ export type StyledVariantComponent<
  *
  * @template V - The variants configuration
  */
-export type CssVariantsFunction<V extends VariantsConfig> = (
-  variants?: Partial<VariantProps<V>>,
-) => string;
+export type CssVariantsFunction<V extends VariantsConfig> = (variants?: VariantProps<V>) => string;
 
 /** Extract props from an HTML tag or component */
 export type PropsOf<T> = T extends HTMLTag
@@ -230,9 +229,9 @@ export type StyledComponent<T extends HTMLTag | ComponentType<any>> = (T extends
 
 /**
  * Default attributes for a styled component.
- * Can be a static object or a function that receives props and returns attrs.
+ * Must be a static object. Pass dynamic values as regular component props.
  */
-export type AttrsArg<P> = Partial<P> | ((props: P) => Partial<P>);
+export type AttrsArg<P> = Partial<P>;
 
 /**
  * Styled element builder with attrs support.
@@ -245,13 +244,13 @@ export interface StyledElementBuilder<T extends HTMLTag> {
    * styled.input.attrs({ type: 'password' })`padding: 0.5rem;`
    */
   attrs<A extends Partial<JSX.IntrinsicElements[T]>>(
-    attrs: A | ((props: JSX.IntrinsicElements[T]) => A),
-  ): (strings: TemplateStringsArray, ...interpolations: never[]) => StyledComponent<T>;
+    attrs: A,
+  ): (strings: TemplateStringsArray, ...interpolations: Keyframes[]) => StyledComponent<T>;
 
   /**
    * Template tag to create styled component.
    */
-  (strings: TemplateStringsArray, ...interpolations: never[]): StyledComponent<T>;
+  (strings: TemplateStringsArray, ...interpolations: Keyframes[]): StyledComponent<T>;
 }
 
 /**
@@ -284,7 +283,7 @@ export interface StyledElementBuilder<T extends HTMLTag> {
  *   font-weight: bold;
  * `;
  *
- * // Nested CSS with postcss-nested
+ * // Nested CSS, processed by Vite's CSS pipeline
  * const Card = styled.div`
  *   padding: 1rem;
  *
@@ -318,7 +317,7 @@ export type StyledFunction = {
    */
   <T extends HTMLTag>(
     tag: T,
-  ): (strings: TemplateStringsArray, ...interpolations: never[]) => StyledComponent<T>;
+  ): (strings: TemplateStringsArray, ...interpolations: Keyframes[]) => StyledComponent<T>;
 
   /**
    * Extend an existing styled component or any component with className prop.
@@ -334,7 +333,7 @@ export type StyledFunction = {
     component: ComponentType<P>,
   ): (
     strings: TemplateStringsArray,
-    ...interpolations: never[]
+    ...interpolations: Keyframes[]
   ) => StyledComponent<ComponentType<P>>;
 } & {
   /**

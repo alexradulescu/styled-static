@@ -1,7 +1,7 @@
 /**
  * styled-static
  *
- * Zero-runtime styled components for React 19+ with Vite.
+ * Near-zero-runtime styled components for React 19+ with Vite.
  * CSS is extracted to static files at build time.
  *
  * @example
@@ -71,10 +71,10 @@ function throwConfigError(name: string): never {
   throw new Error(
     `${name} was not transformed at build time. ` +
       `Ensure the styled-static plugin is configured in vite.config.ts:\n\n` +
-      `  import { styledStatic } from 'styled-static/vite';\n` +
+      `  import { styledStatic } from '@alex.radulescu/styled-static/vite';\n` +
       `  import react from '@vitejs/plugin-react';\n\n` +
       `  export default defineConfig({\n` +
-      `    plugins: [styledStatic(), react()],\n` +
+      `    plugins: [react(), styledStatic()],\n` +
       `  });`,
   );
 }
@@ -130,7 +130,10 @@ export const styled = new Proxy(
  * <div className={isActive ? activeClass : ''} />
  * <Button className={`${activeClass} ${highlightClass}`}>Mixed</Button>
  */
-export function css(_strings: TemplateStringsArray, ..._interpolations: never[]): string {
+export function css(
+  _strings: TemplateStringsArray,
+  ..._interpolations: import("./types").Keyframes[]
+): string {
   throwConfigError("css");
 }
 
@@ -152,7 +155,10 @@ export function css(_strings: TemplateStringsArray, ..._interpolations: never[])
  * // @keyframes ss-abc123 { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
  * // .ss-xyz789 { animation: ss-abc123 1s linear infinite; }
  */
-export function keyframes(_strings: TemplateStringsArray, ..._interpolations: never[]): string {
+export function keyframes(
+  _strings: TemplateStringsArray,
+  ..._interpolations: never[]
+): import("./types").Keyframes {
   throwConfigError("keyframes");
 }
 
@@ -188,7 +194,7 @@ export function keyframes(_strings: TemplateStringsArray, ..._interpolations: ne
  */
 export function createGlobalStyle(
   _strings: TemplateStringsArray,
-  ..._interpolations: never[]
+  ..._interpolations: import("./types").Keyframes[]
 ): () => null {
   throwConfigError("createGlobalStyle");
 }
