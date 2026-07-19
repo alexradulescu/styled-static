@@ -1,3473 +1,552 @@
-/**
- * styled-static Vite Plugin Tests
- *
- * These tests verify the plugin's transformation logic, CSS processing,
- * and edge case handling. We mock Vite's plugin context to test the
- * transform function in isolation.
- */
 import { parse } from "acorn";
+import { describe, expect, it, mock } from "bun:test";
 import type { Plugin } from "vite";
-import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { rewriteCssImports } from "./codegen";
+import { compile } from "./compiler";
 import { hash } from "./hash";
 import { styledStatic } from "./vite";
 
-// =============================================================================
-// Test Utilities
-// =============================================================================
+const PACKAGE = "@alex.radulescu/styled-static";
 
-/**
- * Creates a mock Vite plugin context with a working parser.
- * Uses acorn directly since we can't easily mock Vite's internal parser.
- */
-function createMockContext() {
+function context() {
   return {
     parse(code: string) {
-      return parse(code, {
-        sourceType: "module",
-        ecmaVersion: "latest",
-        locations: false,
-      });
+      return parse(code, { sourceType: "module", ecmaVersion: "latest" });
     },
   };
 }
 
-function createGenerateBundleContext(emitFile: ReturnType<typeof mock>) {
-  return { emitFile, parse: createMockContext().parse };
-}
-
-/**
- * Helper to run the plugin's transform function with proper context.
- */
-async function transform(
+function configure(
   plugin: Plugin,
-  code: string,
-  id: string,
-): Promise<{ code: string; map: any } | null> {
-  const ctx = createMockContext();
-  const transformFn = plugin.transform as Function;
-  if (!transformFn) return null;
-  return transformFn.call(ctx, code, id);
+  command: "serve" | "build",
+  library = false,
+  root = "/project",
+): void {
+  (plugin.configResolved as Function)?.({
+    command,
+    root,
+    build: library ? { lib: { entry: `${root}/src/index.ts` } } : {},
+  });
 }
 
-/**
- * Helper to count occurrences of a pattern in a string.
- */
-function countMatches(str: string, pattern: RegExp): number {
-  return (str.match(pattern) || []).length;
+async function transform(plugin: Plugin, code: string, id = "/project/src/example.tsx") {
+  const hook = plugin.transform as Function | { handler: Function };
+  const handler = typeof hook === "function" ? hook : hook.handler;
+  return handler.call(context(), code, id) as Promise<{
+    code: string;
+    map: unknown;
+  } | null>;
 }
 
-function evaluateGeneratedDeclaration<T>(code: string, variableName: string): T {
-  const executableCode = code.replace(/^import .*;$/gm, "");
-  return Function(`${executableCode}\nreturn ${variableName};`)() as T;
-}
-
-function loadGeneratedCss(plugin: Plugin, transformedCode: string): string {
-  const importIds = Array.from(
-    transformedCode.matchAll(/import "(virtual:styled-static\/[^"]+)";/g),
-    (match) => match[1],
+function cssImports(code: string): string[] {
+  return Array.from(
+    code.matchAll(/import "(virtual:styled-static\/[^"]+)";/g),
+    (match) => match[1]!,
   );
-  const load = plugin.load as Function;
-  return importIds.map((id) => String(load(`\0${id}`))).join("\n");
 }
 
-// =============================================================================
-// Plugin Configuration Tests
-// =============================================================================
+function loadCss(plugin: Plugin, transformed: string): string {
+  return cssImports(transformed)
+    .map((id) => String((plugin.load as Function)(`\0${id}`)))
+    .join("\n");
+}
 
-describe("plugin configuration", () => {
-  it("should create a plugin with correct name", () => {
+describe("public plugin contract", () => {
+  it("is option-free and runs after the React transform", () => {
     const plugin = styledStatic();
     expect(plugin.name).toBe("styled-static");
-  });
-
-  it("should enforce post order to run after React plugin (JSX transformed)", () => {
-    const plugin = styledStatic();
     expect(plugin.enforce).toBe("post");
+    expect(styledStatic.length).toBe(0);
   });
 
-  it("should accept custom class prefix", () => {
-    const plugin = styledStatic({ classPrefix: "my-app" });
-    expect(plugin.name).toBe("styled-static");
+  it("defaults library builds to the two formats that can link CSS", () => {
+    const plugin = styledStatic();
+    const config = (plugin.config as Function)({ build: { lib: { entry: "src/index.ts" } } });
+    expect(config.build.lib.formats).toEqual(["es", "cjs"]);
+    expect(
+      (plugin.config as Function)({
+        build: { lib: { entry: "src/index.ts", formats: ["es"] } },
+      }),
+    ).toBeUndefined();
   });
 
-  it("rejects class prefixes that could break the generated CSS selector", () => {
-    expect(() => styledStatic({ classPrefix: 'app"] { color: red } /*' })).toThrow(
-      "classPrefix must start with a letter or underscore",
-    );
+  it("supports JavaScript and TypeScript module extensions", async () => {
+    for (const extension of ["js", "jsx", "ts", "tsx", "mjs", "cjs", "mts", "cts"]) {
+      const plugin = styledStatic();
+      configure(plugin, "build");
+      const result = await transform(
+        plugin,
+        `import { css } from '${PACKAGE}'; const token = css\`color: red;\`;`,
+        `/project/src/example.${extension}`,
+      );
+      expect(result?.code).toContain('const token = "ss-token-');
+    }
+  });
+
+  it("ignores unrelated packages and non-code modules", async () => {
+    const plugin = styledStatic();
+    configure(plugin, "build");
+    expect(
+      await transform(plugin, `import { css } from './styled-static';`, "/project/a.ts"),
+    ).toBeNull();
+    expect(
+      await transform(plugin, `import { css } from '${PACKAGE}';`, "/project/a.css"),
+    ).toBeNull();
+    expect(
+      await transform(plugin, `import { css } from '${PACKAGE}';`, "/project/node_modules/a.ts"),
+    ).toBeNull();
   });
 });
 
-describe("API regressions", () => {
-  it("allows cssVariants to be called without an options object", async () => {
+describe("accepted static language", () => {
+  it("transforms every public compiler binding through import aliases", async () => {
     const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "build" });
+    configure(plugin, "build");
     const result = await transform(
       plugin,
-      `import { cssVariants } from '@alex.radulescu/styled-static';
-const buttonClass = cssVariants({
-  css: 'display: block;',
-  variants: { size: { sm: 'font-size: 12px;' } },
-});`,
-      "/src/button.ts",
+      `import { styled as s, css as c, globalCss as g, keyframes as k, styledVariants as sv, cssVariants as cv, withComponent as wc } from '${PACKAGE}';
+const spin = k\`to { transform: rotate(1turn); }\`;
+const selected = c\`outline: 2px solid;\`;
+const Button = s.button.attrs({ type: "button" })\`animation: \${spin} 1s;\`;
+const Primary = s(Button)\`color: blue;\`;
+const LinkButton = wc("a", Primary);
+const tones = cv({ css: c\`display: block;\`, variants: { tone: { calm: c\`color: blue;\` } } });
+const VariantButton = sv({ component: Button, css: c\`padding: 1rem;\`, variants: { tone: { calm: c\`color: blue;\` } } });
+g\`body { margin: 0; }\`;`,
     );
 
-    const buttonClass = evaluateGeneratedDeclaration<(options?: { size?: string }) => string>(
-      result!.code,
-      "buttonClass",
-    );
-    expect(buttonClass()).toMatch(/^ss-/);
-    expect(buttonClass({ size: "sm" })).toContain("--size-sm");
+    expect(result).not.toBeNull();
+    expect(result!.code).toContain("mergeClassNames");
+    expect(result!.code).toContain('import { createElement } from "react"');
+    expect(result!.code).toContain("Object.assign");
+    expect(result!.code).toContain("void 0");
+    expect(cssImports(result!.code)).toHaveLength(7);
+    const extracted = loadCss(plugin, result!.code);
+    expect(extracted).toContain("@keyframes ss-spin-");
+    expect(extracted).toContain("body { margin: 0; }");
   });
 
-  it("resolves keyframes references in extracted CSS", async () => {
+  it("preserves base, extension, then user class order", async () => {
     const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "build" });
+    configure(plugin, "build");
     const result = await transform(
       plugin,
-      `import { keyframes, styled } from '@alex.radulescu/styled-static';
-const spin = keyframes\`from { transform: rotate(0deg); } to { transform: rotate(360deg); }\`;
-const Spinner = styled.div\`animation: \${spin /* direct AST identifier */} 1s linear infinite;\`;`,
-      "/src/Spinner.tsx",
+      `import { styled } from '${PACKAGE}';
+const Button = styled.button\`color: blue;\`;
+const Danger = styled(Button)\`color: red;\`;`,
     );
+    expect(result!.code).toContain('[Button.className, "ss-Danger-');
+    expect(result!.code).toContain("mergeClassNames");
+  });
 
-    const css = loadGeneratedCss(plugin, result!.code);
-    const animationName = css.match(/@keyframes (ss-[a-z0-9]+)/)?.[1];
+  it("lets explicit props override static attrs", async () => {
+    const plugin = styledStatic();
+    configure(plugin, "build");
+    const result = await transform(
+      plugin,
+      `import { styled } from '${PACKAGE}'; const Input = styled.input.attrs({ type: "password" })\`padding: 1rem;\`;`,
+    );
+    expect(result!.code).toContain('...({ type: "password" }), ...props');
+
+    const ariaResult = await transform(
+      plugin,
+      `import { styled } from '${PACKAGE}'; const Input = styled.input.attrs({ "aria-label": "Password", tabIndex: -1, hidden: false })\`padding: 1rem;\`;`,
+      "/project/src/aria.tsx",
+    );
+    expect(ariaResult!.code).toContain('"aria-label": "Password"');
+    expect(ariaResult!.code).toContain("tabIndex: -1");
+  });
+});
+
+describe("rejected static language", () => {
+  const cases: Array<[string, string]> = [
+    [
+      `import { styled } from '${PACKAGE}'; let Button = styled.button\`\`;`,
+      "must use a top-level const",
+    ],
+    [
+      `import { styled } from '${PACKAGE}'; const Button = styled.button\`\`, Card = styled.div\`\`;`,
+      "own const statement",
+    ],
+    [
+      `import { styled } from '${PACKAGE}'; function make() { const Button = styled.button\`\`; }`,
+      "one named top-level const",
+    ],
+    [`import { styled } from '${PACKAGE}'; const Box = styled["div"]\`\`;`, "styled.div"],
+    [`import { styled } from '${PACKAGE}'; const Box = styled("div")\`\`;`, "styled.div"],
+    [`import { styled } from '${PACKAGE}'; const Box = styled(UI.Box)\`\`;`, "local identifier"],
+    [
+      `import { styled } from '${PACKAGE}'; const Box = styled()\`\`;`,
+      "Unsupported styled template syntax",
+    ],
+    [
+      `import { styled } from '${PACKAGE}'; const Box = styled.div.attrs({}, {})\`\`;`,
+      "Unsupported styled template syntax",
+    ],
+    [
+      `import { globalCss } from '${PACKAGE}'; const globals = globalCss\`body {}\`;`,
+      "top-level expression",
+    ],
+    [
+      `import { styled } from '${PACKAGE}'; const defaults = { type: "button" }; const Button = styled.button.attrs({ ...defaults })\`\`;`,
+      "only explicit string, number, boolean, or null",
+    ],
+    [
+      `import { styled } from '${PACKAGE}'; const Button = styled.button.attrs({ type: getType() })\`\`;`,
+      "only explicit string, number, boolean, or null",
+    ],
+    [
+      `import { css, cssVariants } from '${PACKAGE}'; const x = cssVariants({ css: "color:red", variants: {} });`,
+      "css tagged template",
+    ],
+    [
+      `import { cssVariants } from '${PACKAGE}'; const x = cssVariants({ variants: { size: { 1: "color:red" } } });`,
+      "static property names",
+    ],
+    [
+      `import { cssVariants } from '${PACKAGE}'; const key = "tone"; const x = cssVariants({ variants: { [key]: { calm: "color:red" } } });`,
+      "static property names",
+    ],
+    [
+      `import { css, cssVariants } from '${PACKAGE}'; const x = cssVariants({ variants: { __proto__: { calm: css\`color:red\` } } });`,
+      "static property names",
+    ],
+    [
+      `import { css, cssVariants } from '${PACKAGE}'; const x = cssVariants({ variants: { "high-contrast": { calm: css\`color:red\` } } });`,
+      "static property names",
+    ],
+    [
+      `import { css, cssVariants } from '${PACKAGE}'; const x = cssVariants({ variants: {}, variants: {} });`,
+      'field "variants" is duplicated',
+    ],
+    [
+      `import { cssVariants } from '${PACKAGE}'; const x = cssVariants({});`,
+      "requires a variants field",
+    ],
+    [
+      `import { styledVariants } from '${PACKAGE}'; const X = styledVariants({ component: "button" });`,
+      "requires a variants field",
+    ],
+    [
+      `import { css, styledVariants } from '${PACKAGE}'; const X = styledVariants({ component: "button", variants: { className: { danger: css\`color:red\` } } });`,
+      "reserved React prop",
+    ],
+    [
+      `import { css, cssVariants } from '${PACKAGE}'; const x = cssVariants({ variants: { css: { compact: css\`color:red\` } } });`,
+      'Variant name "css" is reserved',
+    ],
+    [
+      `import { css as first, css as second } from '${PACKAGE}'; const x = second\`color:red\`;`,
+      "more than one local alias",
+    ],
+  ];
+
+  for (const [code, message] of cases) {
+    it(message, async () => {
+      const plugin = styledStatic();
+      configure(plugin, "build");
+      await expect(transform(plugin, code)).rejects.toThrow(message);
+    });
+  }
+
+  it("rejects all interpolation except direct keyframe identifiers", async () => {
+    const plugin = styledStatic();
+    configure(plugin, "build");
+    await expect(
+      transform(
+        plugin,
+        `import { styled } from '${PACKAGE}'; const color = "red"; const Box = styled.div\`color: \${color};\`;`,
+      ),
+    ).rejects.toThrow("Only direct keyframes references");
+  });
+
+  it("allows direct keyframe references in variant CSS", async () => {
+    const plugin = styledStatic();
+    configure(plugin, "build");
+    const result = await transform(
+      plugin,
+      `import { css, cssVariants, keyframes } from '${PACKAGE}';
+const spin = keyframes\`to { transform: rotate(1turn); }\`;
+const motion = cssVariants({ variants: { motion: { spin: css\`animation: \${spin} 1s linear;\` } } });`,
+    );
+    const extracted = loadCss(plugin, result!.code);
+    const animationName = extracted.match(/@keyframes (ss-spin-[a-z0-9]+)/)?.[1];
     expect(animationName).toBeDefined();
-    expect(css).toContain(`animation: ${animationName} 1s linear infinite`);
-    expect(css).not.toContain("${spin}");
+    expect(extracted).toContain(`animation: ${animationName} 1s linear`);
+  });
+});
+
+describe("stable, readable identity", () => {
+  async function classFor(
+    command: "serve" | "build",
+    css: string,
+    file = "/project/src/Button.tsx",
+    root = "/project",
+  ) {
+    const plugin = styledStatic();
+    configure(plugin, command, false, root);
+    const result = await transform(
+      plugin,
+      `import { styled } from '${PACKAGE}'; const Button = styled.button\`${css}\`;`,
+      file,
+    );
+    return result!.code.match(/ss-Button-[a-z0-9]+/)?.[0];
+  }
+
+  it("uses the same identity in development and production", async () => {
+    expect(await classFor("serve", "color: red;")).toBe(await classFor("build", "color: red;"));
   });
 
-  it("rejects unsupported runtime CSS interpolation instead of emitting broken CSS", async () => {
+  it("does not rename a declaration when only its CSS changes", async () => {
+    expect(await classFor("serve", "color: red;")).toBe(await classFor("serve", "color: blue;"));
+  });
+
+  it("separates same-named declarations in different modules", async () => {
+    expect(await classFor("build", "", "/project/src/a/Button.tsx")).not.toBe(
+      await classFor("build", "", "/project/src/b/Button.tsx"),
+    );
+  });
+
+  it("separates same-named declarations in different packages", async () => {
+    expect(await classFor("build", "", "/one/src/Button.tsx", "/one")).not.toBe(
+      await classFor("build", "", "/two/src/Button.tsx", "/two"),
+    );
+  });
+
+  it("reproduces identity across checkout paths for the same named package", () => {
+    const code = `import { styled } from '${PACKAGE}'; const Button = styled.button\`color:red;\`;`;
+    const compileAt = (checkout: string) =>
+      compile(code, `${checkout}/src/Button.tsx`, {
+        ast: context().parse(code) as any,
+        root: checkout,
+        packageIdentity: "@example/ui",
+        development: false,
+      })!.code.match(/ss-Button-[a-z0-9]+/)?.[0];
+    expect(compileAt("/checkout/one")).toBe(compileAt("/different/location"));
+  });
+
+  it("rejects extracted source outside its package root", () => {
+    const code = `import { css } from '${PACKAGE}'; const token = css\`color:red;\`;`;
+    expect(() =>
+      compile(code, "/external/token.ts", {
+        ast: context().parse(code) as any,
+        root: "/project",
+        packageIdentity: "app",
+        development: false,
+      }),
+    ).toThrow("outside package root");
+  });
+});
+
+describe("variants and security", () => {
+  it("uses explicit equality and own-property checks", async () => {
     const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "build" });
+    configure(plugin, "build");
+    const result = await transform(
+      plugin,
+      `import { css, cssVariants } from '${PACKAGE}';
+const classes = cssVariants({ variants: { tone: { calm: css\`color: blue;\`, danger: css\`color: red;\` } }, defaultVariants: { tone: "calm" } });`,
+    );
+    expect(result!.code).toContain('=== "calm"');
+    expect(result!.code).toContain("Object.hasOwn");
+    expect(result!.code).not.toContain("+ variants[");
+
+    const componentResult = await transform(
+      plugin,
+      `import { css, styledVariants } from '${PACKAGE}';
+const Button = styledVariants({ component: "button", variants: { tone: { calm: css\`color: blue;\` } }, defaultVariants: { tone: "calm" } });`,
+      "/project/src/component.tsx",
+    );
+    expect(componentResult!.code).toContain('Object.hasOwn(props, "tone")');
+    expect(componentResult!.code).toContain('Object.hasOwn(props, "className")');
+
+    const executable = componentResult!.code.replace(/^import .*$/gm, "");
+    const Button = Function(
+      "createElement",
+      "mergeClassNames",
+      `${executable}\nreturn Button;`,
+    )(
+      (tag: string, props: Record<string, unknown>) => ({ tag, props }),
+      (...values: unknown[]) => values.filter(Boolean).join(" "),
+    ) as (props: Record<string, unknown>) => {
+      props: { className: string; id: string };
+    };
+    const inherited = Object.assign(Object.create({ tone: "danger", className: "inherited" }), {
+      id: "safe",
+    });
+    const rendered = Button(inherited);
+    expect(rendered.props.id).toBe("safe");
+    expect(rendered.props.className).toContain("--tone-calm");
+    expect(rendered.props.className).not.toContain("inherited");
+
+    const cssExecutable = result!.code.replace(/^import .*$/gm, "");
+    const classes = Function(`${cssExecutable}\nreturn classes;`)() as (variants?: {
+      tone?: string;
+    }) => string;
+    expect(classes({ tone: undefined })).toContain("--tone-calm");
+    expect(classes(Object.create({ tone: "danger" }))).toContain("--tone-calm");
+  });
+
+  it("ignores inherited className on normal styled components", async () => {
+    const plugin = styledStatic();
+    configure(plugin, "build");
+    const result = await transform(
+      plugin,
+      `import { styled } from '${PACKAGE}';
+const Box = styled.div\`color: blue;\`;`,
+    );
+    const executable = result!.code.replace(/^import .*$/gm, "");
+    const Box = Function(
+      "createElement",
+      "mergeClassNames",
+      `${executable}\nreturn Box;`,
+    )(
+      (tag: string, props: Record<string, unknown>) => ({ tag, props }),
+      (...values: unknown[]) => values.filter(Boolean).join(" "),
+    ) as (props: Record<string, unknown>) => { props: { className: string } };
+    expect(Box(Object.create({ className: "inherited" })).props.className).not.toContain(
+      "inherited",
+    );
+  });
+
+  it("rejects unknown defaults and compounds", async () => {
+    const plugin = styledStatic();
+    configure(plugin, "build");
     await expect(
       transform(
         plugin,
-        `import { styled } from '@alex.radulescu/styled-static';
-const color = 'red';
-const Box = styled.div\`color: \${color};\`;`,
-        "/src/Box.tsx",
-      ),
-    ).rejects.toThrow("Runtime CSS interpolation is not supported");
-  });
-
-  it("rejects functional attrs with a clear build-time error", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "build" });
-    await expect(
-      transform(
-        plugin,
-        `import { styled } from '@alex.radulescu/styled-static';
-const Input = styled.input.attrs((props) => ({ disabled: props.loading }))\`color: gray;\`;`,
-        "/src/Input.tsx",
-      ),
-    ).rejects.toThrow("attrs() only accepts a static object literal");
-  });
-
-  it("uses the complete variant CSS as the production class identity", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "build" });
-    const first = await transform(
-      plugin,
-      `import { cssVariants } from '@alex.radulescu/styled-static';
-const styles = cssVariants({ variants: { tone: { loud: 'color: red;' } } });`,
-      "/src/First.ts",
-    );
-    const second = await transform(
-      plugin,
-      `import { cssVariants } from '@alex.radulescu/styled-static';
-const styles = cssVariants({ variants: { tone: { loud: 'color: blue;' } } });`,
-      "/src/Second.ts",
-    );
-
-    const firstClass = first!.code.match(/let classNames = "([^"]+)"/)?.[1];
-    const secondClass = second!.code.match(/let classNames = "([^"]+)"/)?.[1];
-    expect(firstClass).toBeDefined();
-    expect(secondClass).toBeDefined();
-    expect(firstClass).not.toBe(secondClass);
-  });
-
-  it("keeps dev class names unique for same-named files in different directories", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`color: red;\`;`;
-    const first = await transform(plugin, code, "/src/one/index.tsx");
-    const second = await transform(plugin, code, "/src/two/index.tsx");
-    const firstClass = first!.code.match(/className: "([^"]+)"/)?.[1];
-    const secondClass = second!.code.match(/className: "([^"]+)"/)?.[1];
-    expect(firstClass).not.toBe(secondClass);
-  });
-
-  it("avoids shadowing user identifiers in generated components", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "build" });
-    const result = await transform(
-      plugin,
-      `import { styled, styledVariants, withComponent } from '@alex.radulescu/styled-static';
-const props = { title: 'default' };
-const WithAttrs = styled.div.attrs({ title: props.title })\`color: red;\`;
-const Source = styled.button\`color: blue;\`;
-const ChangedTarget = withComponent(props, Source);
-const classNames = () => null;
-const Variants = styledVariants({
-  component: classNames,
-  variants: { tone: { quiet: 'opacity: .5;' } },
-});`,
-      "/src/shadowing.ts",
-    );
-
-    expect(result!.code).toContain("(props_) =>");
-    expect(result!.code).toContain("title: props.title");
-    expect(result!.code).toContain("createElement(props,");
-    expect(result!.code).toContain("let classNames_");
-    expect(result!.code).toContain("createElement(classNames,");
-  });
-
-  it("does not read inherited properties for unknown variant values", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "build" });
-    const result = await transform(
-      plugin,
-      `import { cssVariants } from '@alex.radulescu/styled-static';
-const styles = cssVariants({
-  variants: { tone: { one: '', two: '', three: '', four: '', five: '' } },
-});`,
-      "/src/styles.ts",
-    );
-    const styles = evaluateGeneratedDeclaration<(options: { tone: string }) => string>(
-      result!.code,
-      "styles",
-    );
-    expect(styles({ tone: "toString" })).not.toContain("function");
-    expect(styles({ tone: "__proto__" })).not.toContain("object");
-    const inheritedSelection = Object.create({ tone: "one" }) as { tone: string };
-    expect(styles(inheritedSelection)).not.toContain("--tone-one");
-  });
-
-  it("supports __proto__ as an explicit default variant key", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "build" });
-    const result = await transform(
-      plugin,
-      `import { cssVariants } from '@alex.radulescu/styled-static';
-const styles = cssVariants({
-  variants: { "__proto__": { active: 'color: red;' } },
-  defaultVariants: { "__proto__": "active" },
-});`,
-      "/src/prototype-default.ts",
-    );
-    const styles = evaluateGeneratedDeclaration<(options?: object) => string>(
-      result!.code,
-      "styles",
-    );
-    expect(styles()).toContain("--__proto__-active");
-  });
-
-  it("supports quoted variant names and common numeric size values", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "build" });
-    const result = await transform(
-      plugin,
-      `import { cssVariants } from '@alex.radulescu/styled-static';
-const styles = cssVariants({ variants: { 'visual-tone': { '2xl': 'font-size: 2rem;' } } });`,
-      "/src/styles.ts",
-    );
-    const styles = evaluateGeneratedDeclaration<(options: { "visual-tone": string }) => string>(
-      result!.code,
-      "styles",
-    );
-    expect(styles({ "visual-tone": "2xl" })).toContain("--visual-tone-2xl");
-  });
-
-  it("rejects unknown default and compound variant references", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "build" });
-    await expect(
-      transform(
-        plugin,
-        `import { cssVariants } from '@alex.radulescu/styled-static';
-const styles = cssVariants({
-  variants: { tone: { quiet: 'opacity: .5;' } },
-  defaultVariants: { tone: 'missing' },
-});`,
-        "/src/default.ts",
+        `import { css, cssVariants } from '${PACKAGE}'; const x = cssVariants({ variants: { tone: { calm: css\`\` } }, defaultVariants: { tone: "missing" } });`,
       ),
     ).rejects.toThrow("Unknown default variant");
-    await expect(
-      transform(
-        plugin,
-        `import { cssVariants } from '@alex.radulescu/styled-static';
-const styles = cssVariants({
-  variants: { tone: { quiet: 'opacity: .5;' } },
-  compoundVariants: [{ tone: 'missing', css: 'color: red;' }],
-});`,
-        "/src/compound.ts",
-      ),
-    ).rejects.toThrow("Unknown compound variant");
   });
+});
 
-  it("avoids collisions with user bindings named createElement and m", async () => {
+describe("Vite lifecycle", () => {
+  it("normalizes query-bearing source ids and exposes the exact source in development CSS", async () => {
     const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "build" });
+    configure(plugin, "serve");
     const result = await transform(
       plugin,
-      `import { styled } from '@alex.radulescu/styled-static';
-const createElement = 'user value';
-const m = 'user value';
-const Button = styled.button\`color: red;\`;`,
-      "/src/Button.ts",
+      `import { css } from '${PACKAGE}'; const token = css\`color:red;\`;`,
+      '/project/src/a*/weird"name.ts?direct',
     );
-
-    expect(result!.code).toContain("createElement as createElement_");
-    expect(result!.code).toContain("m as m_");
-    expect(() =>
-      parse(result!.code, { sourceType: "module", ecmaVersion: "latest" }),
-    ).not.toThrow();
+    const id = cssImports(result!.code)[0]!;
+    const loaded = String((plugin.load as Function)(`\0${id}`));
+    expect(loaded).toContain("sourceURL=/project/src/a*");
+    expect(loaded).toContain('weird\\"name.ts');
+    expect(loaded).toContain('getAttribute("data-ss-id") === id');
+    expect(loaded).toContain("import.meta.hot.dispose");
+    expect(loaded).toContain("import.meta.hot.prune");
   });
 
-  it("processes Vite module ids with query strings", async () => {
+  it("invalidates every style record owned by the changed module", async () => {
     const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-    const result = await transform(
+    configure(plugin, "serve");
+    await transform(
       plugin,
-      `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`color: red;\`;`,
-      "/src/Button.tsx?v=123",
+      `import { css } from '${PACKAGE}'; const one = css\`a{}\`; const two = css\`b{}\`;`,
+      "/project/src/styles.ts?direct",
     );
-    expect(result).not.toBeNull();
-    expect(result!.code).not.toContain("?v=123");
-  });
-
-  it("keeps lowercase component identifiers as component references", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "build" });
-    const result = await transform(
-      plugin,
-      `import { styled, styledVariants, withComponent } from '@alex.radulescu/styled-static';
-const base = styled.button\`color: red;\`;
-const link = (props) => null;
-const Variant = styledVariants({ component: link, variants: {} });
-const LinkButton = withComponent(link, base);`,
-      "/src/components.ts",
-    );
-    expect(result!.code).toContain("createElement(link");
-    expect(result!.code).not.toContain('createElement("link"');
-    expect(result!.code).toContain('[link.className, "ss-');
-    expect(result!.code).toContain('.filter(Boolean).join(" ")');
-  });
-
-  it("supports camel-cased SVG intrinsic elements in styledVariants", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "build" });
-    const result = await transform(
-      plugin,
-      `import { styledVariants } from '@alex.radulescu/styled-static';
-const Blur = styledVariants({ component: 'feGaussianBlur', variants: {} });`,
-      "/src/Icon.ts",
-    );
-    expect(result!.code).toContain('createElement("feGaussianBlur"');
-  });
-
-  it("supports the typed string-tag and member-expression component forms", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "build" });
-    const result = await transform(
-      plugin,
-      `import { styled, styledVariants, withComponent } from '@alex.radulescu/styled-static';
-const UI = { Link: (props) => null };
-const Button = styled('button')\`color: red;\`;
-const StyledLink = styled(UI.Link)\`color: blue;\`;
-const VariantLink = styledVariants({ component: UI.Link, variants: {} });
-const LinkButton = withComponent(UI.Link, Button);`,
-      "/src/components.ts",
-    );
-    expect(result!.code).toContain('createElement("button"');
-    expect(result!.code).toContain("createElement(UI.Link");
-    expect(result!.code).not.toContain("styled('button')");
-    expect(result!.code).not.toContain("styled(UI.Link)");
-    expect(result!.code).not.toContain("withComponent(UI.Link");
-  });
-
-  it("rejects variant configs stored in variables with a clear extraction error", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "build" });
-    await expect(
-      transform(
-        plugin,
-        `import { cssVariants } from '@alex.radulescu/styled-static';
-const config = { variants: { tone: { quiet: 'opacity: .5;' } } };
-const styles = cssVariants(config);`,
-        "/src/styles.ts",
-      ),
-    ).rejects.toThrow("cssVariants() requires one inline object literal");
-  });
-
-  it("escapes source file names before placing them in a CSS comment", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-    const result = await transform(
-      plugin,
-      `import { css } from '@alex.radulescu/styled-static';
-const styles = css\`color: red;\`;`,
-      "/src/end*/body{display:none}.ts",
-    );
-    const loadedModule = (plugin.load as Function)(
-      `\0${result!.code.match(/import "([^"]+)"/)?.[1]}`,
-    );
-    expect(loadedModule).not.toContain("/*# sourceURL=/src/end*/body");
-    expect(loadedModule).toContain("end*\\\\/body");
-  });
-});
-
-// =============================================================================
-// File Filtering Tests
-// =============================================================================
-
-describe("file filtering", () => {
-  let plugin: Plugin;
-
-  beforeEach(() => {
-    plugin = styledStatic();
-    // Simulate configResolved
-    (plugin.configResolved as Function)?.({ command: "serve" });
-  });
-
-  it("should skip .css files", async () => {
-    const result = await transform(plugin, "body { color: red; }", "/test.css");
-    expect(result).toBeNull();
-  });
-
-  it("should skip .json files", async () => {
-    const result = await transform(plugin, '{"key": "value"}', "/test.json");
-    expect(result).toBeNull();
-  });
-
-  it("should skip .html files", async () => {
-    const result = await transform(plugin, "<html></html>", "/index.html");
-    expect(result).toBeNull();
-  });
-
-  it("should skip node_modules", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;`;
-    const result = await transform(plugin, code, "/node_modules/some-pkg/index.tsx");
-    expect(result).toBeNull();
-  });
-
-  it("should skip files without styled-static import", async () => {
-    const code = `import React from 'react';
-const Component = () => <div>Hello</div>;`;
-    const result = await transform(plugin, code, "/src/Component.tsx");
-    expect(result).toBeNull();
-  });
-
-  it("should process .tsx files with styled-static import", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;`;
-    const result = await transform(plugin, code, "/src/Button.tsx");
-    expect(result).not.toBeNull();
-  });
-
-  it("should process .jsx files", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;`;
-    const result = await transform(plugin, code, "/src/Button.jsx");
-    expect(result).not.toBeNull();
-  });
-
-  it("should process .ts files", async () => {
-    const code = `import { css } from '@alex.radulescu/styled-static';
-const buttonClass = css\`padding: 1rem;\`;`;
-    const result = await transform(plugin, code, "/src/styles.ts");
-    expect(result).not.toBeNull();
-  });
-
-  it("should process .js files", async () => {
-    const code = `import { css } from '@alex.radulescu/styled-static';
-const buttonClass = css\`padding: 1rem;\`;`;
-    const result = await transform(plugin, code, "/src/styles.js");
-    expect(result).not.toBeNull();
-  });
-});
-
-// =============================================================================
-// styled.element Transformation Tests
-// =============================================================================
-
-describe("styled.element transformation", () => {
-  let plugin: Plugin;
-
-  beforeEach(() => {
-    plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-  });
-
-  it("should transform styled.button", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`
-  padding: 1rem;
-  color: red;
-\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-    expect(result?.code).toContain('import { createElement } from "react"');
-    expect(result?.code).toContain('import { m } from "@alex.radulescu/styled-static/runtime"');
-    expect(result?.code).toContain('createElement("button"');
-    expect(result?.code).toContain('import "virtual:styled-static/');
-  });
-
-  it("should transform styled.div", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Container = styled.div\`max-width: 1280px;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toContain('createElement("div"');
-  });
-
-  it("should transform styled.a", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Link = styled.a\`color: blue;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toContain('createElement("a"');
-  });
-
-  it("should transform styled.input", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Input = styled.input\`padding: 0.5rem;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toContain('createElement("input"');
-  });
-
-  it("should transform styled.span", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Text = styled.span\`font-weight: bold;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toContain('createElement("span"');
-  });
-
-  it("should transform multiple styled elements in one file", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;
-const Container = styled.div\`margin: 0;\`;
-const Link = styled.a\`color: blue;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toContain('createElement("button"');
-    expect(result?.code).toContain('createElement("div"');
-    expect(result?.code).toContain('createElement("a"');
-
-    // Should have 3 CSS imports
-    const cssImportCount = countMatches(result?.code ?? "", /import "virtual:styled-static\//g);
-    expect(cssImportCount).toBe(3);
-  });
-
-  it("should generate inline component with Object.assign pattern", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const MyButton = styled.button\`padding: 1rem;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    // Should use Object.assign pattern for inline component
-    expect(result?.code).toContain("Object.assign");
-    expect(result?.code).toContain(".className");
-  });
-
-  it("should generate consistent output in prod mode", async () => {
-    const prodPlugin = styledStatic();
-    (prodPlugin.configResolved as Function)?.({ command: "build" });
-
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const MyButton = styled.button\`padding: 1rem;\`;`;
-    const result = await transform(prodPlugin, code, "/test.tsx");
-
-    // Should use Object.assign pattern
-    expect(result?.code).toContain("Object.assign");
-    expect(result?.code).toMatch(/className: "ss-[a-z0-9]+"/);
-  });
-});
-
-// =============================================================================
-// styled.element.attrs() Tests
-// =============================================================================
-
-describe("styled.element.attrs() transformation", () => {
-  let plugin: Plugin;
-
-  beforeEach(() => {
-    plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-  });
-
-  it("should transform styled.input.attrs with type", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const PasswordInput = styled.input.attrs({ type: 'password' })\`
-  padding: 0.5rem;
-\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-    expect(result?.code).toContain('createElement("input"');
-    // Should spread attrs before props
-    expect(result?.code).toContain("{ type: 'password' }");
-    expect(result?.code).toContain("Object.assign");
-  });
-
-  it("should transform styled.button.attrs with type submit", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const SubmitButton = styled.button.attrs({ type: 'submit' })\`
-  background: blue;
-\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-    expect(result?.code).toContain('createElement("button"');
-    expect(result?.code).toContain("{ type: 'submit' }");
-  });
-
-  it("should transform styled.a.attrs with target blank", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const ExternalLink = styled.a.attrs({ target: '_blank', rel: 'noopener noreferrer' })\`
-  color: blue;
-\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-    expect(result?.code).toContain('createElement("a"');
-    expect(result?.code).toContain("target: '_blank'");
-    expect(result?.code).toContain("rel: 'noopener noreferrer'");
-  });
-
-  it("should spread attrs before props for correct override behavior", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Input = styled.input.attrs({ type: 'text', placeholder: 'Enter...' })\`
-  padding: 0.5rem;
-\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    // Props override static attrs, while the generated class still merges with className.
-    // This ensures user props override default attrs
-    expect(result?.code).toMatch(/\{\.\.\..*type.*placeholder.*\}/);
-    expect(result?.code).toContain("...props");
-  });
-
-  it("should handle exported attrs components", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-export const PasswordInput = styled.input.attrs({ type: 'password' })\`
-  padding: 0.5rem;
-\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toContain("export const PasswordInput = Object.assign");
-  });
-});
-
-// =============================================================================
-// styled(Component) Extension Tests
-// =============================================================================
-
-describe("styled(Component) extension", () => {
-  let plugin: Plugin;
-
-  beforeEach(() => {
-    plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-  });
-
-  it("should transform component extension", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;
-const PrimaryButton = styled(Button)\`background: blue;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    // Should render Button component with extended className
-    expect(result?.code).toContain("createElement(Button");
-    // Should concatenate base className
-    expect(result?.code).toContain("Button.className");
-  });
-
-  it("should handle nested component extension (3 levels)", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;
-const PrimaryButton = styled(Button)\`background: blue;\`;
-const LargePrimaryButton = styled(PrimaryButton)\`font-size: 1.5rem;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toContain('createElement("button"');
-    expect(result?.code).toContain("createElement(Button");
-    expect(result?.code).toContain("createElement(PrimaryButton");
-    expect(result?.code).toContain("PrimaryButton.className");
-  });
-
-  it("should maintain declaration order for CSS cascade", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;
-const Primary = styled(Button)\`background: blue;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    // CSS imports should be in order
-    const imports = result?.code.match(/import "virtual:styled-static\/[^"]+"/g) || [];
-    expect(imports.length).toBe(2);
-
-    // Button should come before Primary in the transformed code
-    const buttonPos = result?.code.indexOf('createElement("button"') ?? -1;
-    const primaryPos = result?.code.indexOf("createElement(Button") ?? -1;
-    expect(buttonPos).toBeLessThan(primaryPos);
-  });
-});
-
-// =============================================================================
-// withComponent Transformation Tests
-// =============================================================================
-
-describe("withComponent transformation", () => {
-  let plugin: Plugin;
-
-  beforeEach(() => {
-    plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-  });
-
-  it("should transform withComponent with component reference", async () => {
-    const code = `import { styled, withComponent } from '@alex.radulescu/styled-static';
-import { Link } from 'react-router-dom';
-
-const Button = styled.button\`padding: 1rem;\`;
-const LinkButton = withComponent(Link, Button);`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-    // Should generate inline component with Button.className
-    expect(result?.code).toContain("Object.assign");
-    expect(result?.code).toContain("createElement(Link");
-    expect(result?.code).toContain("Button.className");
-  });
-
-  it("should transform withComponent with HTML tag string", async () => {
-    const code = `import { styled, withComponent } from '@alex.radulescu/styled-static';
-
-const Button = styled.button\`padding: 1rem;\`;
-const AnchorButton = withComponent('a', Button);`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-    expect(result?.code).toContain('createElement("a"');
-    expect(result?.code).toContain("Button.className");
-  });
-
-  it("should handle exported withComponent", async () => {
-    const code = `import { styled, withComponent } from '@alex.radulescu/styled-static';
-import { Link } from 'react-router-dom';
-
-const Button = styled.button\`padding: 1rem;\`;
-export const LinkButton = withComponent(Link, Button);`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toContain("export const LinkButton = Object.assign");
-  });
-
-  it("should work with extended components", async () => {
-    const code = `import { styled, withComponent } from '@alex.radulescu/styled-static';
-import { Link } from 'react-router-dom';
-
-const Button = styled.button\`padding: 1rem;\`;
-const Primary = styled(Button)\`background: blue;\`;
-const PrimaryLink = withComponent(Link, Primary);`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toContain("createElement(Link");
-    expect(result?.code).toContain("Primary.className");
-  });
-});
-
-// =============================================================================
-// css`` Transformation Tests
-// =============================================================================
-
-describe("css`` transformation", () => {
-  let plugin: Plugin;
-
-  beforeEach(() => {
-    plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-  });
-
-  it("should transform css`` to class string", async () => {
-    const code = `import { css } from '@alex.radulescu/styled-static';
-const activeClass = css\`background: blue;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    // css`` only needs the CSS import, no runtime
-    expect(result?.code).not.toContain("import { createElement");
-    expect(result?.code).toContain('import "virtual:styled-static/');
-    // In dev mode, uses readable class name: ss-VariableName-Filename
-    expect(result?.code).toMatch(/const activeClass = "ss-activeClass-test-[a-z0-9]+"/);
-  });
-
-  it("should handle multiple css`` calls", async () => {
-    const code = `import { css } from '@alex.radulescu/styled-static';
-const activeClass = css\`background: blue;\`;
-const hoverClass = css\`transform: scale(1.1);\`;
-const disabledClass = css\`opacity: 0.5;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    const cssImportCount = countMatches(result?.code ?? "", /import "virtual:styled-static\//g);
-    expect(cssImportCount).toBe(3);
-  });
-
-  it("should work alongside styled components", async () => {
-    const code = `import { styled, css } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;
-const activeClass = css\`outline: 2px solid blue;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toContain('createElement("button"');
-    expect(result?.code).toMatch(/const activeClass = "ss-activeClass-test-[a-z0-9]+"/);
-  });
-});
-
-// =============================================================================
-// createGlobalStyle Transformation Tests
-// =============================================================================
-
-describe("createGlobalStyle transformation", () => {
-  let plugin: Plugin;
-
-  beforeEach(() => {
-    plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-  });
-
-  it("should transform createGlobalStyle", async () => {
-    const code = `import { createGlobalStyle } from '@alex.radulescu/styled-static';
-const GlobalStyle = createGlobalStyle\`
-  * { box-sizing: border-box; }
-  body { margin: 0; }
-\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    // createGlobalStyle now returns () => null (no-op component)
-    expect(result?.code).toContain("const GlobalStyle = () => null");
-    expect(result?.code).toContain('import "virtual:styled-static/');
-    // No runtime needed for createGlobalStyle
-    expect(result?.code).not.toContain("import { createElement");
-  });
-
-  it("should not wrap global styles in class selector", async () => {
-    // Global styles should be unscoped - this test verifies the code transforms
-    // The actual CSS content check would require inspecting the virtual module
-    const code = `import { createGlobalStyle } from '@alex.radulescu/styled-static';
-const GlobalStyle = createGlobalStyle\`
-  :root { --color-primary: blue; }
-  body { margin: 0; }
-\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-    expect(result?.code).toContain("() => null");
-  });
-
-  it("should work alongside styled and css", async () => {
-    const code = `import { styled, css, createGlobalStyle } from '@alex.radulescu/styled-static';
-const GlobalStyle = createGlobalStyle\`body { margin: 0; }\`;
-const Button = styled.button\`padding: 1rem;\`;
-const activeClass = css\`background: blue;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toContain('import { createElement } from "react"');
-    expect(result?.code).toContain('import { m } from "@alex.radulescu/styled-static/runtime"');
-    expect(result?.code).toContain("const GlobalStyle = () => null");
-    expect(result?.code).toContain('createElement("button"');
-    expect(result?.code).toMatch(/const activeClass = "ss-activeClass-test-[a-z0-9]+"/);
-  });
-});
-
-// =============================================================================
-// keyframes Transformation Tests
-// =============================================================================
-
-describe("keyframes transformation", () => {
-  let plugin: Plugin;
-
-  beforeEach(() => {
-    plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-  });
-
-  it("should transform keyframes to animation name string", async () => {
-    const code = `import { keyframes } from '@alex.radulescu/styled-static';
-const spin = keyframes\`
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-    // keyframes should become a string (like css) - dev mode uses readable names
-    expect(result?.code).toMatch(/const spin = "ss-spin-test-[a-z0-9]+"/);
-    expect(result?.code).toContain('import "virtual:styled-static/');
-    // No runtime needed for keyframes
-    expect(result?.code).not.toContain("import { createElement");
-  });
-
-  it("should handle keyframes used in styled component", async () => {
-    const code = `import { styled, keyframes } from '@alex.radulescu/styled-static';
-const spin = keyframes\`
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-\`;
-const Spinner = styled.div\`
-  animation: \${spin} 1s linear infinite;
-\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-    // Both keyframes and styled should be transformed - dev mode uses readable names
-    expect(result?.code).toMatch(/const spin = "ss-spin-test-[a-z0-9]+"/);
-    expect(result?.code).toContain('createElement("div"');
-  });
-
-  it("should handle exported keyframes", async () => {
-    const code = `import { keyframes } from '@alex.radulescu/styled-static';
-export const fadeIn = keyframes\`
-  from { opacity: 0; }
-  to { opacity: 1; }
-\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toMatch(/export const fadeIn = "ss-fadeIn-test-[a-z0-9]+"/);
-  });
-
-  it("should handle multiple keyframes declarations", async () => {
-    const code = `import { keyframes } from '@alex.radulescu/styled-static';
-const spin = keyframes\`from { transform: rotate(0deg); } to { transform: rotate(360deg); }\`;
-const fadeIn = keyframes\`from { opacity: 0; } to { opacity: 1; }\`;
-const slideIn = keyframes\`from { transform: translateX(-100%); } to { transform: translateX(0); }\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    // Should have 3 CSS imports
-    const cssImportCount = countMatches(result?.code ?? "", /import "virtual:styled-static\//g);
-    expect(cssImportCount).toBe(3);
-  });
-});
-
-// =============================================================================
-// styledVariants Transformation Tests
-// =============================================================================
-
-describe("styledVariants transformation", () => {
-  let plugin: Plugin;
-
-  beforeEach(() => {
-    plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-  });
-
-  it("should transform styledVariants with HTML tag", async () => {
-    const code = `import { styledVariants, css } from '@alex.radulescu/styled-static';
-const Button = styledVariants({
-  component: 'button',
-  css: css\`padding: 1rem;\`,
-  variants: {
-    size: {
-      sm: css\`font-size: 0.875rem;\`,
-      lg: css\`font-size: 1.25rem;\`,
-    },
-  },
-});`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-    expect(result?.code).toContain("Object.assign");
-    expect(result?.code).toContain('createElement("button"');
-    expect(result?.code).toContain('import "virtual:styled-static/');
-  });
-
-  it("should transform styledVariants extending a component", async () => {
-    const code = `import { styled, styledVariants, css } from '@alex.radulescu/styled-static';
-const BaseButton = styled.button\`padding: 1rem;\`;
-const Button = styledVariants({
-  component: BaseButton,
-  css: css\`border: none;\`,
-  variants: {
-    color: {
-      primary: css\`background: blue;\`,
-    },
-  },
-});`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-    // Should extend BaseButton
-    expect(result?.code).toContain("createElement(BaseButton");
-    expect(result?.code).toContain("BaseButton.className");
-  });
-
-  it("should handle multiple variant dimensions", async () => {
-    const code = `import { styledVariants, css } from '@alex.radulescu/styled-static';
-const Button = styledVariants({
-  component: 'button',
-  css: css\`padding: 1rem;\`,
-  variants: {
-    color: {
-      primary: css\`background: blue;\`,
-      danger: css\`background: red;\`,
-    },
-    size: {
-      sm: css\`font-size: 0.875rem;\`,
-      lg: css\`font-size: 1.25rem;\`,
-    },
-  },
-});`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-    // Should destructure variant props
-    expect(result?.code).toContain("color");
-    expect(result?.code).toContain("size");
-    // Should have variant class conditions
-    expect(result?.code).toContain('=== "primary"');
-    expect(result?.code).toContain('=== "sm"');
-  });
-
-  it("should handle exported styledVariants", async () => {
-    const code = `import { styledVariants, css } from '@alex.radulescu/styled-static';
-export const Button = styledVariants({
-  component: 'button',
-  css: css\`padding: 1rem;\`,
-  variants: {
-    size: { sm: css\`font-size: 0.875rem;\` },
-  },
-});`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toContain("export const Button = Object.assign");
-  });
-
-  it("should handle styledVariants with plain template literal css", async () => {
-    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
-const Button = styledVariants({
-  component: 'button',
-  css: \`padding: 1rem;\`,
-  variants: {
-    size: { sm: \`font-size: 0.875rem;\` },
-  },
-});`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-    expect(result?.code).toContain("Object.assign");
-  });
-
-  it("should apply defaultVariants as default parameter values", async () => {
-    const code = `import { styledVariants, css } from '@alex.radulescu/styled-static';
-const Button = styledVariants({
-  component: 'button',
-  css: css\`padding: 1rem;\`,
-  variants: {
-    size: {
-      sm: css\`font-size: 0.875rem;\`,
-      md: css\`font-size: 1rem;\`,
-      lg: css\`font-size: 1.25rem;\`,
-    },
-    intent: {
-      primary: css\`background: blue;\`,
-      danger: css\`background: red;\`,
-    },
-  },
-  defaultVariants: {
-    size: 'md',
-    intent: 'primary',
-  },
-});`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-    // Default values should appear in the destructure
-    expect(result?.code).toContain('_variant_size_0 = "md"');
-    expect(result?.code).toContain('_variant_intent_1 = "primary"');
-  });
-
-  it("should generate compoundVariants CSS with combined selectors", async () => {
-    const code = `import { styledVariants, css } from '@alex.radulescu/styled-static';
-const Button = styledVariants({
-  component: 'button',
-  css: css\`padding: 1rem;\`,
-  variants: {
-    size: {
-      sm: css\`font-size: 0.875rem;\`,
-      lg: css\`font-size: 1.25rem;\`,
-    },
-    intent: {
-      primary: css\`background: blue;\`,
-      danger: css\`background: red;\`,
-    },
-  },
-  compoundVariants: [
-    {
-      size: 'lg',
-      intent: 'danger',
-      css: css\`font-weight: 900; text-transform: uppercase;\`,
-    },
-  ],
-});`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-    // Component should still work normally
-    expect(result?.code).toContain("Object.assign");
-    expect(result?.code).toContain("createElement");
-  });
-
-  it("should handle both defaultVariants and compoundVariants together", async () => {
-    const code = `import { styledVariants, css } from '@alex.radulescu/styled-static';
-const Button = styledVariants({
-  component: 'button',
-  css: css\`padding: 1rem;\`,
-  variants: {
-    size: { sm: css\`font-size: 0.875rem;\`, lg: css\`font-size: 1.25rem;\` },
-    intent: { primary: css\`background: blue;\`, danger: css\`background: red;\` },
-  },
-  defaultVariants: {
-    size: 'sm',
-    intent: 'primary',
-  },
-  compoundVariants: [
-    { size: 'lg', intent: 'danger', css: css\`font-weight: bold;\` },
-  ],
-});`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-    expect(result?.code).toContain('_variant_size_0 = "sm"');
-    expect(result?.code).toContain('_variant_intent_1 = "primary"');
-  });
-});
-
-// =============================================================================
-// cssVariants Transformation Tests
-// =============================================================================
-
-describe("cssVariants transformation", () => {
-  let plugin: Plugin;
-
-  beforeEach(() => {
-    plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-  });
-
-  it("should transform cssVariants to function", async () => {
-    const code = `import { cssVariants, css } from '@alex.radulescu/styled-static';
-const buttonClass = cssVariants({
-  css: css\`padding: 1rem;\`,
-  variants: {
-    color: {
-      primary: css\`background: blue;\`,
-      danger: css\`background: red;\`,
-    },
-  },
-});`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-    // cssVariants becomes a function that returns class string
-    expect(result?.code).toContain("(variants = {}) =>");
-    expect(result?.code).toContain('Object.hasOwn(variants, "color")');
-    expect(result?.code).toContain('=== "primary"');
-    expect(result?.code).toContain('import "virtual:styled-static/');
-    // No createElement needed
-    expect(result?.code).not.toContain("createElement");
-  });
-
-  it("should handle multiple variant dimensions in cssVariants", async () => {
-    const code = `import { cssVariants, css } from '@alex.radulescu/styled-static';
-const styles = cssVariants({
-  css: css\`display: flex;\`,
-  variants: {
-    size: { sm: css\`gap: 0.5rem;\`, lg: css\`gap: 1rem;\` },
-    align: { start: css\`align-items: start;\`, center: css\`align-items: center;\` },
-  },
-});`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-    expect(result?.code).toContain('Object.hasOwn(variants, "size")');
-    expect(result?.code).toContain('Object.hasOwn(variants, "align")');
-  });
-
-  it("should handle exported cssVariants", async () => {
-    const code = `import { cssVariants, css } from '@alex.radulescu/styled-static';
-export const buttonClass = cssVariants({
-  css: css\`padding: 1rem;\`,
-  variants: {
-    color: { primary: css\`background: blue;\` },
-  },
-});`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toContain("export const buttonClass = (variants = {}) =>");
-  });
-
-  it("should handle cssVariants with defaultVariants", async () => {
-    const code = `import { cssVariants, css } from '@alex.radulescu/styled-static';
-const buttonClass = cssVariants({
-  css: css\`padding: 1rem;\`,
-  variants: {
-    size: { sm: css\`font-size: 0.875rem;\`, md: css\`font-size: 1rem;\`, lg: css\`font-size: 1.25rem;\` },
-  },
-  defaultVariants: {
-    size: 'md',
-  },
-});`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-    expect(result?.code).toContain("(variants = {}) =>");
-  });
-
-  it("should handle cssVariants with compoundVariants", async () => {
-    const code = `import { cssVariants, css } from '@alex.radulescu/styled-static';
-const buttonClass = cssVariants({
-  css: css\`padding: 1rem;\`,
-  variants: {
-    size: { sm: css\`font-size: 0.875rem;\`, lg: css\`font-size: 1.25rem;\` },
-    intent: { primary: css\`background: blue;\`, danger: css\`background: red;\` },
-  },
-  compoundVariants: [
-    { size: 'lg', intent: 'danger', css: css\`font-weight: bold;\` },
-  ],
-});`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-    expect(result?.code).toContain("(variants = {}) =>");
-  });
-});
-
-// =============================================================================
-// Export Handling Tests
-// =============================================================================
-
-describe("export handling", () => {
-  let plugin: Plugin;
-
-  beforeEach(() => {
-    plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-  });
-
-  it("should handle exported styled components", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-export const Button = styled.button\`padding: 1rem;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toContain("export const Button = Object.assign");
-  });
-
-  it("should handle multiple exports", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-export const Button = styled.button\`padding: 1rem;\`;
-export const Card = styled.div\`margin: 1rem;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toContain("export const Button = Object.assign");
-    expect(result?.code).toContain("export const Card = Object.assign");
-  });
-
-  it("should handle mix of exported and non-exported", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-export const Button = styled.button\`padding: 1rem;\`;
-const InternalCard = styled.div\`margin: 1rem;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toContain("export const Button = Object.assign");
-    expect(result?.code).toContain("const InternalCard = Object.assign");
-  });
-
-  it("should handle exported css classes", async () => {
-    const code = `import { css } from '@alex.radulescu/styled-static';
-export const activeClass = css\`background: blue;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toMatch(/export const activeClass = "ss-activeClass-test-[a-z0-9]+"/);
-  });
-});
-
-// =============================================================================
-// Import Aliasing Tests
-// =============================================================================
-
-describe("import aliasing", () => {
-  let plugin: Plugin;
-
-  beforeEach(() => {
-    plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-  });
-
-  it("should handle aliased styled import", async () => {
-    const code = `import { styled as s } from '@alex.radulescu/styled-static';
-const Button = s.button\`padding: 1rem;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toContain('createElement("button"');
-  });
-
-  it("should handle aliased css import", async () => {
-    const code = `import { css as c } from '@alex.radulescu/styled-static';
-const activeClass = c\`background: blue;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toMatch(/const activeClass = "ss-activeClass-test-[a-z0-9]+"/);
-  });
-
-  it("should handle aliased createGlobalStyle import", async () => {
-    const code = `import { createGlobalStyle as global } from '@alex.radulescu/styled-static';
-const GlobalStyle = global\`body { margin: 0; }\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toContain("const GlobalStyle = () => null");
-  });
-
-  it("should handle multiple aliased imports", async () => {
-    const code = `import { styled as s, css as c, createGlobalStyle as g } from '@alex.radulescu/styled-static';
-const GlobalStyle = g\`body { margin: 0; }\`;
-const Button = s.button\`padding: 1rem;\`;
-const activeClass = c\`background: blue;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toContain("() => null");
-    expect(result?.code).toContain('createElement("button"');
-    expect(result?.code).toMatch(/const activeClass = "ss-activeClass-test-[a-z0-9]+"/);
-  });
-
-  it("should handle aliased keyframes import", async () => {
-    const code = `import { keyframes as kf } from '@alex.radulescu/styled-static';
-const spin = kf\`from { transform: rotate(0deg); } to { transform: rotate(360deg); }\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toMatch(/const spin = "ss-spin-test-[a-z0-9]+"/);
-  });
-
-  it("should handle aliased styledVariants import", async () => {
-    const code = `import { styledVariants as sv, css } from '@alex.radulescu/styled-static';
-const Button = sv({
-  component: 'button',
-  css: css\`padding: 1rem;\`,
-  variants: { size: { sm: css\`font-size: 0.875rem;\` } },
-});`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toContain("Object.assign");
-    expect(result?.code).toContain('createElement("button"');
-  });
-
-  it("should handle aliased cssVariants import", async () => {
-    const code = `import { cssVariants as cv, css } from '@alex.radulescu/styled-static';
-const styles = cv({
-  css: css\`padding: 1rem;\`,
-  variants: { size: { sm: css\`font-size: 0.875rem;\` } },
-});`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toContain("(variants = {}) =>");
-  });
-
-  it("should handle aliased withComponent import", async () => {
-    const code = `import { styled, withComponent as wc } from '@alex.radulescu/styled-static';
-import { Link } from 'react-router-dom';
-const Button = styled.button\`padding: 1rem;\`;
-const LinkButton = wc(Link, Button);`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toContain("createElement(Link");
-    expect(result?.code).toContain("Button.className");
-  });
-});
-
-// =============================================================================
-// CSS Content Preservation Tests
-// =============================================================================
-
-describe("CSS content preservation", () => {
-  let plugin: Plugin;
-
-  beforeEach(() => {
-    plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-  });
-
-  it("should handle CSS with special characters", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Box = styled.div\`
-  content: "Hello World";
-  background: url('image.png');
-  font-family: 'Helvetica Neue', sans-serif;
-\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-    expect(result?.code).toContain('createElement("div"');
-  });
-
-  it("should handle CSS variables", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Box = styled.div\`
-  --custom-color: #3b82f6;
-  color: var(--custom-color);
-  padding: var(--spacing, 1rem);
-\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-  });
-
-  it("should handle nested selectors with &", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`
-  padding: 1rem;
-
-  &:hover {
-    background: blue;
-  }
-
-  &:focus {
-    outline: 2px solid;
-  }
-
-  &:disabled {
-    opacity: 0.5;
-  }
-\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-  });
-
-  it("should handle complex nested selectors", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const List = styled.ul\`
-  & > li {
-    padding: 0.5rem;
-  }
-
-  & > li:first-child {
-    border-top: none;
-  }
-
-  & > li:not(:last-child) {
-    border-bottom: 1px solid #ccc;
-  }
-
-  &[data-active="true"] {
-    background: blue;
-  }
-\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-  });
-
-  it("should handle media queries", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Container = styled.div\`
-  padding: 1rem;
-
-  @media (min-width: 640px) {
-    padding: 1.5rem;
-  }
-
-  @media (min-width: 768px) {
-    padding: 2rem;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    background: #1a1a1a;
-  }
-\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-  });
-
-  it("should handle keyframe animations", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Spinner = styled.div\`
-  animation: spin 1s linear infinite;
-
-  @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-  });
-
-  it("should handle empty CSS content", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Empty = styled.div\`\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-    expect(result?.code).toContain('createElement("div"');
-  });
-
-  it("should handle whitespace-only CSS content", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Whitespace = styled.div\`   \`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result).not.toBeNull();
-  });
-});
-
-// =============================================================================
-// Edge Cases and Error Handling
-// =============================================================================
-
-describe("edge cases", () => {
-  let plugin: Plugin;
-
-  beforeEach(() => {
-    plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-  });
-
-  it("should handle component names with numbers", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button2 = styled.button\`padding: 1rem;\`;
-const Card3D = styled.div\`transform: perspective(500px);\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    // Should transform both components with inline pattern
-    expect(result?.code).toContain("const Button2 = Object.assign");
-    expect(result?.code).toContain("const Card3D = Object.assign");
-  });
-
-  it("should handle underscore in component names", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Primary_Button = styled.button\`background: blue;\`;
-const _PrivateCard = styled.div\`padding: 1rem;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toContain("const Primary_Button = Object.assign");
-    expect(result?.code).toContain("const _PrivateCard = Object.assign");
-  });
-
-  it("should transform let declarations", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-let Button = styled.button\`padding: 1rem;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    // let declarations are transformed (valid use case for reassignment)
-    expect(result).not.toBeNull();
-    expect(result?.code).toContain('createElement("button"');
-  });
-
-  it("should transform var declarations", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-var Button = styled.button\`padding: 1rem;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    // var declarations are transformed (legacy code support)
-    expect(result).not.toBeNull();
-    expect(result?.code).toContain('createElement("button"');
-  });
-
-  it("should handle files with mixed content", async () => {
-    const code = `import React from 'react';
-import { styled } from '@alex.radulescu/styled-static';
-
-// Regular code
-const regularVar = 'test';
-const num = 42;
-
-// Styled component
-const Button = styled.button\`padding: 1rem;\`;
-
-// Regular function
-function helper() {
-  return 'helper';
-}
-
-// Another styled component
-const Card = styled.div\`margin: 1rem.\`;
-
-export { Button, Card, helper };`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toContain("import React from 'react'");
-    expect(result?.code).toContain("const regularVar = 'test'");
-    expect(result?.code).toContain("const num = 42");
-    expect(result?.code).toContain("function helper()");
-    expect(result?.code).toContain('createElement("button"');
-    expect(result?.code).toContain('createElement("div"');
-  });
-
-  it("should not transform strings that look like styled calls", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-// Comment about styled.button
-const config = { styled: { button: true } };
-const text = "styled.button is great";
-
-// Only this should be transformed
-const Button = styled.button\`padding: 1rem;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.code).toContain("const config = { styled: { button: true } }");
-    expect(result?.code).toContain('const text = "styled.button is great"');
-    expect(result?.code).toContain('createElement("button"');
-
-    // Should only have one Object.assign call (one styled component)
-    const objectAssignCalls = countMatches(result?.code ?? "", /Object\.assign\(/g);
-    expect(objectAssignCalls).toBe(1);
-  });
-});
-
-// =============================================================================
-// Source Map Tests
-// =============================================================================
-
-describe("source maps", () => {
-  let plugin: Plugin;
-
-  beforeEach(() => {
-    plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-  });
-
-  it("should generate source maps", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.map).toBeTruthy();
-  });
-
-  it("should generate hires source maps", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    expect(result?.map).toBeTruthy();
-    expect(result?.map.mappings).toBeTruthy();
-  });
-});
-
-// =============================================================================
-// Custom Class Prefix Tests
-// =============================================================================
-
-describe("custom class prefix", () => {
-  it("should use custom class prefix", async () => {
-    const plugin = styledStatic({ classPrefix: "myapp" });
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    // In dev mode, uses readable class name with custom prefix
-    expect(result?.code).toMatch(/className: "myapp-Button-test-[a-z0-9]+"/);
-  });
-
-  it("should use custom prefix for css`` too", async () => {
-    const plugin = styledStatic({ classPrefix: "app" });
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { css } from '@alex.radulescu/styled-static';
-const activeClass = css\`background: blue;\`;`;
-    const result = await transform(plugin, code, "/test.tsx");
-
-    // In dev mode, uses readable class name with custom prefix
-    expect(result?.code).toMatch(/const activeClass = "app-activeClass-test-[a-z0-9]+"/);
-  });
-});
-
-// =============================================================================
-// Virtual Module Tests
-// =============================================================================
-
-describe("virtual modules", () => {
-  let plugin: Plugin;
-
-  beforeEach(() => {
-    plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-  });
-
-  it("should resolve new virtual module format with prefix", () => {
-    const resolveId = plugin.resolveId as Function;
-
-    const result = resolveId("virtual:styled-static//test.tsx/0.css");
-    expect(result).toBe("\0virtual:styled-static//test.tsx/0.css");
-  });
-
-  it("should pass through already-prefixed new format virtual module IDs", () => {
-    const resolveId = plugin.resolveId as Function;
-
-    const result = resolveId("\0virtual:styled-static//test.tsx/0.css");
-    expect(result).toBe("\0virtual:styled-static//test.tsx/0.css");
-  });
-
-  it("should return null for non-styled-static modules", () => {
-    const resolveId = plugin.resolveId as Function;
-
-    const result = resolveId("react");
-    expect(result).toBeNull();
-  });
-});
-
-// =============================================================================
-// Minimal Runtime Tests
-// =============================================================================
-
-describe("minimal runtime", () => {
-  it("should export class merge helper m()", async () => {
-    const { m } = await import("./runtime/index");
-
-    expect(typeof m).toBe("function");
-  });
-
-  it("should merge base and user className", async () => {
-    const { m } = await import("./runtime/index");
-
-    expect(m("ss-base", "user-class")).toBe("ss-base user-class");
-  });
-
-  it("should return base class when no user class", async () => {
-    const { m } = await import("./runtime/index");
-
-    expect(m("ss-base", undefined)).toBe("ss-base");
-    expect(m("ss-base")).toBe("ss-base");
-  });
-
-  it("should handle empty user className", async () => {
-    const { m } = await import("./runtime/index");
-
-    // Empty string is falsy, so it returns base only
-    expect(m("ss-base", "")).toBe("ss-base");
-  });
-});
-
-// =============================================================================
-// Hash Function Tests
-// =============================================================================
-
-describe("hash", () => {
-  it("should produce consistent hashes", async () => {
-    const { hash } = await import("./hash");
-
-    const result1 = hash("padding: 1rem;");
-    const result2 = hash("padding: 1rem;");
-
-    expect(result1).toBe(result2);
-  });
-
-  it("should produce different hashes for different input", async () => {
-    const { hash } = await import("./hash");
-
-    const result1 = hash("padding: 1rem;");
-    const result2 = hash("margin: 1rem;");
-
-    expect(result1).not.toBe(result2);
-  });
-
-  it("should handle empty string", async () => {
-    const { hash } = await import("./hash");
-
-    const result = hash("");
-    expect(typeof result).toBe("string");
-    expect(result.length).toBeGreaterThan(0);
-  });
-
-  it("should handle long strings", async () => {
-    const { hash } = await import("./hash");
-
-    const longCss = "a".repeat(10000);
-    const result = hash(longCss);
-
-    expect(typeof result).toBe("string");
-    expect(result.length).toBeGreaterThan(0);
-    expect(result.length).toBeLessThan(20); // Hash should be short
-  });
-
-  it("should handle unicode characters", async () => {
-    const { hash } = await import("./hash");
-
-    const result = hash('content: "🎨";');
-    expect(typeof result).toBe("string");
-  });
-});
-
-// =============================================================================
-// Security Tests
-// =============================================================================
-
-describe("security: build-time variant safety", () => {
-  let plugin: Plugin;
-
-  beforeEach(() => {
-    plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-  });
-
-  it("should generate explicit equality checks for variant values", async () => {
-    const code = `import { styledVariants, css } from '@alex.radulescu/styled-static';
-const Button = styledVariants({
-  component: 'button',
-  css: css\`padding: 1rem;\`,
-  variants: {
-    color: {
-      primary: css\`background: blue;\`,
-      danger: css\`background: red;\`,
-    },
-  },
-});`;
-    const result = await transform(plugin, code, "/test-variants.tsx");
-
-    // Variants use explicit equality checks (===) not string interpolation
-    expect(result?.code).toContain('=== "primary"');
-    expect(result?.code).toContain('=== "danger"');
-    // No dynamic string building with variant values
-    expect(result?.code).not.toMatch(/\+ color\b/);
-  });
-
-  it("should use static class names for variants", async () => {
-    const code = `import { styledVariants, css } from '@alex.radulescu/styled-static';
-const Button = styledVariants({
-  component: 'button',
-  css: css\`padding: 1rem;\`,
-  variants: {
-    size: {
-      sm: css\`font-size: 0.875rem;\`,
-      lg: css\`font-size: 1.25rem;\`,
-    },
-  },
-});`;
-    const result = await transform(plugin, code, "/test-static-variants.tsx");
-
-    // Class names are hardcoded literals, not dynamically built from user input
-    // In dev mode, uses readable format: ss-VariableName-Filename--variant-value
-    expect(result?.code).toMatch(/ss-Button-test-static-variants-[a-z0-9]+--size-sm/);
-    expect(result?.code).toMatch(/ss-Button-test-static-variants-[a-z0-9]+--size-lg/);
-  });
-
-  it("should generate correct cssVariants class names without variants. prefix", async () => {
-    const code = `import { cssVariants, css } from '@alex.radulescu/styled-static';
-const calloutStyles = cssVariants({
-  css: css\`padding: 1rem;\`,
-  variants: {
-    type: {
-      note: css\`background: blue;\`,
-      tip: css\`background: green;\`,
-    },
-  },
-});`;
-    const result = await transform(plugin, code, "/test-cssVariants.tsx");
-
-    // Should use a literal property lookup in condition checks.
-    expect(result?.code).toContain('Object.hasOwn(variants, "type")');
-    expect(result?.code).toContain('=== "note"');
-    expect(result?.code).toContain('=== "tip"');
-    // Class names should NOT contain "variants." - just the key name
-    expect(result?.code).toMatch(/--type-note/);
-    expect(result?.code).toMatch(/--type-tip/);
-    expect(result?.code).not.toContain("--variants.type");
-  });
-
-  it("should use if/else for <= 4 total variant values", async () => {
-    // 2 variants × 2 values = 4 total (at threshold, should use if/else)
-    const code = `import { styledVariants, css } from '@alex.radulescu/styled-static';
-const Button = styledVariants({
-  component: 'button',
-  css: css\`padding: 1rem;\`,
-  variants: {
-    color: {
-      primary: css\`background: blue;\`,
-      danger: css\`background: red;\`,
-    },
-    size: {
-      sm: css\`font-size: 0.875rem;\`,
-      lg: css\`font-size: 1.125rem;\`,
-    },
-  },
-});`;
-    const result = await transform(plugin, code, "/test-threshold-4.tsx");
-
-    // Should use if/else chain (original approach)
-    expect(result?.code).toContain('if (_variant_color_0 === "primary")');
-    expect(result?.code).toContain('else if (_variant_color_0 === "danger")');
-    expect(result?.code).toContain('if (_variant_size_1 === "sm")');
-    expect(result?.code).not.toContain("_vm");
-  });
-
-  it("should keep explicit checks for more than 4 variant values", async () => {
-    const code = `import { styledVariants, css } from '@alex.radulescu/styled-static';
-const Button = styledVariants({
-  component: 'button',
-  css: css\`padding: 1rem;\`,
-  variants: {
-    color: {
-      primary: css\`background: blue;\`,
-      secondary: css\`background: gray;\`,
-      success: css\`background: green;\`,
-      danger: css\`background: red;\`,
-      warning: css\`background: orange;\`,
-    },
-  },
-});`;
-    const result = await transform(plugin, code, "/test-threshold-5.tsx");
-
-    expect(result?.code).toContain('if (_variant_color_0 === "primary")');
-    expect(result?.code).toContain('else if (_variant_color_0 === "warning")');
-    expect(result?.code).not.toContain("_vm");
-  });
-
-  it("should keep explicit checks for complex multi-variant components", async () => {
-    // 3 variants × 2 values each = 6 total (above threshold)
-    const code = `import { styledVariants, css } from '@alex.radulescu/styled-static';
-const Button = styledVariants({
-  component: 'button',
-  css: css\`padding: 1rem;\`,
-  variants: {
-    color: {
-      primary: css\`background: blue;\`,
-      danger: css\`background: red;\`,
-    },
-    size: {
-      sm: css\`font-size: 0.875rem;\`,
-      lg: css\`font-size: 1.125rem;\`,
-    },
-    variant: {
-      solid: css\`border: none;\`,
-      outline: css\`border: 1px solid;\`,
-    },
-  },
-});`;
-    const result = await transform(plugin, code, "/test-threshold-6.tsx");
-
-    expect(result?.code).toContain('_variant_color_0 === "primary"');
-    expect(result?.code).toContain('_variant_size_1 === "sm"');
-    expect(result?.code).toContain('_variant_variant_2 === "solid"');
-    expect(result?.code).not.toContain("_vm");
-  });
-
-  it("should keep explicit checks for cssVariants with more than 4 values", async () => {
-    const code = `import { cssVariants, css } from '@alex.radulescu/styled-static';
-const calloutStyles = cssVariants({
-  css: css\`padding: 1rem;\`,
-  variants: {
-    type: {
-      note: css\`background: blue;\`,
-      tip: css\`background: green;\`,
-      warning: css\`background: orange;\`,
-      danger: css\`background: red;\`,
-      info: css\`background: cyan;\`,
-    },
-  },
-});`;
-    const result = await transform(plugin, code, "/test-cssVariants-hoisted.tsx");
-
-    expect(result?.code).toContain('Object.hasOwn(variants, "type")');
-    expect(result?.code).toContain('=== "note"');
-    expect(result?.code).toContain('=== "info"');
-    expect(result?.code).not.toContain("_vm");
-  });
-});
-
-describe("security: prototype pollution prevention", () => {
-  it("should use Object.keys to avoid prototype pollution", () => {
-    // The runtime uses Object.keys() which only returns own properties
-    const pollutedKey = "__test_polluted__";
-
-    try {
-      // @ts-expect-error - intentionally polluting prototype for test
-      Object.prototype[pollutedKey] = "malicious-value";
-
-      const testObj = { normalProp: "value" };
-
-      // Object.keys only returns own properties, not inherited ones
-      const keys = Object.keys(testObj);
-      expect(keys).not.toContain(pollutedKey);
-      expect(keys).toContain("normalProp");
-
-      // for...in would have included polluted key (this is what we avoid)
-      const forInKeys: string[] = [];
-      for (const key in testObj) {
-        forInKeys.push(key);
-      }
-      // Demonstrate the vulnerability we're protecting against
-      expect(forInKeys).toContain(pollutedKey);
-    } finally {
-      // @ts-expect-error - cleanup
-      delete Object.prototype[pollutedKey];
-    }
-  });
-});
-
-describe("security: debug logging control", () => {
-  it("should not log by default (no debug option)", async () => {
-    const consoleSpy = spyOn(console, "log").mockImplementation(() => {});
-
-    const plugin = styledStatic();
-    // Simulate configResolved
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    // Transform should not log without debug enabled
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;`;
-
-    // Reset spy before transform
-    consoleSpy.mockClear();
-
-    await transform(plugin, code, "/test-no-log.tsx");
-
-    // Check that no styled-static logs were made
-    const styledStaticLogs = consoleSpy.mock.calls.filter((call) =>
-      String(call[0]).includes("[styled-static]"),
-    );
-
-    expect(styledStaticLogs.length).toBe(0);
-
-    consoleSpy.mockRestore();
-  });
-
-  it("should log when debug option is true", async () => {
-    const consoleSpy = spyOn(console, "log").mockImplementation(() => {});
-
-    const plugin = styledStatic({ debug: true });
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;`;
-
-    consoleSpy.mockClear();
-
-    await transform(plugin, code, "/test-with-log.tsx");
-
-    // Check that styled-static logs were made
-    const styledStaticLogs = consoleSpy.mock.calls.filter((call) =>
-      String(call[0]).includes("[styled-static]"),
-    );
-
-    expect(styledStaticLogs.length).toBeGreaterThan(0);
-
-    consoleSpy.mockRestore();
-  });
-});
-
-describe("security: identifier validation", () => {
-  let plugin: Plugin;
-
-  beforeEach(() => {
-    plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-  });
-
-  it("should handle components with valid identifiers", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const MyButton = styled.button\`padding: 1rem;\`;
-const _PrivateButton = styled.button\`margin: 1rem;\`;
-const $special = styled.button\`color: red;\`;`;
-
-    const result = await transform(plugin, code, "/test-identifiers.tsx");
-
-    expect(result).not.toBeNull();
-    // Should transform all components with Object.assign pattern
-    expect(result?.code).toContain("const MyButton = Object.assign");
-    expect(result?.code).toContain("const _PrivateButton = Object.assign");
-    expect(result?.code).toContain("const $special = Object.assign");
-  });
-
-  it("should use longer hash in production mode", async () => {
-    const prodPlugin = styledStatic();
-    (prodPlugin.configResolved as Function)?.({ command: "build" });
-
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;`;
-
-    const result = await transform(prodPlugin, code, "/test-prod-hash.tsx");
-
-    // In production, hash should be 8 chars (base36 may produce 5-8 chars)
-    // Match pattern: ss-[5-8 alphanumeric chars]
-    expect(result?.code).toMatch(/ss-[a-z0-9]{5,8}/);
-    // Should use Object.assign pattern
-    expect(result?.code).toContain("Object.assign");
-  });
-});
-
-describe("security: file path based CSS modules", () => {
-  let plugin: Plugin;
-
-  beforeEach(() => {
-    plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-  });
-
-  it("should use file path in CSS module ID (for proper chunk association)", async () => {
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;`;
-
-    const result = await transform(plugin, code, "/test-collision.tsx");
-
-    // CSS import should include the source file path for chunk association
-    // Format: virtual:styled-static/path/to/file.tsx/N.css (build) or .js (dev)
-    expect(result?.code).toMatch(/virtual:styled-static\/.*\/\d+\.(css|js)/);
-    expect(result?.code).toContain("test-collision.tsx");
-  });
-});
-
-// =============================================================================
-// cx Utility Tests
-// =============================================================================
-
-describe("cx utility", () => {
-  it("should join class names", async () => {
-    const { cx } = await import("./index");
-
-    expect(cx("a", "b", "c")).toBe("a b c");
-  });
-
-  it("should filter falsy values", async () => {
-    const { cx } = await import("./index");
-
-    expect(cx("a", null, "b", undefined, "c", false)).toBe("a b c");
-  });
-
-  it("should handle empty input", async () => {
-    const { cx } = await import("./index");
-
-    expect(cx()).toBe("");
-  });
-
-  it("should handle single class", async () => {
-    const { cx } = await import("./index");
-
-    expect(cx("single")).toBe("single");
-  });
-
-  it("should work with conditional classes", async () => {
-    const { cx } = await import("./index");
-
-    const isActive = true;
-    const isDisabled = false;
-
-    expect(cx("base", isActive && "active", isDisabled && "disabled")).toBe("base active");
-  });
-
-  it("should handle all falsy values", async () => {
-    const { cx } = await import("./index");
-
-    expect(cx(null, undefined, false, "")).toBe("");
-  });
-});
-
-// =============================================================================
-// Dev-friendly Class Names Tests
-// =============================================================================
-
-describe("dev-friendly class names", () => {
-  it("should use variable name and filename in dev mode", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const MyButton = styled.button\`padding: 1rem;\`;`;
-    const result = await transform(plugin, code, "/src/components/Button.tsx");
-
-    expect(result).not.toBeNull();
-    // Includes a short path hash so same-named files in different directories cannot collide.
-    expect(result?.code).toMatch(/className: "ss-MyButton-Button-[a-z0-9]+"/);
-  });
-
-  it("should use hash in prod mode", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "build" });
-
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const MyButton = styled.button\`padding: 1rem;\`;`;
-    const result = await transform(plugin, code, "/src/components/Button.tsx");
-
-    expect(result).not.toBeNull();
-    // Should use hash-based class name in prod
-    expect(result?.code).toMatch(/className: "ss-[a-z0-9]+"/);
-    expect(result?.code).not.toContain("ss-MyButton");
-  });
-
-  it("should handle css helper with variable name in dev mode", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { css } from '@alex.radulescu/styled-static';
-const highlightClass = css\`background: yellow;\`;`;
-    const result = await transform(plugin, code, "/src/styles/shared.tsx");
-
-    expect(result).not.toBeNull();
-    // Should use readable class name for css helper too
-    expect(result?.code).toMatch(/"ss-highlightClass-shared-[a-z0-9]+"/);
-  });
-
-  it("should handle styled extension with variable name in dev mode", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;
-const PrimaryButton = styled(Button)\`background: blue;\`;`;
-    const result = await transform(plugin, code, "/src/App.tsx");
-
-    expect(result).not.toBeNull();
-    expect(result?.code).toMatch(/className: "ss-Button-App-[a-z0-9]+"/);
-    expect(result?.code).toMatch(/"ss-PrimaryButton-App-[a-z0-9]+"/);
-  });
-
-  it("should sanitize special characters in filename", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Box = styled.div\`display: flex;\`;`;
-    const result = await transform(plugin, code, "/src/my-component.test.tsx");
-
-    expect(result).not.toBeNull();
-    // Special characters are normalized and disambiguated.
-    expect(result?.code).toMatch(/className: "ss-Box-my-component-test-[a-z0-9]+-[a-z0-9]+"/);
-  });
-});
-
-// =============================================================================
-// Load Hook Tests
-// =============================================================================
-
-describe("load hook", () => {
-  it("should return null for non-styled-static IDs", () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-    const load = plugin.load as Function;
-    expect(load("\0other-plugin/module.css")).toBeNull();
-  });
-
-  it("should return null for IDs without virtual prefix", () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-    const load = plugin.load as Function;
-    expect(load("regular-module.js")).toBeNull();
-  });
-
-  it("should return JS DOM injection code in dev mode", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;`;
-    const result = await transform(plugin, code, "/test-load.tsx");
-    expect(result).not.toBeNull();
-
-    // Extract the virtual module import from the transformed output
-    const importMatch = result!.code.match(/import "([^"]+)"/);
-    expect(importMatch).not.toBeNull();
-
-    const load = plugin.load as Function;
-    // In dev mode the import uses .js extension; the load function maps it to .css key
-    const virtualId = "\0" + importMatch![1];
-    const loaded = load(virtualId);
-    expect(loaded).toContain("document.createElement('style')");
-    expect(loaded).toContain("import.meta.hot");
-  });
-
-  it("should return raw CSS in build mode with virtual output", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "build" });
-
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;`;
-    const result = await transform(plugin, code, "/test-load-build.tsx");
-    expect(result).not.toBeNull();
-
-    const importMatch = result!.code.match(/import "([^"]+)"/);
-    expect(importMatch).not.toBeNull();
-
-    const load = plugin.load as Function;
-    const virtualId = "\0" + importMatch![1];
-    const loaded = load(virtualId);
-    // Build mode virtual: returns raw CSS
-    expect(loaded).toContain("padding: 1rem;");
-    // Should NOT contain JS injection
-    expect(loaded).not.toContain("document.createElement");
-  });
-
-  it("should return empty string in build mode with file output", async () => {
-    const plugin = styledStatic({ cssOutput: "file" });
-    (plugin.configResolved as Function)?.({ command: "build" });
-
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;`;
-    const result = await transform(plugin, code, "/test-load-file.tsx");
-    expect(result).not.toBeNull();
-
-    const importMatch = result!.code.match(/import "([^"]+)"/);
-    expect(importMatch).not.toBeNull();
-
-    const load = plugin.load as Function;
-    const virtualId = "\0" + importMatch![1];
-    const loaded = load(virtualId);
-    expect(loaded).toBe("");
-  });
-
-  it("should handle CSS module with no matching entry gracefully", () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "build" });
-
-    const load = plugin.load as Function;
-    // Load a virtual module ID that was never registered via transform
-    const loaded = load("\0virtual:styled-static/nonexistent/0.css");
-    // Should return empty CSS (the fallback)
-    expect(loaded).toBe("");
-  });
-});
-
-// =============================================================================
-// Resolve ID Hook Tests
-// =============================================================================
-
-describe("resolveId hook", () => {
-  it("should resolve virtual:styled-static/ IDs", () => {
-    const plugin = styledStatic();
-    const resolveId = plugin.resolveId as Function;
-    const result = resolveId("virtual:styled-static/test/0.css");
-    expect(result).toBe("\0virtual:styled-static/test/0.css");
-  });
-
-  it("should pass through already-prefixed IDs", () => {
-    const plugin = styledStatic();
-    const resolveId = plugin.resolveId as Function;
-    const result = resolveId("\0virtual:styled-static/test/0.css");
-    expect(result).toBe("\0virtual:styled-static/test/0.css");
-  });
-
-  it("should return null for non-styled-static IDs", () => {
-    const plugin = styledStatic();
-    const resolveId = plugin.resolveId as Function;
-    const result = resolveId("some-other-module");
-    expect(result).toBeNull();
-  });
-});
-
-// =============================================================================
-// HMR (handleHotUpdate) Hook Tests
-// =============================================================================
-
-describe("handleHotUpdate hook", () => {
-  it("should invalidate virtual modules for changed source files", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    // Transform a file to populate CSS modules
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;`;
-    await transform(plugin, code, "/src/Button.tsx");
-
-    const mockMod = { id: "mock-module" };
-    const invalidateModule = mock();
-    const getModuleById = mock().mockReturnValue(mockMod);
-    const mockServer = {
-      moduleGraph: { getModuleById, invalidateModule },
-    };
-
-    const handleHotUpdate = plugin.handleHotUpdate as Function;
-    handleHotUpdate({ file: "/src/Button.tsx", server: mockServer });
-
-    // Should have looked up and invalidated the module
-    expect(getModuleById).toHaveBeenCalled();
-    expect(invalidateModule).toHaveBeenCalledWith(mockMod);
-  });
-
-  it("should not invalidate modules for non-matching source files", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;`;
-    await transform(plugin, code, "/src/Button.tsx");
-
-    const getModuleById = mock();
-    const mockServer = {
-      moduleGraph: { getModuleById, invalidateModule: mock() },
-    };
-
-    const handleHotUpdate = plugin.handleHotUpdate as Function;
-    // Different file that doesn't match
-    handleHotUpdate({ file: "/src/Other.tsx", server: mockServer });
-
-    // Should not find any matching modules
-    expect(getModuleById).not.toHaveBeenCalled();
-  });
-
-  it("should invalidate virtual modules created from query-bearing ids", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;`;
-    await transform(plugin, code, "/src/Button.tsx?v=123");
-
-    const mockMod = { id: "query-module" };
-    const invalidateModule = mock();
-    const getModuleById = mock().mockReturnValue(mockMod);
-    const handleHotUpdate = plugin.handleHotUpdate as Function;
-    handleHotUpdate({
-      file: "/src/Button.tsx",
+    const invalidateModule = mock(() => {});
+    const getModuleById = mock((id: string) => ({ id }));
+    (plugin.handleHotUpdate as Function)({
+      file: "/project/src/styles.ts",
       server: { moduleGraph: { getModuleById, invalidateModule } },
     });
-
-    expect(getModuleById).toHaveBeenCalled();
-    expect(invalidateModule).toHaveBeenCalledWith(mockMod);
+    expect(invalidateModule).toHaveBeenCalledTimes(2);
   });
 
-  it("should ignore non-JS/TS files", () => {
+  it("clears style records when the last definition is deleted", async () => {
     const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const getModuleById = mock();
-    const mockServer = {
-      moduleGraph: { getModuleById, invalidateModule: mock() },
-    };
-
-    const handleHotUpdate = plugin.handleHotUpdate as Function;
-    handleHotUpdate({ file: "/src/styles.css", server: mockServer });
-
-    expect(getModuleById).not.toHaveBeenCalled();
-  });
-
-  it("should handle module not found in graph", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;`;
-    await transform(plugin, code, "/src/Button.tsx");
-
-    const invalidateModule = mock();
-    const getModuleById = mock().mockReturnValue(null); // Module not in graph
-    const mockServer = {
-      moduleGraph: { getModuleById, invalidateModule },
-    };
-
-    const handleHotUpdate = plugin.handleHotUpdate as Function;
-    handleHotUpdate({ file: "/src/Button.tsx", server: mockServer });
-
-    expect(getModuleById).toHaveBeenCalled();
-    // Should not try to invalidate null
-    expect(invalidateModule).not.toHaveBeenCalled();
-  });
-});
-
-// =============================================================================
-// generateBundle Hook Tests
-// =============================================================================
-
-describe("generateBundle hook", () => {
-  it("escapes quotes in emitted CSS file imports", () => {
-    const input =
-      'import "virtual:styled-static/source/0.css";\nexport const example = \'import "virtual:styled-static/keep-me.css";\';';
-    const rewritten = rewriteCssImports(
-      input,
-      'chunks/name"with-quote.css',
-      parse(input, {
-        sourceType: "module",
-        ecmaVersion: "latest",
-      }),
+    configure(plugin, "serve");
+    const file = "/project/src/styles.ts";
+    const styled = await transform(
+      plugin,
+      `import { css } from '${PACKAGE}'; const token = css\`color: stale-red;\`;`,
+      file,
     );
+    const styleId = cssImports(styled!.code)[0]!;
+    expect(String((plugin.load as Function)(`\0${styleId}`))).toContain("stale-red");
 
-    expect(rewritten).toStartWith('import "./name\\\"with-quote.css";');
-    expect(rewritten).toContain('import "virtual:styled-static/keep-me.css";');
+    expect(await transform(plugin, `import { css } from '${PACKAGE}';`, file)).toBeNull();
+    expect(String((plugin.load as Function)(`\0${styleId}`))).not.toContain("stale-red");
   });
 
-  it("should emit CSS files in file output mode", async () => {
-    const plugin = styledStatic({ cssOutput: "file" });
-    (plugin.configResolved as Function)?.({ command: "build" });
-
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;`;
-    await transform(plugin, code, "/src/components/Button.tsx");
-
-    const emitFile = mock();
-    const generateBundle = plugin.generateBundle as Function;
-    const mockBundle: Record<string, any> = {
-      "components/Button.js": {
-        type: "chunk",
-        moduleIds: ["/src/components/Button.tsx"],
-        code: 'import "virtual:styled-static/something";\nconsole.log("test");',
-      },
-    };
-    generateBundle.call(createGenerateBundleContext(emitFile), {}, mockBundle);
-
-    expect(emitFile).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: "asset",
-        fileName: "components/Button.css",
-      }),
+  it("returns raw CSS for apps and emits colocated CSS imports for libraries", async () => {
+    const app = styledStatic();
+    configure(app, "build");
+    const appResult = await transform(
+      app,
+      `import { css } from '${PACKAGE}'; const x = css\`a{}\`;`,
     );
-    // The chunk code should be rewritten to have relative CSS import
-    expect(mockBundle["components/Button.js"].code).toContain('import "./Button.css"');
+    expect(loadCss(app, appResult!.code)).toContain("a{}");
+
+    const library = styledStatic();
+    configure(library, "build", true);
+    const libraryResult = await transform(
+      library,
+      `import { css } from '${PACKAGE}'; const x = css\`a{}\`;`,
+    );
+    const emitted: unknown[] = [];
+    const chunk = {
+      type: "chunk",
+      code: libraryResult!.code,
+      moduleIds: ["/project/src/example.tsx"],
+    };
+    (library.generateBundle as Function).call(
+      { ...context(), emitFile: (asset: unknown) => emitted.push(asset) },
+      { format: "es" },
+      { "index.js": chunk },
+    );
+    expect(emitted).toEqual([
+      { type: "asset", fileName: "index.css", source: expect.stringContaining("a{}") },
+    ]);
+    expect(chunk.code).toStartWith('import "./index.css";');
   });
 
-  it("should replace mjs and cjs chunk extensions with css", async () => {
-    for (const extension of ["mjs", "cjs"]) {
-      const plugin = styledStatic({ cssOutput: "file" });
-      (plugin.configResolved as Function)?.({ command: "build" });
-      const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;`;
-      await transform(plugin, code, `/src/Button-${extension}.tsx`);
-
-      const emitFile = mock();
-      const generateBundle = plugin.generateBundle as Function;
-      const fileName = `Button.${extension}`;
-      const mockBundle: Record<string, any> = {
-        [fileName]: {
-          type: "chunk",
-          moduleIds: [`/src/Button-${extension}.tsx`],
-          code: 'import "virtual:styled-static/something";',
+  it("rejects library formats that cannot carry a static CSS dependency", async () => {
+    const library = styledStatic();
+    configure(library, "build", true);
+    const result = await transform(
+      library,
+      `import { css } from '${PACKAGE}'; const x = css\`a{}\`;`,
+    );
+    const chunk = {
+      type: "chunk",
+      code: result!.code,
+      moduleIds: ["/project/src/example.tsx"],
+    };
+    expect(() =>
+      (library.generateBundle as Function).call(
+        {
+          ...context(),
+          error: (message: string) => {
+            throw new Error(message);
+          },
         },
-      };
-      generateBundle.call(createGenerateBundleContext(emitFile), {}, mockBundle);
-      expect(emitFile).toHaveBeenCalledWith(expect.objectContaining({ fileName: "Button.css" }));
-    }
-  });
-
-  it("should skip chunks with no CSS", async () => {
-    const plugin = styledStatic({ cssOutput: "file" });
-    (plugin.configResolved as Function)?.({ command: "build" });
-
-    const emitFile = mock();
-    const generateBundle = plugin.generateBundle as Function;
-    const mockBundle: Record<string, any> = {
-      "utils/helpers.js": {
-        type: "chunk",
-        moduleIds: ["/src/utils/helpers.ts"],
-        code: 'console.log("no css here");',
-      },
-    };
-    generateBundle.call(createGenerateBundleContext(emitFile), {}, mockBundle);
-
-    expect(emitFile).not.toHaveBeenCalled();
-  });
-
-  it("should skip non-chunk entries in bundle", async () => {
-    const plugin = styledStatic({ cssOutput: "file" });
-    (plugin.configResolved as Function)?.({ command: "build" });
-
-    const emitFile = mock();
-    const generateBundle = plugin.generateBundle as Function;
-    const mockBundle: Record<string, any> = {
-      "styles.css": {
-        type: "asset",
-        source: "body { margin: 0; }",
-      },
-    };
-    generateBundle.call(createGenerateBundleContext(emitFile), {}, mockBundle);
-
-    expect(emitFile).not.toHaveBeenCalled();
-  });
-
-  it("should be a no-op in virtual output mode", () => {
-    const plugin = styledStatic(); // default: virtual
-    (plugin.configResolved as Function)?.({ command: "build" });
-
-    const emitFile = mock();
-    const generateBundle = plugin.generateBundle as Function;
-    generateBundle.call(createGenerateBundleContext(emitFile), {}, {});
-
-    expect(emitFile).not.toHaveBeenCalled();
+        { format: "umd" },
+        { "index.umd.js": chunk },
+      ),
+    ).toThrow("cannot link a static stylesheet");
   });
 });
 
-// =============================================================================
-// cssOutput Configuration Tests
-// =============================================================================
-
-describe("cssOutput configuration", () => {
-  it("should default to virtual for non-library builds", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "build" });
-
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;`;
-    const result = await transform(plugin, code, "/test-virtual.tsx");
-    expect(result).not.toBeNull();
-    // In virtual mode, CSS imports point to virtual modules
-    expect(result!.code).toContain("virtual:styled-static/");
-  });
-
-  it("should auto-detect file mode for library builds", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({
-      command: "build",
-      build: { lib: { entry: "src/index.ts" } },
-    });
-
-    // generateBundle should emit files in this mode
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;`;
-    await transform(plugin, code, "/src/lib.tsx");
-
-    const emitFile = mock();
-    const generateBundle = plugin.generateBundle as Function;
-    const mockBundle: Record<string, any> = {
-      "lib.js": {
-        type: "chunk",
-        moduleIds: ["/src/lib.tsx"],
-        code: 'import "virtual:styled-static/something";',
-      },
-    };
-    generateBundle.call(createGenerateBundleContext(emitFile), {}, mockBundle);
-    expect(emitFile).toHaveBeenCalled();
-  });
-
-  it("should use explicit virtual mode when configured", async () => {
-    const plugin = styledStatic({ cssOutput: "virtual" });
-    (plugin.configResolved as Function)?.({ command: "build" });
-
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;`;
-    const result = await transform(plugin, code, "/test-explicit-virtual.tsx");
-    expect(result).not.toBeNull();
-  });
-
-  it("should use explicit file mode when configured", async () => {
-    const plugin = styledStatic({ cssOutput: "file" });
-    (plugin.configResolved as Function)?.({ command: "build" });
-
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;`;
-    const result = await transform(plugin, code, "/test-explicit-file.tsx");
-    expect(result).not.toBeNull();
-  });
-});
-
-// =============================================================================
-// Hash Remainder Byte Tests
-// =============================================================================
-
-describe("hash remainder bytes", () => {
-  it("should handle string with 3 remainder bytes (length 7)", async () => {
-    const { hash } = await import("./hash");
-    // 7 chars: 4 processed in main loop, 3 remaining
-    const result = hash("abcdefg");
-    expect(typeof result).toBe("string");
-    expect(result.length).toBeGreaterThan(0);
-  });
-
-  it("should handle string with 2 remainder bytes (length 6)", async () => {
-    const { hash } = await import("./hash");
-    // 6 chars: 4 processed in main loop, 2 remaining
-    const result = hash("abcdef");
-    expect(typeof result).toBe("string");
-    expect(result.length).toBeGreaterThan(0);
-  });
-
-  it("should handle string with 1 remainder byte (length 5)", async () => {
-    const { hash } = await import("./hash");
-    // 5 chars: 4 processed in main loop, 1 remaining
-    const result = hash("abcde");
-    expect(typeof result).toBe("string");
-    expect(result.length).toBeGreaterThan(0);
-  });
-
-  it("should handle string with 0 remainder bytes (length 4)", async () => {
-    const { hash } = await import("./hash");
-    // 4 chars: exactly 4 processed, 0 remaining
-    const result = hash("abcd");
-    expect(typeof result).toBe("string");
-    expect(result.length).toBeGreaterThan(0);
-  });
-
-  it("should produce different hashes for different remainder lengths", async () => {
-    const { hash } = await import("./hash");
-    const h4 = hash("abcd");
-    const h5 = hash("abcde");
-    const h6 = hash("abcdef");
-    const h7 = hash("abcdefg");
-    // All should be unique
-    const unique = new Set([h4, h5, h6, h7]);
-    expect(unique.size).toBe(4);
-  });
-});
-
-// =============================================================================
-// Import Source Isolation Tests
-// =============================================================================
-
-describe("import source isolation", () => {
-  it("should ignore an unrelated ./index export named styled", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { styled } from './index';
-const Button = styled.button\`padding: 1rem;\`;`;
-    const result = await transform(plugin, code, "/src/test-local.tsx");
-    expect(result).toBeNull();
-  });
-
-  it("should ignore an unrelated ../index export named styled", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { styled } from '../index';
-const Button = styled.button\`padding: 1rem;\`;`;
-    const result = await transform(plugin, code, "/src/sub/test-local.tsx");
-    expect(result).toBeNull();
-  });
-});
-
-// =============================================================================
-// Debug Mode Tests
-// =============================================================================
-
-describe("debug mode", () => {
-  it("should log debug messages when debug is enabled", async () => {
-    const consoleSpy = spyOn(console, "log").mockImplementation(() => {});
-    const plugin = styledStatic({ debug: true });
-    (plugin.configResolved as Function)?.({
-      command: "serve",
-      build: {},
-    });
-
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;`;
-    await transform(plugin, code, "/src/Debug.tsx");
-
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[styled-static]"),
-      expect.anything(),
+describe("small pure helpers", () => {
+  it("hashes deterministically without practical collisions in representative input", () => {
+    const values = new Set(
+      Array.from({ length: 10_000 }, (_, index) => hash(`.item-${index}{color:${index}}`)),
     );
-    consoleSpy.mockRestore();
+    expect(values.size).toBe(10_000);
   });
 
-  it("should log when no templates or variants found after parsing imports", async () => {
-    const consoleSpy = spyOn(console, "log").mockImplementation(() => {});
-    const plugin = styledStatic({ debug: true });
-    (plugin.configResolved as Function)?.({ command: "serve", build: {} });
-
-    // Import cx (not styled/css) — has the import but no templates/variants
-    const code = `import { cx } from '@alex.radulescu/styled-static';
-const cls = cx("a", "b");`;
-    const result = await transform(plugin, code, "/src/NoTemplates.tsx");
-
-    // Should return null since cx doesn't need transformation
-    expect(result).toBeNull();
-    // Should have logged that no imports were found
-    expect(consoleSpy).toHaveBeenCalledWith("[styled-static] No imports found, skipping");
-    consoleSpy.mockRestore();
-  });
-
-  it("should log when parse error occurs", async () => {
-    const consoleSpy = spyOn(console, "log").mockImplementation(() => {});
-    const plugin = styledStatic({ debug: true });
-    (plugin.configResolved as Function)?.({ command: "serve", build: {} });
-
-    // Invalid JS that references styled-static
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const ??? = invalid syntax here;`;
-    const result = await transform(plugin, code, "/src/BadFile.tsx");
-    expect(result).toBeNull();
-
-    expect(consoleSpy).toHaveBeenCalledWith("[styled-static] AST parse error:", expect.anything());
-    consoleSpy.mockRestore();
-  });
-
-  it("should log CSS output mode during configResolved", async () => {
-    const consoleSpy = spyOn(console, "log").mockImplementation(() => {});
-    const plugin = styledStatic({ debug: true });
-    (plugin.configResolved as Function)?.({ command: "build", build: {} });
-
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[styled-static] CSS output mode:"),
+  it("rewrites only side-effect styling imports", () => {
+    const code = `import "virtual:styled-static/a.css";\nexport const value = 1;`;
+    const ast = context().parse(code);
+    expect(rewriteCssImports(code, "chunks/value.css", ast as any)).toBe(
+      `import "./value.css";\n\nexport const value = 1;`,
     );
-    consoleSpy.mockRestore();
-  });
-
-  it("should log generateBundle emit with debug enabled", async () => {
-    const consoleSpy = spyOn(console, "log").mockImplementation(() => {});
-    const plugin = styledStatic({ debug: true, cssOutput: "file" });
-    (plugin.configResolved as Function)?.({ command: "build", build: {} });
-
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;`;
-    await transform(plugin, code, "/src/comp/Dbg.tsx");
-
-    const emitFile = mock();
-    const generateBundle = plugin.generateBundle as Function;
-    generateBundle.call(
-      createGenerateBundleContext(emitFile),
-      {},
-      {
-        "comp/Dbg.js": {
-          type: "chunk",
-          moduleIds: ["/src/comp/Dbg.tsx"],
-          code: 'import "virtual:styled-static/something";',
-        },
-      },
-    );
-
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[styled-static] Emitted CSS file:"),
-    );
-    consoleSpy.mockRestore();
-  });
-});
-
-// =============================================================================
-// Edge Cases: Import-but-no-use & Parse Errors
-// =============================================================================
-
-describe("edge cases for transform skip paths", () => {
-  it("should skip when file imports only non-API exports like cx", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    // cx is exported but not transformed by the plugin
-    const code = `import { cx } from '@alex.radulescu/styled-static';
-const cls = cx("a", "b");`;
-    const result = await transform(plugin, code, "/src/CxOnly.tsx");
-    expect(result).toBeNull();
-  });
-
-  it("should skip when file has styled-static import but uses none of the APIs", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    // Import styled but never use it in a tagged template
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-console.log(styled);`;
-    const result = await transform(plugin, code, "/src/Unused.tsx");
-    expect(result).toBeNull();
-  });
-
-  it("should handle AST parse errors gracefully", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    // Contains styled-static string so it passes the quick check,
-    // but has syntax that acorn can't parse
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const 123invalid = "bad";`;
-    const result = await transform(plugin, code, "/src/Bad.tsx");
-    expect(result).toBeNull();
-  });
-});
-
-// =============================================================================
-// Variants in Prod Mode (build)
-// =============================================================================
-
-describe("variants in build mode", () => {
-  it("should use hash-based class names for styledVariants in build mode", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "build" });
-
-    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
-const Button = styledVariants({
-  component: 'button',
-  css: \`padding: 1rem;\`,
-  variants: {
-    color: {
-      primary: \`background: blue;\`,
-      danger: \`background: red;\`,
-    },
-  },
-});`;
-    const result = await transform(plugin, code, "/src/ProdVariant.tsx");
-    expect(result).not.toBeNull();
-    // In prod mode, class names should be hash-based, not variable-name-based.
-    // The file path in CSS imports will naturally contain "ProdVariant", so only
-    // check that no variable-derived class name (e.g. ss-Button-ProdVariant) appears.
-    expect(result!.code).not.toMatch(/["']ss-\w+-ProdVariant/);
-    expect(result!.code).toContain("ss-");
-  });
-
-  it("should use hash-based class names for cssVariants in build mode", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "build" });
-
-    const code = `import { cssVariants } from '@alex.radulescu/styled-static';
-const buttonCss = cssVariants({
-  css: \`padding: 1rem;\`,
-  variants: {
-    size: {
-      sm: \`font-size: 0.875rem;\`,
-      lg: \`font-size: 1.25rem;\`,
-    },
-  },
-});`;
-    const result = await transform(plugin, code, "/src/ProdCssVar.tsx");
-    expect(result).not.toBeNull();
-    expect(result!.code).toContain("ss-");
-  });
-});
-
-// =============================================================================
-// CompoundVariants with Template Literal CSS
-// =============================================================================
-
-describe("compoundVariants with template literal CSS", () => {
-  it("should handle compoundVariants with plain template literal CSS", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
-const Button = styledVariants({
-  component: 'button',
-  css: \`padding: 1rem;\`,
-  variants: {
-    size: {
-      sm: \`font-size: 0.875rem;\`,
-      lg: \`font-size: 1.25rem;\`,
-    },
-    intent: {
-      primary: \`background: blue;\`,
-      danger: \`background: red;\`,
-    },
-  },
-  compoundVariants: [
-    { size: 'lg', intent: 'danger', css: \`font-weight: bold;\` },
-  ],
-});`;
-    const result = await transform(plugin, code, "/src/CompoundTpl.tsx");
-    expect(result).not.toBeNull();
-    // Should generate compound variant CSS
-    expect(result!.code).toContain("createElement");
-  });
-});
-
-// =============================================================================
-// Variant Edge Cases (branch coverage)
-// =============================================================================
-
-describe("variant branch coverage", () => {
-  it("should handle cssVariants with no variant keys (base only)", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { cssVariants } from '@alex.radulescu/styled-static';
-const baseCss = cssVariants({
-  css: \`padding: 1rem;\`,
-  variants: {},
-});`;
-    const result = await transform(plugin, code, "/src/BaseOnly.tsx");
-    expect(result).not.toBeNull();
-    // Should generate a function with just the base class, no variant logic
-    expect(result!.code).toContain("(variants = {})");
-    expect(result!.code).toContain("return classNames;");
-  });
-
-  it("should handle styledVariants with string literal CSS values", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
-const Button = styledVariants({
-  component: 'button',
-  css: 'padding: 1rem;',
-  variants: {
-    color: {
-      primary: 'background: blue;',
-      danger: 'background: red;',
-    },
-  },
-});`;
-    const result = await transform(plugin, code, "/src/StringLiterals.tsx");
-    expect(result).not.toBeNull();
-    expect(result!.code).toContain("createElement");
-  });
-
-  it("should handle cssVariants with string literal base CSS", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { cssVariants } from '@alex.radulescu/styled-static';
-const btnCss = cssVariants({
-  css: 'display: flex;',
-  variants: {
-    size: {
-      sm: 'font-size: 12px;',
-    },
-  },
-});`;
-    const result = await transform(plugin, code, "/src/StrCssVar.tsx");
-    expect(result).not.toBeNull();
-  });
-
-  it("should handle styledVariants with no base CSS", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
-const Button = styledVariants({
-  component: 'button',
-  variants: {
-    color: {
-      primary: \`background: blue;\`,
-    },
-  },
-});`;
-    const result = await transform(plugin, code, "/src/NoBase.tsx");
-    expect(result).not.toBeNull();
-    expect(result!.code).toContain("createElement");
-  });
-
-  it("should handle styledVariants with defaults and more than 4 values", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
-const Button = styledVariants({
-  component: 'button',
-  css: \`padding: 1rem;\`,
-  variants: {
-    color: {
-      red: \`color: red;\`,
-      blue: \`color: blue;\`,
-      green: \`color: green;\`,
-      yellow: \`color: yellow;\`,
-      purple: \`color: purple;\`,
-    },
-  },
-  defaultVariants: {
-    color: 'blue',
-  },
-});`;
-    const result = await transform(plugin, code, "/src/HoistedDefaults.tsx");
-    expect(result).not.toBeNull();
-    expect(result!.code).not.toContain("_vm");
-    expect(result!.code).toContain('_variant_color_0 = "blue"');
-  });
-
-  it("should handle styledVariants extending a component", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { styled, styledVariants } from '@alex.radulescu/styled-static';
-const Base = styled.div\`display: flex;\`;
-const Variant = styledVariants({
-  component: Base,
-  css: \`padding: 1rem;\`,
-  variants: {
-    size: {
-      sm: \`font-size: 12px;\`,
-      lg: \`font-size: 18px;\`,
-    },
-  },
-});`;
-    const result = await transform(plugin, code, "/src/ExtendVariant.tsx");
-    expect(result).not.toBeNull();
-    // Should reference Base.className
-    expect(result!.code).toContain("Base.className");
-  });
-
-  it("should handle compoundVariants with string literal CSS", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
-const Button = styledVariants({
-  component: 'button',
-  css: \`padding: 1rem;\`,
-  variants: {
-    size: {
-      sm: \`font-size: 12px;\`,
-      lg: \`font-size: 18px;\`,
-    },
-    intent: {
-      primary: \`background: blue;\`,
-      danger: \`background: red;\`,
-    },
-  },
-  compoundVariants: [
-    { size: 'lg', intent: 'danger', css: 'font-weight: bold;' },
-  ],
-});`;
-    const result = await transform(plugin, code, "/src/CompoundStr.tsx");
-    expect(result).not.toBeNull();
-  });
-
-  it("should handle cssVariants with compoundVariants", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { cssVariants } from '@alex.radulescu/styled-static';
-const btnCss = cssVariants({
-  css: \`padding: 1rem;\`,
-  variants: {
-    size: {
-      sm: \`font-size: 12px;\`,
-      lg: \`font-size: 18px;\`,
-    },
-    intent: {
-      primary: \`background: blue;\`,
-      danger: \`background: red;\`,
-    },
-  },
-  compoundVariants: [
-    { size: 'lg', intent: 'danger', css: \`font-weight: bold;\` },
-  ],
-});`;
-    const result = await transform(plugin, code, "/src/CssCompound.tsx");
-    expect(result).not.toBeNull();
-    expect(result!.code).toContain('variants["size"]');
-  });
-});
-
-// =============================================================================
-// Load Hook Edge Cases (branch coverage)
-// =============================================================================
-
-describe("load hook edge cases", () => {
-  it("should handle dev mode load for nonexistent CSS module (no sourceFile)", () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-    const load = plugin.load as Function;
-
-    // Load a virtual module that doesn't exist in cssModules map
-    const loaded = load("\0virtual:styled-static/nonexistent/0.js");
-    // Should return JS injection code with empty CSS and no sourceURL
-    expect(loaded).toContain("document.createElement('style')");
-    // No sourceURL since sourceFile is ""
-    expect(loaded).not.toContain("sourceURL");
-  });
-});
-
-// =============================================================================
-// Transform Import/Skip Edge Cases (branch coverage)
-// =============================================================================
-
-describe("transform import edge cases", () => {
-  it("should return null when styled-static is imported but only non-API names used", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    // Import styled but use it as regular identifier, not template tag
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const x = styled;
-export default x;`;
-    const result = await transform(plugin, code, "/src/NoUse.tsx");
-    // Found styled import, found templates: 0, variants: 0, withComponent: 0 → null
-    expect(result).toBeNull();
-  });
-
-  it("should reject non-string defaultVariants values", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
-const Button = styledVariants({
-  component: 'button',
-  css: \`padding: 1rem;\`,
-  variants: {
-    size: {
-      sm: \`font-size: 12px;\`,
-      lg: \`font-size: 18px;\`,
-    },
-  },
-  defaultVariants: {
-    size: 1,
-  },
-});`;
-    await expect(transform(plugin, code, "/src/Defaults.tsx")).rejects.toThrow(
-      "must be a string literal",
-    );
-  });
-
-  it("should handle variant config with tagged css template for base", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { styledVariants, css } from '@alex.radulescu/styled-static';
-const Button = styledVariants({
-  component: 'button',
-  css: css\`padding: 1rem;\`,
-  variants: {
-    color: {
-      primary: css\`background: blue;\`,
-    },
-  },
-});`;
-    const result = await transform(plugin, code, "/src/CssTagged.tsx");
-    expect(result).not.toBeNull();
-  });
-
-  it("should handle cssVariants with tagged css templates", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { cssVariants, css } from '@alex.radulescu/styled-static';
-const btnCss = cssVariants({
-  css: css\`padding: 1rem;\`,
-  variants: {
-    color: {
-      primary: css\`background: blue;\`,
-    },
-  },
-});`;
-    const result = await transform(plugin, code, "/src/CssTaggedVar.tsx");
-    expect(result).not.toBeNull();
-  });
-
-  it("should handle compoundVariants with tagged css template", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { styledVariants, css } from '@alex.radulescu/styled-static';
-const Button = styledVariants({
-  component: 'button',
-  css: css\`padding: 1rem;\`,
-  variants: {
-    size: {
-      sm: css\`font-size: 12px;\`,
-      lg: css\`font-size: 18px;\`,
-    },
-    intent: {
-      primary: css\`background: blue;\`,
-      danger: css\`background: red;\`,
-    },
-  },
-  compoundVariants: [
-    { size: 'lg', intent: 'danger', css: css\`font-weight: bold;\` },
-  ],
-});`;
-    const result = await transform(plugin, code, "/src/CompoundTagged.tsx");
-    expect(result).not.toBeNull();
-  });
-});
-
-// =============================================================================
-// Hash Collision Rate Tests
-// =============================================================================
-
-describe("hash collision rate", () => {
-  it("should have zero collisions for 1000 typical CSS inputs", () => {
-    const seen = new Set<string>();
-    for (let i = 0; i < 1000; i++) {
-      const css = `.class-${i} { color: red; padding: ${i}px; margin: ${i * 2}px; }`;
-      const h = hash(css).slice(0, 8);
-      expect(seen.has(h), `collision at index ${i}: "${h}"`).toBe(false);
-      seen.add(h);
-    }
-  });
-
-  it("should have zero collisions for 10000 similar inputs at 8-char truncation", () => {
-    const seen = new Set<string>();
-    let collisions = 0;
-    for (let i = 0; i < 10000; i++) {
-      const css = `padding: ${i}px`;
-      const h = hash(css).slice(0, 8);
-      if (seen.has(h)) collisions++;
-      seen.add(h);
-    }
-    expect(collisions).toBe(0);
-  });
-});
-
-// =============================================================================
-// Branch Coverage — vite.ts: debug log + CSS module cleanup
-// =============================================================================
-
-describe("debug mode no-templates log (vite.ts:336)", () => {
-  it("should log when styled is imported but not used as a tagged template", async () => {
-    const consoleSpy = spyOn(console, "log").mockImplementation(() => {});
-    const plugin = styledStatic({ debug: true });
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    // File imports styled (so hasTemplateImports is true) but doesn't use it as a template tag.
-    // findTaggedTemplates returns [] → falls through to line 335 "No templates found" log.
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-export { styled };`;
-    const result = await transform(plugin, code, "/src/ReExport.tsx");
-    expect(result).toBeNull();
-    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("No templates"));
-    consoleSpy.mockRestore();
-  });
-});
-
-describe("CSS module stale cleanup on re-transform (vite.ts:352-353)", () => {
-  it("should delete stale CSS entries when same file is transformed twice", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Box = styled.div\`color: red;\`;`;
-
-    // First transform populates cssModules
-    const result1 = await transform(plugin, code, "/src/Box.tsx");
-    expect(result1).not.toBeNull();
-
-    // Second transform of same file should clean up old entries and re-populate
-    const result2 = await transform(plugin, code, "/src/Box.tsx");
-    expect(result2).not.toBeNull();
-    // Both results should produce equivalent output (no stale state)
-    expect(result1!.code).toBe(result2!.code);
-  });
-});
-
-// =============================================================================
-// Branch Coverage — parse.ts: edge cases in AST walking
-// =============================================================================
-
-describe("parse.ts edge cases", () => {
-  it("should reject styledVariants with the wrong number of arguments", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    // styledVariants called with 2 args instead of 1 — classifyVariantCall returns null
-    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
-const Button = styledVariants({ component: 'button', variants: {} }, extraArg);`;
-    await expect(transform(plugin, code, "/src/WrongArgs.tsx")).rejects.toThrow(
-      "styledVariants() requires one inline object literal",
-    );
-  });
-
-  it("should support a quoted variant group key", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
-const Button = styledVariants({
-  component: 'button',
-  css: \`padding: 1rem;\`,
-  variants: {
-    "size": {
-      sm: \`font-size: 12px;\`,
-    },
-  },
-});`;
-    const result = await transform(plugin, code, "/src/QuotedGroupKey.tsx");
-    expect(result).not.toBeNull();
-    expect(result!.code).toContain('_variant_size_0 === "sm"');
-  });
-
-  it("should support a quoted variant value key", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
-const Button = styledVariants({
-  component: 'button',
-  css: \`padding: 1rem;\`,
-  variants: {
-    size: {
-      "sm": \`font-size: 12px;\`,
-    },
-  },
-});`;
-    const result = await transform(plugin, code, "/src/QuotedValueKey.tsx");
-    expect(result).not.toBeNull();
-    expect(result!.code).toContain('_variant_size_0 === "sm"');
-  });
-
-  it("should support quoted defaultVariants keys", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
-const Button = styledVariants({
-  component: 'button',
-  variants: { size: { sm: \`font-size: 12px;\` } },
-  defaultVariants: { "size": "sm" },
-});`;
-    const result = await transform(plugin, code, "/src/QuotedDefaults.tsx");
-    expect(result).not.toBeNull();
-    expect(result!.code).toContain('_variant_size_0 = "sm"');
-  });
-
-  it("should support quoted compoundVariants condition keys", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
-const Button = styledVariants({
-  component: 'button',
-  variants: { size: { lg: \`font-size: 18px;\` } },
-  compoundVariants: [{ "size": "lg", css: \`font-weight: bold;\` }],
-});`;
-    const result = await transform(plugin, code, "/src/QuotedCompound.tsx");
-    expect(result).not.toBeNull();
-    const css = (plugin.load as Function)(`\0${result!.code.match(/import "([^"]+)"/)?.[1]}`);
-    expect(css).toContain("font-weight: bold");
-  });
-
-  it("should reject an unextractable variant CSS expression", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    // Using an Identifier as the css value — not a literal/template/tagged template
-    // extractCssFromValueNode returns undefined → baseCss is undefined
-    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
-const myStyles = \`padding: 1rem;\`;
-const Button = styledVariants({
-  component: 'button',
-  css: myStyles,
-  variants: { size: { sm: \`font-size: 12px;\` } },
-});`;
-    await expect(transform(plugin, code, "/src/IdentifierCss.tsx")).rejects.toThrow(
-      "css must be a string or a static template literal",
-    );
-  });
-
-  it("should support a computed static styled tag", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { styled } from '@alex.radulescu/styled-static';
-const Box = styled["div"]\`color: red;\`;`;
-    const result = await transform(plugin, code, "/src/ComputedMember.tsx");
-    expect(result!.code).toContain('createElement("div"');
-  });
-
-  it("should reject non-object compoundVariants entries", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    // compoundVariants array with a null/sparse element — element?.type !== "ObjectExpression"
-    const code = `import { styledVariants } from '@alex.radulescu/styled-static';
-const Button = styledVariants({
-  component: 'button',
-  variants: { size: { sm: \`font-size: 12px;\`, lg: \`font-size: 18px;\` } },
-  compoundVariants: [null, { size: 'lg', css: \`font-weight: bold;\` }],
-});`;
-    await expect(transform(plugin, code, "/src/NullCompound.tsx")).rejects.toThrow(
-      "Every compoundVariants entry",
-    );
-  });
-
-  it("should handle withComponent with Identifier toComponent (parse.ts:611)", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    // withComponent(Link, Button) — toArg is Identifier, not string literal
-    // Covers the `else if (toArg?.type === "Identifier")` branch
-    const code = `import { styled, withComponent } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;
-const LinkButton = withComponent(Link, Button);`;
-    const result = await transform(plugin, code, "/src/IdentifierTo.tsx");
-    expect(result).not.toBeNull();
-    expect(result!.code).toContain("createElement(Link,");
-  });
-
-  it("should reject an unresolvable withComponent target", async () => {
-    const plugin = styledStatic();
-    (plugin.configResolved as Function)?.({ command: "serve" });
-
-    const code = `import { styled, withComponent } from '@alex.radulescu/styled-static';
-const Button = styled.button\`padding: 1rem;\`;
-const Bad = withComponent(42, Button);`;
-    await expect(transform(plugin, code, "/src/UnresolvableTo.tsx")).rejects.toThrow(
-      "arguments must be an HTML tag string",
+    expect(rewriteCssImports(code, "chunks/value.css", ast as any, "cjs")).toBe(
+      `require("./value.css");\n\nexport const value = 1;`,
     );
   });
 });

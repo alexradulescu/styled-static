@@ -46,6 +46,6 @@
     // Types for Node.js APIs used in the plugin
     "types": ["node", "vite/client"]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "type-tests/**/*.ts", "vite.config.ts"],
   "exclude": ["node_modules", "dist", "docs", "**/*.test.ts", "**/*.test.tsx"]
 }

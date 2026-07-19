@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
-  createGlobalStyle,
+  globalCss,
   css,
   cssVariants,
   cx,
@@ -9,7 +9,7 @@ import {
   styledVariants,
   withComponent,
 } from "./index";
-import { m } from "./runtime/index";
+import { mergeClassNames } from "./runtime/index";
 
 describe("runtime error guards (untransformed calls)", () => {
   it("styled proxy get should throw config error", () => {
@@ -42,9 +42,9 @@ describe("runtime error guards (untransformed calls)", () => {
     );
   });
 
-  it("createGlobalStyle should throw config error", () => {
-    expect(() => createGlobalStyle`body { margin: 0; }`).toThrow(
-      "createGlobalStyle was not transformed at build time",
+  it("globalCss should throw config error", () => {
+    expect(() => globalCss`body { margin: 0; }`).toThrow(
+      "globalCss was not transformed at build time",
     );
   });
 
@@ -107,25 +107,25 @@ describe("cx utility", () => {
   });
 });
 
-describe("m (runtime className merge)", () => {
+describe("mergeClassNames", () => {
   it("returns base when user class is undefined", () => {
-    expect(m("ss-btn", undefined)).toBe("ss-btn");
+    expect(mergeClassNames("ss-btn", undefined)).toBe("ss-btn");
   });
 
   it("merges base and user class", () => {
-    expect(m("ss-btn", "custom")).toBe("ss-btn custom");
+    expect(mergeClassNames("ss-btn", "custom")).toBe("ss-btn custom");
   });
 
   it("returns base when user class is empty string (falsy)", () => {
-    expect(m("ss-btn", "")).toBe("ss-btn");
+    expect(mergeClassNames("ss-btn", "")).toBe("ss-btn");
   });
 
   it("merges multi-class base with user class", () => {
-    expect(m("ss-btn ss-primary", "active")).toBe("ss-btn ss-primary active");
+    expect(mergeClassNames("ss-btn ss-primary", "active")).toBe("ss-btn ss-primary active");
   });
 
   it("user class appended last (allows override via CSS cascade)", () => {
-    const result = m("ss-base", "override");
+    const result = mergeClassNames("ss-base", "override");
     expect(result.indexOf("ss-base")).toBeLessThan(result.indexOf("override"));
   });
 });

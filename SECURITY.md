@@ -4,7 +4,7 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.x.x   | :white_check_mark: |
+| 1.x.x   | :white_check_mark: |
 
 ## Reporting a Vulnerability
 
@@ -26,9 +26,14 @@ This library implements several security measures:
 
 - **Build-time CSS extraction** - No runtime CSS parsing reduces XSS attack surface
 - **Static variant lookup** - Runtime variant values are matched only against build-time values
+- **Own-property checks** - Inherited variant and class-name properties are ignored
+- **Literal static attrs** - Attr defaults accept only explicit string, number, boolean, or `null` values
 - **Generated-code escaping** - Generated string literals and CSS class segments are escaped or normalized
-- **Configuration validation** - Unsafe class-name prefixes fail during configuration
-- **Defense-in-depth** - Multiple layers of protection against common web vulnerabilities
+- **Fixed class-name policy** - There is no user-controlled class prefix or output mode
+- **Safe virtual IDs** - Raw source paths never appear in JavaScript import specifiers
+- **Reproducible identities** - Class hashes use a named package and package-relative path, never an absolute checkout path
+- **Exact import matching** - Only the canonical package import activates extraction
+- **No JavaScript evaluation** - Extraction reads syntax and trusted CSS text only
 - **Minimal runtime** - Small attack surface
 
 Application CSS is trusted developer input. styled-static does not sanitize CSS source code and must not be used to compile untrusted templates.

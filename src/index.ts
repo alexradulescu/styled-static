@@ -6,7 +6,7 @@
  *
  * @example
  * ```tsx
- * import { styled, css, createGlobalStyle } from '@alex.radulescu/styled-static';
+ * import { styled, css, globalCss } from '@alex.radulescu/styled-static';
  *
  * // Style HTML elements
  * const Button = styled.button`
@@ -30,7 +30,7 @@
  * `;
  *
  * // Global styles
- * const GlobalStyle = createGlobalStyle`
+ * globalCss`
  *   * { box-sizing: border-box; }
  *   body { margin: 0; }
  * `;
@@ -40,7 +40,6 @@
  * const LinkButton = withComponent(Link, Button);
  *
  * // Usage
- * <GlobalStyle />
  * <Button>Click me</Button>
  * <LinkButton to="/home">Link button</LinkButton>
  * <PrimaryButton className={activeClass}>Active</PrimaryButton>
@@ -62,10 +61,8 @@ export type {
   StyledVariantComponent,
   CssVariantsFunction,
   Keyframes,
+  ExtractedCss,
 } from "./types";
-
-// Theme helpers - runtime utilities for theme switching
-export { getTheme, setTheme, initTheme, onSystemThemeChange, type InitThemeOptions } from "./theme";
 
 function throwConfigError(name: string): never {
   throw new Error(
@@ -133,7 +130,7 @@ export const styled = new Proxy(
 export function css(
   _strings: TemplateStringsArray,
   ..._interpolations: import("./types").Keyframes[]
-): string {
+): import("./types").ExtractedCss {
   throwConfigError("css");
 }
 
@@ -163,12 +160,11 @@ export function keyframes(
 }
 
 /**
- * Create global (unscoped) styles.
- * Returns a component that should be rendered once at the root of your app.
- * The component renders nothing - CSS is extracted at build time.
+ * Extract global, unscoped CSS as a module side effect.
+ * Call this once at module scope; there is no component to render.
  *
  * @example
- * const GlobalStyle = createGlobalStyle`
+ * globalCss`
  *   * {
  *     box-sizing: border-box;
  *   }
@@ -184,19 +180,13 @@ export function keyframes(
  *   }
  * `;
  *
- * // In your app entry point
- * createRoot(document.getElementById('root')!).render(
- *   <StrictMode>
- *     <GlobalStyle />
- *     <App />
- *   </StrictMode>
- * );
+ * // Import this module once from your application entry point.
  */
-export function createGlobalStyle(
+export function globalCss(
   _strings: TemplateStringsArray,
   ..._interpolations: import("./types").Keyframes[]
-): () => null {
-  throwConfigError("createGlobalStyle");
+): void {
+  throwConfigError("globalCss");
 }
 
 /**
@@ -253,13 +243,6 @@ export function cx(...args: (string | false | null | undefined)[]): string {
  *       lg: css`font-size: 1.125rem;`,
  *     },
  *   },
- * });
- *
- * // Plain strings also work (no highlighting)
- * const SimpleButton = styledVariants({
- *   component: 'button',
- *   css: `padding: 0.5rem;`,
- *   variants: { size: { sm: `font-size: 0.875rem;` } },
  * });
  *
  * // Usage - variant props become modifier classes

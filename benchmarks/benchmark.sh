@@ -2,24 +2,30 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 FRAMEWORKS=("styled-static" "emotion" "tailwind" "restyle" "panda-css")
 RUNS=5
 RESULTS_FILE="$SCRIPT_DIR/results.md"
-TMP_DIR="$SCRIPT_DIR/.bench-tmp"
-mkdir -p "$TMP_DIR"
+TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/styled-static-bench.XXXXXX")"
+trap 'rm -rf "$TMP_DIR"' EXIT
+
+cd "$REPO_ROOT"
+bun install --frozen-lockfile
+bun test showcase/contract.test.tsx
 
 # Portable millisecond timestamp (works on macOS and Linux)
 now_ms() {
-  python3 -c 'import time; print(int(time.time() * 1000))'
+  bun -e 'console.log(Date.now())'
+}
+
+brotli_size() {
+  bun -e 'import { brotliCompressSync } from "node:zlib"; const input = await Bun.stdin.bytes(); console.log(input.length === 0 ? 0 : brotliCompressSync(input).length)'
 }
 
 for fw in "${FRAMEWORKS[@]}"; do
   echo "=== Benchmarking: $fw ==="
   FW_DIR="$SCRIPT_DIR/$fw"
   cd "$FW_DIR"
-
-  # Install dependencies
-  bun install --frozen-lockfile 2>/dev/null || bun install
 
   # Build time: run RUNS times, collect all, take median
   > "$TMP_DIR/${fw}_times.txt"
@@ -43,8 +49,8 @@ for fw in "${FRAMEWORKS[@]}"; do
   find dist -name "*.html" -exec cat {} + 2>/dev/null | wc -c | tr -d ' ' > "$TMP_DIR/${fw}_html_raw.txt"
 
   # Brotli compressed sizes
-  find dist -name "*.js" -exec cat {} + 2>/dev/null | brotli -c 2>/dev/null | wc -c | tr -d ' ' > "$TMP_DIR/${fw}_js_brotli.txt"
-  find dist -name "*.css" -exec cat {} + 2>/dev/null | brotli -c 2>/dev/null | wc -c | tr -d ' ' > "$TMP_DIR/${fw}_css_brotli.txt"
+  find dist -name "*.js" -exec cat {} + 2>/dev/null | brotli_size > "$TMP_DIR/${fw}_js_brotli.txt"
+  find dist -name "*.css" -exec cat {} + 2>/dev/null | brotli_size > "$TMP_DIR/${fw}_css_brotli.txt"
 
   build_time=$(cat "$TMP_DIR/${fw}_build.txt")
   js_raw=$(cat "$TMP_DIR/${fw}_js_raw.txt")
@@ -72,7 +78,7 @@ cat > "$RESULTS_FILE" << 'HEADER'
 HEADER
 
 # Helper to format bytes as KB
-fmt() { echo "scale=1; $1 / 1024" | bc; }
+fmt() { awk -v bytes="$1" 'BEGIN { printf "%.1f", bytes / 1024 }'; }
 
 # Helper to compute delta string: delta <value> <baseline>
 # For baseline row, returns empty string. Otherwise returns " (+X.XX%)" or " (-X.XX%)" or " (=)"
@@ -83,19 +89,11 @@ delta() {
     echo ""
     return
   fi
-  # Use python3 for float math (bc on macOS can be quirky with signed results)
-  python3 -c "
-v, b = $val, $base
-if b == 0:
-    if v == 0:
-        print('')
-    else:
-        print(' (+∞)')
-else:
-    d = (v - b) / b * 100
-    sign = '+' if d > 0 else ''
-    print(f' ({sign}{d:.1f}%)')
-"
+  if [ "$base" -eq 0 ]; then
+    echo " (+∞)"
+  else
+    awk -v value="$val" -v baseline="$base" 'BEGIN { printf " (%+.1f%%)\n", (value - baseline) / baseline * 100 }'
+  fi
 }
 
 echo "| Framework | Build (ms) | JS raw (KB) | JS brotli (KB) | CSS raw (KB) | CSS brotli (KB) | Total raw (KB) | Total brotli (KB) | HTML (KB) |" >> "$RESULTS_FILE"
@@ -126,9 +124,6 @@ for fw in "${FRAMEWORKS[@]}"; do
     echo "| $fw | ${build_time}${d_build} | $(fmt $js_raw)${d_js_raw} | $(fmt $js_brotli)${d_js_brotli} | $(fmt $css_raw)${d_css_raw} | $(fmt $css_brotli)${d_css_brotli} | $(fmt $total_raw)${d_total_raw} | $(fmt $total_brotli)${d_total_brotli} | $(fmt $html_raw)${d_html} |" >> "$RESULTS_FILE"
   fi
 done
-
-# Cleanup
-rm -rf "$TMP_DIR"
 
 echo ""
 echo "Results written to $RESULTS_FILE"

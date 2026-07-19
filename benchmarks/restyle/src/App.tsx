@@ -1,1150 +1,177 @@
-import { Suspense, lazy, useEffect, useRef, useState } from "react";
-import {
-  Atom,
-  Ban,
-  Code2,
-  Globe,
-  HeartCrack,
-  Info,
-  Moon,
-  Palette,
-  PartyPopper,
-  Rocket,
-  Search,
-  Shield,
-  Sparkles,
-  Sun,
-  Target,
-  Zap,
-} from "lucide-react";
-import { styled, css, GlobalStyles } from "restyle";
-import { initTheme, getTheme, setTheme, onSystemThemeChange } from "./theme";
-import { CodeBlock, cx } from "./sections/shared";
-import { KeyframeStyles } from "./sections/keyframes-demo";
+import { GlobalStyles, css, type CSSObject } from "restyle";
+import { ShowcaseApp, type ShowcaseStyles } from "../../../showcase/App";
 
-// Lazy-loaded sections for code splitting
-const ApiSection = lazy(() =>
-  import("./sections/ApiSection").then((m) => ({ default: m.ApiSection })),
-);
-const FeaturesSection = lazy(() =>
-  import("./sections/FeaturesSection").then((m) => ({
-    default: m.FeaturesSection,
-  })),
-);
-const HowItWorksSection = lazy(() =>
-  import("./sections/HowItWorksSection").then((m) => ({
-    default: m.HowItWorksSection,
-  })),
-);
-
-// =============================================================================
-// Layout Components
-// =============================================================================
-
-const Layout = styled("div", {
-  display: "flex",
-  minHeight: "100vh",
-  overflowX: "hidden",
-});
-
-const MobileHeader = styled("header", {
-  display: "none",
-  position: "fixed",
-  top: 0,
-  left: 0,
-  right: 0,
-  height: "var(--mobile-header-height)",
-  background: "var(--color-bg)",
-  borderBottom: "1px solid var(--color-border)",
-  padding: "0 12px",
-  alignItems: "center",
-  justifyContent: "space-between",
-  zIndex: 150,
-  transition: "background var(--transition), border-color var(--transition)",
-  "@media (max-width: 767px)": {
-    display: "flex",
-  },
-});
-
-const BurgerButton = styled("button", {
-  background: "none",
-  border: "none",
-  padding: "8px",
-  cursor: "pointer",
-  display: "flex",
-  flexDirection: "column",
-  gap: "5px",
-  "& span": {
-    display: "block",
-    width: "20px",
-    height: "2px",
-    background: "var(--color-text)",
-    borderRadius: "1px",
-    transition: "background var(--transition)",
-  },
-});
-
-const HeaderTitle = styled("span", {
-  fontWeight: 600,
-  fontSize: "1rem",
-  color: "var(--color-text)",
-});
-
-const Overlay = styled("div", {
-  display: "none",
-  "@media (max-width: 767px)": {
-    display: "block",
-    position: "fixed",
-    inset: "var(--mobile-header-height) 0 0 0",
-    background: "rgba(0, 0, 0, 0.5)",
-    opacity: 0,
-    pointerEvents: "none",
-    transition: "opacity 0.2s ease",
-    zIndex: 99,
-    '&[data-visible="true"]': {
-      opacity: 1,
-      pointerEvents: "auto",
-    },
-  },
-});
-
-const Sidebar = styled("aside", {
-  position: "fixed",
-  top: 0,
-  left: 0,
-  width: "var(--sidebar-width)",
-  height: "100vh",
-  background: "var(--color-bg-sidebar)",
-  borderRight: "1px solid var(--color-border)",
-  display: "flex",
-  flexDirection: "column",
-  zIndex: 100,
-  transition: "background var(--transition), border-color var(--transition)",
-  '[data-theme="light"] &': {
-    boxShadow: "1px 0 3px rgba(0, 0, 0, 0.02)",
-  },
-  "@media (max-width: 767px)": {
-    top: "var(--mobile-header-height)",
-    height: "calc(100vh - var(--mobile-header-height))",
-    transform: "translateX(-100%)",
-    transition: "background var(--transition), border-color var(--transition), transform 0.2s ease",
-    '&[data-open="true"]': {
-      transform: "translateX(0)",
-    },
-  },
-});
-
-const SidebarHeader = styled("div", {
-  padding: "1rem 1.25rem",
-  borderBottom: "1px solid var(--color-border)",
-});
-
-const Logo = styled("a", {
-  display: "flex",
-  alignItems: "center",
-  gap: "0.5rem",
-  fontSize: "1.25rem",
-  fontWeight: 700,
-  color: "var(--color-text)",
-  textDecoration: "none",
-  "&:hover": {
-    color: "var(--color-primary)",
-  },
-});
-
-const SearchInputWrapper = styled("div", {
-  position: "relative",
-  marginTop: "1rem",
-});
-
-const SearchIcon = styled("span", {
-  position: "absolute",
-  left: "0.75rem",
-  top: "50%",
-  transform: "translateY(-50%)",
-  color: "var(--color-text-secondary)",
-  pointerEvents: "none",
-});
-
-const SearchField = styled("input", {
-  width: "100%",
-  padding: "0.5rem 0.75rem 0.5rem 2.25rem",
-  fontSize: "0.875rem",
-  fontFamily: "inherit",
-  color: "var(--color-text)",
-  background: "var(--color-bg)",
-  border: "1px solid var(--color-border)",
-  borderRadius: "var(--radius)",
-  outline: "none",
-  transition: "border-color var(--transition), background var(--transition)",
-  "&::placeholder": {
-    color: "var(--color-text-secondary)",
-  },
-  "&:focus": {
-    borderColor: "var(--color-primary)",
-  },
-});
-
-const SearchHint = styled("span", {
-  position: "absolute",
-  right: "0.75rem",
-  top: "50%",
-  transform: "translateY(-50%)",
-  fontSize: "0.75rem",
-  color: "var(--color-text-secondary)",
-  background: "var(--color-bg-sidebar)",
-  padding: "0.125rem 0.375rem",
-  borderRadius: "4px",
-  border: "1px solid var(--color-border)",
-  pointerEvents: "none",
-});
-
-const NavSection = styled("nav", {
-  flex: 1,
-  overflowY: "auto",
-  padding: "1rem 0",
-});
-
-const NavGroup = styled("div", {
-  padding: "0 0.75rem",
-  marginBottom: "1rem",
-});
-
-const NavGroupTitle = styled("div", {
-  display: "flex",
-  alignItems: "center",
-  gap: "0.5rem",
-  padding: "0.5rem 0.5rem 0.375rem",
-  fontSize: "0.6875rem",
-  fontWeight: 600,
-  color: "var(--color-text-muted)",
-  textTransform: "uppercase",
-  letterSpacing: "0.06em",
-  marginTop: "0.25rem",
-});
-
-const activeNavCss = css({
-  background: "var(--color-nav-active)",
-  color: "var(--color-primary)",
-  fontWeight: 500,
-  borderLeft: "2px solid var(--color-primary)",
-  paddingLeft: "calc(0.75rem - 2px)",
-});
-
-const NavItem = styled("a", {
-  display: "block",
-  padding: "0.4375rem 0.75rem",
-  margin: "0.0625rem 0",
-  fontSize: "0.875rem",
-  color: "var(--color-text-secondary)",
-  textDecoration: "none",
-  borderRadius: "6px",
-  borderLeft: "2px solid transparent",
-  transition: "all var(--transition)",
-  "&:hover": {
-    color: "var(--color-text)",
-    background: "var(--color-border-subtle)",
-  },
-});
-
-const SidebarFooter = styled("div", {
-  padding: "1rem",
-  borderTop: "1px solid var(--color-border)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-});
-
-const ThemeToggle = styled("button", {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  width: "36px",
-  height: "36px",
-  padding: 0,
-  fontFamily: "inherit",
-  color: "var(--color-text-secondary)",
-  background: "transparent",
-  border: "1px solid var(--color-border)",
-  borderRadius: "var(--radius)",
-  cursor: "pointer",
-  transition: "all var(--transition)",
-  "&:hover": {
-    background: "var(--color-border-subtle)",
-    color: "var(--color-text)",
-    borderColor: "var(--color-text-secondary)",
-  },
-});
-
-const IconLink = styled("a", {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  width: "36px",
-  height: "36px",
-  padding: 0,
-  color: "var(--color-text-secondary)",
-  background: "transparent",
-  border: "1px solid var(--color-border)",
-  borderRadius: "var(--radius)",
-  cursor: "pointer",
-  transition: "all var(--transition)",
-  textDecoration: "none",
-  "&:hover": {
-    background: "var(--color-border-subtle)",
-    color: "var(--color-text)",
-    borderColor: "var(--color-text-secondary)",
-  },
-});
-
-const Main = styled("main", {
-  flex: 1,
-  marginLeft: "var(--sidebar-width)",
-  minHeight: "100vh",
-  minWidth: 0,
-  "@media (max-width: 767px)": {
-    marginLeft: 0,
-    marginTop: "var(--mobile-header-height)",
-  },
-});
-
-const Content = styled("div", {
-  maxWidth: "var(--content-max-width)",
-  margin: "0 auto",
-  padding: "3rem 2rem 6rem",
-  "@media (max-width: 767px)": {
-    maxWidth: "100%",
-    padding: "2rem 12px 4rem",
-  },
-});
-
-// =============================================================================
-// Typography - Inline for Getting Started
-// =============================================================================
-
-const PageTitle = styled("h1", {
-  fontSize: "2.5rem",
-  fontWeight: 700,
-  margin: "0 0 1rem",
-  letterSpacing: "-0.02em",
-  "@media (max-width: 767px)": {
-    fontSize: "1.75rem",
-  },
-});
-
-const PageSubtitle = styled("p", {
-  fontSize: "1.125rem",
-  color: "var(--color-text-secondary)",
-  margin: "0 0 1.5rem",
-  lineHeight: 1.6,
-});
-
-const HeroBanner = styled("div", {
-  height: "140px",
-  margin: "0 0 3rem",
-  background: "linear-gradient(135deg, #0a0a0a 0%, #0f1f12 50%, #0a1a0d 100%)",
-  borderRadius: "var(--radius-lg)",
-  position: "relative",
-  overflow: "hidden",
-  "&::before": {
-    content: "''",
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background:
-      "linear-gradient(135deg, transparent 40%, rgba(16, 185, 129, 0.08) 40%, rgba(16, 185, 129, 0.08) 60%, transparent 60%), linear-gradient(225deg, transparent 30%, rgba(16, 185, 129, 0.05) 30%, rgba(16, 185, 129, 0.05) 50%, transparent 50%)",
-  },
-  "&::after": {
-    content: "''",
-    position: "absolute",
-    top: "20%",
-    right: "10%",
-    width: "200px",
-    height: "200px",
-    background:
-      "linear-gradient(45deg, transparent 45%, rgba(16, 185, 129, 0.12) 45%, rgba(16, 185, 129, 0.12) 55%, transparent 55%)",
-    transform: "rotate(15deg)",
-  },
-  "@media (max-width: 767px)": {
-    height: "100px",
-    margin: "0 0 2rem",
-    borderRadius: "var(--radius)",
-  },
-});
-
-const Section = styled("section", {
-  marginBottom: "4rem",
-  scrollMarginTop: "calc(var(--header-height) + 2rem)",
-  "@media (max-width: 767px)": {
-    marginBottom: "3rem",
-    scrollMarginTop: "calc(var(--mobile-header-height) + 1rem)",
-  },
-});
-
-const Breadcrumb = styled("span", {
-  display: "block",
-  fontSize: "0.8125rem",
-  fontWeight: 500,
-  color: "var(--color-primary)",
-  marginBottom: "0.5rem",
-});
-
-const SectionTitle = styled("h2", {
-  fontSize: "1.625rem",
-  fontWeight: 600,
-  margin: "0 0 1.25rem",
-  letterSpacing: "-0.02em",
-  "@media (max-width: 767px)": {
-    fontSize: "1.375rem",
-  },
-});
-
-const Paragraph = styled("p", {
-  margin: "0 0 1rem",
-  color: "var(--color-text)",
-});
-
-const InlineCode = styled("code", {
-  padding: "0.2rem 0.4rem",
-  fontSize: "0.875em",
-  fontFamily: '"Fira Code", "Monaco", monospace',
-  background: "var(--color-border)",
-  borderRadius: "4px",
-});
-
-// =============================================================================
-// Callout (inline for Getting Started)
-// =============================================================================
-
-// Section-specific helpers (replicate inline css from docs/App.tsx)
-const paragraphMutedCss = css({
-  marginTop: "1rem",
-  color: "var(--color-text-secondary)",
-});
-
-const paragraphSpacedCss = css({
-  marginTop: "1.5rem",
-});
-
-const calloutBaseCss = css({
-  display: "flex",
-  gap: "0.875rem",
-  padding: "1.125rem 1.25rem",
-  margin: "1.5rem 0",
-  borderRadius: "var(--radius)",
-  fontSize: "0.9375rem",
-  lineHeight: 1.6,
-});
-
-const calloutNoteCss = css({
-  background: "#eff6ff",
-  border: "1px solid #bfdbfe",
-  '[data-theme="dark"] &': {
-    background: "#1e3a5f",
-    borderColor: "#2563eb40",
-  },
-});
-
-const calloutTipCss = css({
-  background: "#f0fdf4",
-  border: "1px solid #bbf7d0",
-  '[data-theme="dark"] &': {
-    background: "#0c2915",
-    borderColor: "#10b98140",
-  },
-});
-
-const calloutWarningCss = css({
-  background: "#fffbeb",
-  border: "1px solid #fde68a",
-  '[data-theme="dark"] &': {
-    background: "#3d2e0a",
-    borderColor: "#d9790640",
-  },
-});
-
-const calloutVariantMap = {
-  note: calloutNoteCss,
-  tip: calloutTipCss,
-  warning: calloutWarningCss,
-} as const;
-
-function calloutStyles(type: "note" | "tip" | "warning"): [string, React.FC] {
-  const [baseClass, BaseStyles] = calloutBaseCss;
-  const [variantClass, VariantStyles] = calloutVariantMap[type];
-  const combined = cx(baseClass, variantClass);
-  const CombinedStyles = () => (
-    <>
-      <BaseStyles />
-      <VariantStyles />
-    </>
-  );
-  return [combined, CombinedStyles];
+const styleComponents: Array<[string, () => React.JSX.Element]> = [];
+function classFor(style: CSSObject): string {
+  const [className, Styles] = css(style);
+  styleComponents.push([className, Styles]);
+  return className;
 }
-
-const CalloutIcon = styled("span", {
-  fontSize: "1.25rem",
-  flexShrink: 0,
-});
-
-const CalloutContent = styled("div", {
-  flex: 1,
-});
-
-// =============================================================================
-// Loading Spinner
-// =============================================================================
-
-const LoadingWrapper = styled("div", {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "4rem 2rem",
-  color: "var(--color-text-secondary)",
-});
-
-// =============================================================================
-// Section Data
-// =============================================================================
-
-interface SectionInfo {
-  id: string;
-  title: string;
-  group?: string;
-  keywords: string[];
-}
-
-const sections: SectionInfo[] = [
-  {
-    id: "quick-overview",
-    title: "Quick Overview",
-    group: "Getting Started",
-    keywords: ["overview", "quick", "summary", "api", "all"],
-  },
-  {
-    id: "why",
-    title: "Why styled-static?",
-    group: "Getting Started",
-    keywords: ["why", "motivation", "reason", "benefits"],
-  },
-  {
-    id: "what-we-dont-do",
-    title: "What We Don't Do",
-    group: "Getting Started",
-    keywords: ["limitations", "no", "interpolation", "runtime"],
-  },
-  {
-    id: "installation",
-    title: "Installation",
-    group: "Getting Started",
-    keywords: ["install", "setup", "npm", "bun", "yarn"],
-  },
-  {
-    id: "styled",
-    title: "styled",
-    group: "API",
-    keywords: ["styled", "component", "element", "html"],
-  },
-  {
-    id: "extension",
-    title: "Component Extension",
-    group: "API",
-    keywords: ["extend", "inherit", "base"],
-  },
-  {
-    id: "css",
-    title: "css Helper",
-    group: "API",
-    keywords: ["css", "class", "classname", "helper"],
-  },
-  {
-    id: "cx",
-    title: "cx Utility",
-    group: "API",
-    keywords: ["cx", "classnames", "conditional", "join"],
-  },
-  {
-    id: "keyframes",
-    title: "keyframes",
-    group: "API",
-    keywords: ["keyframes", "animation", "spin", "pulse", "rotate"],
-  },
-  {
-    id: "attrs",
-    title: "attrs",
-    group: "API",
-    keywords: ["attrs", "attributes", "default", "type", "input"],
-  },
-  {
-    id: "variants",
-    title: "Variants API",
-    group: "API",
-    keywords: ["variant", "styledVariants", "cssVariants", "props"],
-  },
-  {
-    id: "global",
-    title: "Global Styles",
-    group: "API",
-    keywords: ["global", "createGlobalStyle", "reset", "root"],
-  },
-  {
-    id: "polymorphism",
-    title: "Polymorphism",
-    group: "Features",
-    keywords: ["as", "polymorphic", "element", "render", "withComponent", "className"],
-  },
-  {
-    id: "nesting",
-    title: "CSS Nesting",
-    group: "Features",
-    keywords: ["nesting", "&", "hover", "pseudo"],
-  },
-  {
-    id: "theming",
-    title: "Theming",
-    group: "Features",
-    keywords: ["theme", "dark", "light", "mode", "toggle", "custom"],
-  },
-  {
-    id: "how-it-works",
-    title: "Overview",
-    group: "Internals",
-    keywords: ["how", "works", "build", "compile", "transform"],
-  },
-  {
-    id: "transformation",
-    title: "Build-Time Transformation",
-    group: "Internals",
-    keywords: ["transform", "ast", "vite", "plugin", "compile"],
-  },
-  {
-    id: "virtual-css",
-    title: "Virtual CSS Modules",
-    group: "Internals",
-    keywords: ["virtual", "css", "modules", "import", "extract"],
-  },
-  {
-    id: "runtime",
-    title: "Runtime Wrappers",
-    group: "Internals",
-    keywords: ["runtime", "wrapper", "component", "size"],
-  },
-  {
-    id: "comparison",
-    title: "Library Comparison",
-    group: "Internals",
-    keywords: [
-      "comparison",
-      "bundle",
-      "size",
-      "emotion",
-      "linaria",
-      "panda",
-      "css-in-js",
-      "alternatives",
-    ],
-  },
-];
-
-// =============================================================================
-// Inline Callout helper for App (renders styles inline)
-// =============================================================================
-
-function AppCallout({
-  type,
-  icon,
-  children,
-}: {
-  type: "note" | "tip" | "warning";
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  const [className, Styles] = calloutStyles(type);
+function Styles() {
   return (
     <>
-      <div className={className}>
-        <CalloutIcon>{icon}</CalloutIcon>
-        <CalloutContent>{children}</CalloutContent>
-      </div>
-      <Styles />
-    </>
-  );
-}
-
-// =============================================================================
-// Main App
-// =============================================================================
-
-export function App() {
-  const [theme, setThemeState] = useState<string>(() => {
-    return initTheme();
-  });
-  const [activeSection, setActiveSection] = useState("introduction");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
-  // Active nav css
-  const [activeNavClass, ActiveNavStyles] = activeNavCss;
-
-  // Paragraph helper css tuples
-  const [paragraphMutedClass, ParagraphMutedStyles] = paragraphMutedCss;
-  const [paragraphSpacedClass, ParagraphSpacedStyles] = paragraphSpacedCss;
-
-  // Theme toggle using theme helpers
-  const toggleTheme = () => {
-    const current = getTheme();
-    const next = current === "dark" ? "light" : "dark";
-    setTheme(next);
-    setThemeState(next);
-  };
-
-  // Subscribe to system theme changes
-  useEffect(() => {
-    return onSystemThemeChange((systemTheme) => {
-      if (!localStorage.getItem("theme")) {
-        setTheme(systemTheme, false);
-        setThemeState(systemTheme);
-      }
-    });
-  }, []);
-
-  // Keyboard shortcut for search
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-      }
-      if (e.key === "Escape") {
-        searchInputRef.current?.blur();
-        setSearchQuery("");
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
-  // Scroll spy with MutationObserver to handle lazy-loaded sections
-  useEffect(() => {
-    const observedElements = new Set<Element>();
-
-    const intersectionObserver = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setActiveSection(entry.target.id);
-          }
-        });
-      },
-      { rootMargin: "-20% 0px -70% 0px" },
-    );
-
-    const observeSections = () => {
-      sections.forEach(({ id }) => {
-        const el = document.getElementById(id);
-        if (el && !observedElements.has(el)) {
-          intersectionObserver.observe(el);
-          observedElements.add(el);
-        }
-      });
-    };
-
-    observeSections();
-
-    const mutationObserver = new MutationObserver(() => {
-      observeSections();
-    });
-
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
-
-    return () => {
-      for (const element of observedElements) intersectionObserver.unobserve(element);
-      observedElements.clear();
-      intersectionObserver.disconnect();
-      mutationObserver.disconnect();
-    };
-  }, []);
-
-  // Filter sections based on search query
-  const filteredSections = searchQuery
-    ? sections.filter(
-        (s) =>
-          s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          s.keywords.some((k) => k.toLowerCase().includes(searchQuery.toLowerCase())),
-      )
-    : sections;
-
-  // Group sections by their group
-  const groupedSections = filteredSections.reduce(
-    (acc, section) => {
-      const group = section.group || "Other";
-      if (!acc[group]) acc[group] = [];
-      acc[group].push(section);
-      return acc;
-    },
-    {} as Record<string, SectionInfo[]>,
-  );
-
-  const closeSidebar = () => setSidebarOpen(false);
-
-  return (
-    <>
-      <KeyframeStyles />
-      <ParagraphMutedStyles />
-      <ParagraphSpacedStyles />
       <GlobalStyles>
         {{
-          ":root": {
-            "--color-bg": "#ffffff",
-            "--color-bg-sidebar": "#fafafa",
-            "--color-bg-code": "#0f0f0f",
-            "--color-bg-callout": "#f0fdf4",
-            "--color-border": "#e2e8f0",
-            "--color-border-subtle": "#f1f5f9",
-            "--color-text": "#0f172a",
-            "--color-text-secondary": "#64748b",
-            "--color-text-muted": "#94a3b8",
-            "--color-primary": "#10b981",
-            "--color-primary-hover": "#059669",
-            "--color-nav-active": "rgba(16, 185, 129, 0.08)",
-            "--sidebar-width": "260px",
-            "--header-height": "60px",
-            "--mobile-header-height": "56px",
-            "--content-max-width": "720px",
-            "--radius": "8px",
-            "--radius-lg": "12px",
-            "--transition": "0.15s ease",
-            "--scrollbar-thumb": "rgba(0, 0, 0, 0.12)",
-            "--scrollbar-thumb-hover": "rgba(0, 0, 0, 0.2)",
-            "--sh-class": "#4ec9b0",
-            "--sh-identifier": "#9cdcfe",
-            "--sh-sign": "#d4d4d4",
-            "--sh-property": "#9cdcfe",
-            "--sh-entity": "#4fc1ff",
-            "--sh-jsxliterals": "#ce9178",
-            "--sh-string": "#ce9178",
-            "--sh-keyword": "#c586c0",
-            "--sh-comment": "#6a9955",
+          ":root, [data-theme=light]": {
+            "--bg": "#fff",
+            "--surface": "#f7f8fb",
+            "--text": "#182033",
+            "--muted": "#5d687f",
+            "--accent": "#3157d5",
+            "--line": "#dfe4ee",
+            colorScheme: "light",
           },
-          '[data-theme="dark"]': {
-            "--color-bg": "#0a0a0a",
-            "--color-bg-sidebar": "#111111",
-            "--color-bg-code": "#0f0f0f",
-            "--color-bg-callout": "#0c2915",
-            "--color-border": "#1f1f1f",
-            "--color-border-subtle": "#171717",
-            "--color-text": "#f1f5f9",
-            "--color-text-secondary": "#94a3b8",
-            "--color-text-muted": "#64748b",
-            "--scrollbar-thumb": "rgba(255, 255, 255, 0.12)",
-            "--scrollbar-thumb-hover": "rgba(255, 255, 255, 0.2)",
+          "[data-theme=dark]": {
+            "--bg": "#111522",
+            "--surface": "#191f30",
+            "--text": "#f2f5ff",
+            "--muted": "#abb5cb",
+            "--accent": "#89a5ff",
+            "--line": "#30394e",
+            colorScheme: "dark",
           },
-          "*": {
-            boxSizing: "border-box",
-            scrollbarWidth: "thin",
-            scrollbarColor: "var(--scrollbar-thumb) transparent",
+          "[data-theme=copper]": {
+            "--bg": "#24150f",
+            "--surface": "#321d14",
+            "--text": "#ffe2c4",
+            "--muted": "#d5aa86",
+            "--accent": "#e39358",
+            "--line": "#65402c",
+            colorScheme: "dark",
           },
-          "*::-webkit-scrollbar": {
-            width: "6px",
-            height: "6px",
-          },
-          "*::-webkit-scrollbar-track": {
-            background: "transparent",
-          },
-          "*::-webkit-scrollbar-thumb": {
-            background: "var(--scrollbar-thumb)",
-            borderRadius: "3px",
-          },
-          "*::-webkit-scrollbar-thumb:hover": {
-            background: "var(--scrollbar-thumb-hover)",
-          },
-          "*::-webkit-scrollbar-corner": {
-            background: "transparent",
-          },
-          html: {
-            scrollBehavior: "smooth",
-            scrollPaddingTop: "calc(var(--header-height) + 2rem)",
-          },
-          body: {
-            margin: 0,
-            fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-            fontSize: "15px",
-            lineHeight: 1.65,
-            color: "var(--color-text)",
-            background: "var(--color-bg)",
-            transition: "background var(--transition), color var(--transition)",
-            WebkitFontSmoothing: "antialiased",
-            MozOsxFontSmoothing: "grayscale",
-          },
-          "::selection": {
-            background: "var(--color-primary)",
-            color: "white",
-          },
+          "*": { boxSizing: "border-box" },
+          body: { margin: 0 },
+          "button, a": { font: "inherit" },
+          a: { color: "inherit" },
         }}
       </GlobalStyles>
-      <ActiveNavStyles />
-      <Layout>
-        <MobileHeader>
-          <HeaderTitle>styled-static</HeaderTitle>
-          <BurgerButton onClick={() => setSidebarOpen((prev) => !prev)} aria-label="Toggle menu">
-            <span />
-            <span />
-          </BurgerButton>
-        </MobileHeader>
-        <Overlay data-visible={sidebarOpen} onClick={closeSidebar} />
-        <Sidebar data-open={sidebarOpen}>
-          <SidebarHeader>
-            <Logo href="#">
-              <Palette size={24} />
-              styled-static
-            </Logo>
-            <SearchInputWrapper>
-              <SearchIcon>
-                <Search size={16} />
-              </SearchIcon>
-              <SearchField
-                ref={searchInputRef}
-                type="text"
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <SearchHint>&#8984;K</SearchHint>
-            </SearchInputWrapper>
-          </SidebarHeader>
-
-          <NavSection>
-            {Object.entries(groupedSections).map(([group, items]) => (
-              <NavGroup key={group}>
-                <NavGroupTitle>
-                  {group === "Getting Started" && <Rocket size={12} />}
-                  {group === "API" && <Code2 size={12} />}
-                  {group === "Features" && <Sparkles size={12} />}
-                  {group}
-                </NavGroupTitle>
-                {items.map((item) => (
-                  <NavItem
-                    key={item.id}
-                    href={`#${item.id}`}
-                    className={activeSection === item.id ? activeNavClass : ""}
-                    onClick={() => {
-                      setSearchQuery("");
-                      closeSidebar();
-                    }}
-                  >
-                    {item.title}
-                  </NavItem>
-                ))}
-              </NavGroup>
-            ))}
-          </NavSection>
-
-          <SidebarFooter>
-            <ThemeToggle onClick={toggleTheme} aria-label="Toggle theme">
-              {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
-            </ThemeToggle>
-            <IconLink
-              href="https://github.com/alexradulescu/styled-static"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="GitHub repository"
-            >
-              <Code2 size={18} />
-            </IconLink>
-          </SidebarFooter>
-        </Sidebar>
-
-        <Main>
-          <Content>
-            {/* Hero */}
-            <PageTitle>styled-static</PageTitle>
-            <PageSubtitle>
-              Near-zero-runtime CSS-in-JS for React 19+ with Vite. Write styled-components syntax,
-              get static CSS extracted at build time.
-            </PageSubtitle>
-            <HeroBanner />
-
-            {/* ========================================== */}
-            {/* GETTING STARTED - Inline (not lazy loaded) */}
-            {/* ========================================== */}
-
-            {/* Quick Overview */}
-            <Section id="quick-overview">
-              <Breadcrumb>Getting Started</Breadcrumb>
-              <SectionTitle>Quick Overview</SectionTitle>
-              <Paragraph>
-                All the APIs you need at a glance. styled-static provides 10 core functions that
-                cover most CSS-in-JS use cases:
-              </Paragraph>
-              <CodeBlock>{`// Style elements
-const Button = styled.button\`padding: 0.5rem 1rem;\`;
-
-// Extend components
-const Primary = styled(Button)\`font-weight: bold;\`;
-
-// Get class string
-const active = css\`outline: 2px solid;\`;
-
-// Global styles
-const GlobalStyle = createGlobalStyle\`* { box-sizing: border-box; }\`;
-
-// Scoped keyframes
-const spin = keyframes\`from { transform: rotate(0deg); } to { transform: rotate(360deg); }\`;
-
-// Type-safe component variants
-const Btn = styledVariants({
-  component: 'button',
-  css: css\`padding: 0.5rem;\`,
-  variants: { size: { sm: css\`font-size: 0.875rem;\` } }
-});
-
-// Type-safe class variants
-const badge = cssVariants({
-  css: css\`padding: 0.25rem;\`,
-  variants: { color: { blue: css\`background: #e0f2fe;\` } }
-});
-<span className={badge({ color: 'blue' })}>Info</span>
-
-// Combine classes conditionally
-<div className={cx('base', isActive && activeClass)} />
-
-// Default attributes
-const Input = styled.input.attrs({ type: 'password' })\`padding: 0.5rem;\`;
-
-// Polymorphism
-const LinkButton = withComponent(Link, Button);`}</CodeBlock>
-            </Section>
-
-            {/* Why styled-static? */}
-            <Section id="why">
-              <Breadcrumb>Getting Started</Breadcrumb>
-              <SectionTitle>Why styled-static?</SectionTitle>
-
-              <AppCallout type="tip" icon={<Globe size={20} />}>
-                <strong>CSS evolved.</strong> Native nesting, CSS variables, container queries—the
-                gap between CSS and CSS-in-JS is smaller than ever.
-              </AppCallout>
-
-              <AppCallout type="note" icon={<HeartCrack size={20} />}>
-                <strong>CSS-in-JS fatigue.</strong> Most libraries are obsolete, complex, or have
-                large runtime overhead.
-              </AppCallout>
-
-              <AppCallout type="tip" icon={<Sparkles size={20} />}>
-                <strong>Syntactic sugar over CSS modules.</strong> Better DX for writing CSS,
-                without runtime interpolation.
-              </AppCallout>
-
-              <AppCallout type="warning" icon={<Shield size={20} />}>
-                <strong>No browser-runtime dependencies.</strong> One small build dependency to
-                audit.
-              </AppCallout>
-
-              <AppCallout type="tip" icon={<Target size={20} />}>
-                <strong>Intentionally simple.</strong> 95% native browser + 5% sprinkles.
-              </AppCallout>
-
-              <AppCallout type="note" icon={<PartyPopper size={20} />}>
-                <strong>Built for fun.</strong> Curiosity-driven, useful code.
-              </AppCallout>
-            </Section>
-
-            {/* What We Don't Do */}
-            <Section id="what-we-dont-do">
-              <Breadcrumb>Getting Started</Breadcrumb>
-              <SectionTitle>What We Don't Do</SectionTitle>
-
-              <AppCallout type="warning" icon={<Ban size={20} />}>
-                <strong>No runtime interpolation</strong> — Can't write{" "}
-                <InlineCode>{`\${props => props.color}`}</InlineCode>. Use variants, CSS variables,
-                or data attributes.
-              </AppCallout>
-
-              <AppCallout type="note" icon={<Atom size={20} />}>
-                <strong>React 19+ only</strong> — Uses automatic ref forwarding (no{" "}
-                <InlineCode>forwardRef</InlineCode>).
-              </AppCallout>
-
-              <AppCallout type="note" icon={<Zap size={20} />}>
-                <strong>Vite only</strong> — Uses Vite's AST parser and virtual modules. No
-                Webpack/Rollup.
-              </AppCallout>
-
-              <Paragraph className={paragraphMutedClass}>
-                Each constraint removes complexity—no CSS parsing, no forwardRef, one great
-                integration.
-              </Paragraph>
-            </Section>
-
-            {/* Installation */}
-            <Section id="installation">
-              <Breadcrumb>Getting Started</Breadcrumb>
-              <SectionTitle>Installation</SectionTitle>
-              <Paragraph>Install the package with your preferred package manager:</Paragraph>
-              <CodeBlock filename="terminal">{`npm install styled-static
-# or
-bun add styled-static`}</CodeBlock>
-              <Paragraph>Configure the Vite plugin:</Paragraph>
-              <CodeBlock filename="vite.config.ts">{`import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import { styledStatic } from 'styled-static/vite';
-
-export default defineConfig({
-  plugins: [react(), styledStatic()],
-});`}</CodeBlock>
-              <AppCallout type="note" icon={<Info size={20} />}>
-                The plugin must be placed <strong>before</strong> the React plugin in the plugins
-                array.
-              </AppCallout>
-
-              <Paragraph className={paragraphSpacedClass}>
-                <strong>Optional: Lightning CSS</strong> for autoprefixing and faster CSS
-                processing:
-              </Paragraph>
-              <CodeBlock filename="terminal">{`npm install lightningcss`}</CodeBlock>
-              <CodeBlock filename="vite.config.ts">{`import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import { styledStatic } from 'styled-static/vite';
-
-export default defineConfig({
-  css: { transformer: 'lightningcss' },
-  plugins: [react(), styledStatic()],
-});`}</CodeBlock>
-              <AppCallout type="tip" icon={<Zap size={20} />}>
-                Lightning CSS provides automatic vendor prefixes, better minification, and faster
-                builds than PostCSS.
-              </AppCallout>
-            </Section>
-
-            {/* ========================================== */}
-            {/* API SECTION - Lazy loaded */}
-            {/* ========================================== */}
-            <Suspense fallback={<LoadingWrapper>Loading API docs...</LoadingWrapper>}>
-              <ApiSection />
-            </Suspense>
-
-            {/* ========================================== */}
-            {/* FEATURES SECTION - Lazy loaded */}
-            {/* ========================================== */}
-            <Suspense fallback={<LoadingWrapper>Loading Features docs...</LoadingWrapper>}>
-              <FeaturesSection theme={theme} toggleTheme={toggleTheme} />
-            </Suspense>
-
-            {/* ========================================== */}
-            {/* HOW IT WORKS SECTION - Lazy loaded */}
-            {/* ========================================== */}
-            <Suspense fallback={<LoadingWrapper>Loading How It Works docs...</LoadingWrapper>}>
-              <HowItWorksSection />
-            </Suspense>
-          </Content>
-        </Main>
-      </Layout>
+      {styleComponents.map(([className, Style]) => (
+        <Style key={className} />
+      ))}
     </>
   );
 }
+
+const styles: ShowcaseStyles = {
+  Styles,
+  page: classFor({
+    minHeight: "100vh",
+    background: "var(--bg)",
+    color: "var(--text)",
+    font: "16px/1.6 system-ui, sans-serif",
+  }),
+  shell: classFor({ width: "min(1080px, calc(100% - 2rem))", marginInline: "auto" }),
+  header: classFor({
+    position: "sticky",
+    top: 0,
+    zIndex: 10,
+    borderBottom: "1px solid var(--line)",
+    background: "var(--bg)",
+    "& > div": {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      minHeight: "4rem",
+    },
+  }),
+  brand: classFor({ fontWeight: 800, textDecoration: "none", letterSpacing: "-0.03em" }),
+  nav: classFor({
+    display: "flex",
+    gap: "1rem",
+    "& a": { color: "var(--muted)", textDecoration: "none" },
+  }),
+  hero: classFor({ paddingBlock: "clamp(5rem, 12vw, 9rem)" }),
+  kicker: classFor({
+    margin: "0 0 1rem",
+    color: "var(--accent)",
+    fontWeight: 700,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+  }),
+  title: classFor({
+    maxWidth: 850,
+    margin: 0,
+    fontSize: "clamp(2.7rem, 8vw, 6rem)",
+    lineHeight: 0.98,
+    letterSpacing: "-0.06em",
+  }),
+  lede: classFor({
+    maxWidth: 690,
+    margin: "1.5rem 0 0",
+    color: "var(--muted)",
+    fontSize: "clamp(1.1rem, 2vw, 1.35rem)",
+  }),
+  actions: classFor({ display: "flex", flexWrap: "wrap", gap: "0.75rem", marginTop: "2rem" }),
+  primary: classFor({
+    display: "inline-flex",
+    border: "1px solid var(--accent)",
+    borderRadius: "0.6rem",
+    padding: "0.65rem 1rem",
+    background: "var(--accent)",
+    color: "var(--bg)",
+    fontWeight: 700,
+    textDecoration: "none",
+    cursor: "pointer",
+  }),
+  secondary: classFor({
+    display: "inline-flex",
+    border: "1px solid var(--line)",
+    borderRadius: "0.6rem",
+    padding: "0.65rem 1rem",
+    textDecoration: "none",
+  }),
+  section: classFor({
+    paddingBlock: "4rem",
+    borderTop: "1px solid var(--line)",
+    "& > h2": { marginTop: 0, fontSize: "2rem", letterSpacing: "-0.035em" },
+  }),
+  grid: classFor({
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: "1rem",
+  }),
+  card: classFor({
+    border: "1px solid var(--line)",
+    borderRadius: "0.8rem",
+    padding: "1.25rem",
+    background: "var(--surface)",
+    "& p": { marginBottom: 0, color: "var(--muted)" },
+  }),
+  cardTitle: classFor({ margin: 0, fontSize: "1.05rem" }),
+  code: classFor({
+    overflow: "auto",
+    border: "1px solid var(--line)",
+    borderRadius: "0.8rem",
+    padding: "1.25rem",
+    background: "#0c1020",
+    color: "#dce6ff",
+  }),
+  counter: classFor({
+    display: "flex",
+    alignItems: "center",
+    gap: "1rem",
+    marginTop: "1rem",
+    color: "var(--muted)",
+  }),
+  themes: classFor({ display: "flex", flexWrap: "wrap", gap: "0.5rem" }),
+  themeButton: classFor({
+    border: "1px solid var(--line)",
+    borderRadius: 999,
+    padding: "0.45rem 0.8rem",
+    background: "var(--surface)",
+    color: "var(--text)",
+    textTransform: "capitalize",
+    cursor: "pointer",
+  }),
+  activeTheme: classFor({ borderColor: "var(--accent)", outline: "2px solid var(--accent)" }),
+  footer: classFor({
+    paddingBlock: "3rem",
+    borderTop: "1px solid var(--line)",
+    color: "var(--muted)",
+  }),
+};
+
+export function App() {
+  return <ShowcaseApp styles={styles} />;
+}
+export default App;

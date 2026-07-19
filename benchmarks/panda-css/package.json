@@ -5,15 +5,13 @@
   "type": "module",
   "scripts": {
     "prepare": "panda codegen",
-    "dev": "panda codegen && vite",
-    "build": "panda codegen && tsc && vite build",
+    "dev": "panda codegen && panda cssgen --minimal && vite",
+    "build": "rm -rf ./dist && panda codegen && panda cssgen --minimal && tsc && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
-    "lucide-react": "^1.25.0",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "sugar-high": "^1.2.1"
+    "react-dom": "^19.2.7"
   },
   "devDependencies": {
     "@pandacss/dev": "^1.11.4",

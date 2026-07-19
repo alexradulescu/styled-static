@@ -5,7 +5,7 @@
  * variant calls, and withComponent calls. All functions are pure
  * and produce string output for AST replacement.
  */
-import type { FoundTemplate, FoundVariant } from "./parse.js";
+import type { FoundTemplate, FoundVariant, FoundWithComponent } from "./parse.js";
 
 // ============================================================================
 // Security Helpers
@@ -71,12 +71,16 @@ export interface GeneratedRuntimeNames {
 
 const defaultRuntimeNames: GeneratedRuntimeNames = {
   createElement: "createElement",
-  mergeClassNames: "m",
+  mergeClassNames: "mergeClassNames",
   props: "props",
   remainingProps: "remainingProps",
   userClassName: "userClassName",
   classNames: "classNames",
 };
+
+function ownClassName(props: string): string {
+  return `Object.hasOwn(${props}, "className") ? ${props}.className : undefined`;
+}
 
 // ============================================================================
 // Template Code Generation
@@ -86,7 +90,7 @@ const defaultRuntimeNames: GeneratedRuntimeNames = {
  * Generate the replacement code for a styled template.
  *
  * This generates inline React components using Object.assign pattern:
- * Object.assign((props) => createElement(tag, {...props, className: m(cls, props.className)}), { className: cls })
+ * Object.assign((props) => createElement(tag, {...props, className: mergeClassNames(cls, props.className)}), { className: cls })
  *
  * SECURITY: Uses safeStringLiteral() for className to prevent code injection.
  */
@@ -100,7 +104,7 @@ export function generateReplacement(
 
   switch (template.type) {
     case "styled":
-      return `Object.assign((${props}) => ${createElement}(${safeStringLiteral(template.tag)}, {...${props}, className: ${mergeClassNames}(${cls}, ${props}.className)}), { className: ${cls} })`;
+      return `Object.assign((${props}) => ${createElement}(${safeStringLiteral(template.tag)}, {...${props}, className: ${mergeClassNames}(${cls}, ${ownClassName(props)})}), { className: ${cls} })`;
 
     case "styledExtend":
       // template.baseComponent comes from AST (Identifier node) so it is a valid
@@ -109,10 +113,10 @@ export function generateReplacement(
         /* unreachable: AST component references are validated during parsing */
         throw new Error(`[styled-static] Invalid base component name: ${template.baseComponent}`);
       }
-      return `Object.assign((${props}) => ${createElement}(${template.baseComponent}, {...${props}, className: ${mergeClassNames}(${cls}, ${props}.className)}), { className: [${template.baseComponent}.className, ${cls}].filter(Boolean).join(" ") })`;
+      return `Object.assign((${props}) => ${createElement}(${template.baseComponent}, {...${props}, className: ${mergeClassNames}(${cls}, ${ownClassName(props)})}), { className: [${template.baseComponent}.className, ${cls}].filter(Boolean).join(" ") })`;
 
     case "styledAttrs":
-      return `Object.assign((${props}) => ${createElement}(${safeStringLiteral(template.tag)}, {...(${template.attrsArg ?? "{}"}), ...${props}, className: ${mergeClassNames}(${cls}, ${props}.className)}), { className: ${cls} })`;
+      return `Object.assign((${props}) => ${createElement}(${safeStringLiteral(template.tag)}, {...(${template.attrsArg ?? "{}"}), ...${props}, className: ${mergeClassNames}(${cls}, ${ownClassName(props)})}), { className: ${cls} })`;
 
     case "css":
       return cls;
@@ -120,9 +124,32 @@ export function generateReplacement(
     case "keyframes":
       return cls;
 
-    case "createGlobalStyle":
-      return `() => null`;
+    case "globalCss":
+      return "void 0";
   }
+}
+
+/** Generate the replacement for withComponent(To, From). */
+export function generateWithComponentReplacement(
+  conversion: FoundWithComponent,
+  runtimeNames: GeneratedRuntimeNames = defaultRuntimeNames,
+): string {
+  if (!isValidComponentReference(conversion.fromComponent)) {
+    /* unreachable: component references are validated during parsing */
+    throw new Error(`[styled-static] Invalid source component: ${conversion.fromComponent}`);
+  }
+
+  const target =
+    conversion.toComponent.kind === "htmlTag"
+      ? safeStringLiteral(conversion.toComponent.value)
+      : conversion.toComponent.value;
+  if (conversion.toComponent.kind === "component" && !isValidComponentReference(target)) {
+    /* unreachable: component references are validated during parsing */
+    throw new Error(`[styled-static] Invalid target component: ${target}`);
+  }
+
+  const { createElement, mergeClassNames, props } = runtimeNames;
+  return `Object.assign((${props}) => ${createElement}(${target}, {...${props}, className: ${mergeClassNames}(${conversion.fromComponent}.className, ${ownClassName(props)})}), { className: ${conversion.fromComponent}.className })`;
 }
 
 // ============================================================================
@@ -152,17 +179,24 @@ export function generateVariantReplacement(
     variantValues,
   } = runtimeNames;
 
-  // Destructure variant props from the component props, with defaults if specified
-  const propsEntries = variantKeys.map((key, index) => {
-    const defaultValue = variant.defaultVariants?.get(key);
-    const localName = variantValues?.[index] ?? createVariantValueName(key, index);
-    const defaultInitializer = defaultValue ? ` = ${safeStringLiteral(defaultValue)}` : "";
-    return `${safeStringLiteral(key)}: ${localName}${defaultInitializer}`;
-  });
-  const propsDestructure =
-    variantKeys.length > 0
-      ? `{ ${propsEntries.join(", ")}, className: ${userClassName}, ...${remainingProps} }`
-      : `{ className: ${userClassName}, ...${remainingProps} }`;
+  const props = runtimeNames.props;
+  const omittedVariantProps = variantKeys
+    .map((key, index) => {
+      const localName = variantValues?.[index] ?? createVariantValueName(key, index);
+      return `${safeStringLiteral(key)}: ${localName}_omitted`;
+    })
+    .join(", ");
+  const propsDestructure = `{ ${omittedVariantProps}${omittedVariantProps ? ", " : ""}className: ${userClassName}_omitted, ...${remainingProps} }`;
+  const styledSelectionDeclarations = variantKeys
+    .map((key, index) => {
+      const keyLiteral = safeStringLiteral(key);
+      const localName = variantValues?.[index] ?? createVariantValueName(key, index);
+      const defaultValue = variant.defaultVariants?.get(key);
+      const fallback = defaultValue === undefined ? "undefined" : safeStringLiteral(defaultValue);
+      return `const ${localName} = Object.hasOwn(${props}, ${keyLiteral}) && ${props}[${keyLiteral}] !== undefined ? ${props}[${keyLiteral}] : ${fallback};`;
+    })
+    .join(" ");
+  const userClassNameDeclaration = `const ${userClassName} = Object.hasOwn(${props}, "className") ? ${props}.className : undefined;`;
 
   const variantChecks: string[] = [];
   for (let keyIndex = 0; keyIndex < variantKeys.length; keyIndex++) {
@@ -212,23 +246,20 @@ export function generateVariantReplacement(
         ? cls
         : `[${component.value}.className, ${cls}].filter(Boolean).join(" ")`;
 
-    return `Object.assign((${propsDestructure}) => { let ${classNames} = ${cls}; ${variantLogic}return ${createElement}(${componentRef}, {...${remainingProps}, className: ${mergeClassNames}(${classNames}, ${userClassName})}); }, { className: ${classNameValue} })`;
+    return `Object.assign((${props}) => { const ${propsDestructure} = ${props}; ${styledSelectionDeclarations} ${userClassNameDeclaration} let ${classNames} = ${cls}; ${variantLogic}return ${createElement}(${componentRef}, {...${remainingProps}, className: ${mergeClassNames}(${classNames}, ${userClassName})}); }, { className: ${classNameValue} })`;
   }
 
-  // cssVariants: returns a function that generates class string
-  // Apply defaultVariants by merging defaults with provided variants
-  const defaultEntries = Array.from(variant.defaultVariants?.entries() ?? [])
-    .map(([key, value]) => `[${safeStringLiteral(key)}]: ${safeStringLiteral(value)}`)
-    .join(", ");
-  const defaultsPrefix = defaultEntries ? `variants = {${defaultEntries}, ...variants}; ` : "";
+  // cssVariants: returns a function that generates a class string.
   const selectionDeclarations = variantKeys
     .map((key, index) => {
       const keyLiteral = safeStringLiteral(key);
       const localName = variantValues?.[index] ?? createVariantValueName(key, index);
-      return `const ${localName} = Object.hasOwn(variants, ${keyLiteral}) ? variants[${keyLiteral}] : undefined;`;
+      const defaultValue = variant.defaultVariants?.get(key);
+      const fallback = defaultValue === undefined ? "undefined" : safeStringLiteral(defaultValue);
+      return `const ${localName} = Object.hasOwn(variants, ${keyLiteral}) && variants[${keyLiteral}] !== undefined ? variants[${keyLiteral}] : ${fallback};`;
     })
     .join(" ");
-  return `(variants = {}) => { ${defaultsPrefix}${selectionDeclarations} let ${classNames} = ${cls}; ${variantLogic}return ${classNames}; }`;
+  return `(variants = {}) => { ${selectionDeclarations} let ${classNames} = ${cls}; ${variantLogic}return ${classNames}; }`;
 }
 
 // ============================================================================
@@ -260,6 +291,7 @@ export function rewriteCssImports(
   code: string,
   cssFileName: string,
   ast: import("estree").Program,
+  format: "es" | "cjs" = "es",
 ): string {
   const importRanges = ast.body
     .filter(
@@ -286,6 +318,7 @@ export function rewriteCssImports(
   // Get just the filename for relative import (same directory)
   const baseName = cssFileName.split("/").pop() || cssFileName;
 
-  // Add single relative CSS import at top
-  return `import ${safeStringLiteral(`./${baseName}`)};\n${code}`;
+  const cssPath = safeStringLiteral(`./${baseName}`);
+  const cssLink = format === "cjs" ? `require(${cssPath});` : `import ${cssPath};`;
+  return `${cssLink}\n${code}`;
 }

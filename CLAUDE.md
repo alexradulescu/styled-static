@@ -1,187 +1,93 @@
-# CLAUDE.md - Project Context for Claude Code CLI
+# styled-static maintainer guide
 
-## What is this?
+## BLUF
 
-**styled-static** is a near-zero-runtime CSS-in-JS library for React 19+ with Vite. It provides a styled-components-like API and extracts all CSS at build time. Components are generated inline at build time with a minimal (~45 byte) runtime for className merging.
+styled-static 1.x is a static styling language for React 19 and Vite 8. Keep its source grammar small. The compiler turns trusted developer-authored templates into readable React code and extracted CSS. The browser runtime only merges class names.
 
-## Tech Stack
+## Platform
 
-- **Runtime**: React 19+ (uses automatic ref forwarding)
-- **Build**: Vite plugin with AST-based transformation
-- **Language**: TypeScript (strict mode)
-- **Package Manager**: Bun
-- **Testing**: Vitest
-- **Dependencies**: Zero browser-runtime dependencies; the Vite plugin uses `magic-string`
+- Node 24+
+- React 19
+- Vite 8
+- TypeScript strict mode
+- Bun workspaces, tests, and package management
+- No browser-runtime dependency
 
-## Project Structure
-
-```
-src/
-  vite.ts       # Main Vite plugin - AST transformation, CSS extraction
-  runtime/
-    index.ts    # Minimal runtime (~45 bytes) - just className merging
-  index.ts      # Public API exports (styled, css, createGlobalStyle, withComponent)
-  types.ts      # TypeScript types (StyledComponent, StyledFunction, etc.)
-  hash.ts       # 64-bit FNV-1a hash for class name generation
-  vite.test.ts  # Comprehensive test suite
-example/        # Working demo app
-```
-
-## API
+## Public API
 
 ```tsx
-// Style elements
-const Button = styled.button`
-  padding: 1rem;
-`;
-
-// Extend components (multi-level works too)
-const Primary = styled(Button)`
-  background: blue;
-`;
-const BigPrimary = styled(Primary)`
-  font-size: 2rem;
-`;
-
-// Access className for manual composition
-<a className={Button.className} href="/link">
-  Link with button styles
-</a>;
-
-// Get class string
-const active = css`
-  outline: 2px solid;
-`;
-
-// Global styles
-const GlobalStyle = createGlobalStyle`* { box-sizing: border-box; }`;
-
-// Polymorphism via withComponent (replaces 'as' prop)
-import { Link } from "react-router-dom";
-const LinkButton = withComponent(Link, Button);
-<LinkButton to="/path">Router link styled as button</LinkButton>;
-
-// Default attributes
-const PasswordInput = styled.input.attrs({ type: "password" })`...`;
+styled.div`...`;
+styled(LocalComponent)`...`;
+styled.input.attrs({ type: "password" })`...`;
+css`...`;
+keyframes`...`;
+globalCss`...`;
+styledVariants({ component, css: css`...`, variants: { ... } });
+cssVariants({ css: css`...`, variants: { ... } });
+withComponent(Target, StyledSource);
+cx("base", condition && "active");
 ```
 
-## Key Design Decisions
+The Vite plugin is option-free: `styledStatic()`. Library builds default to ESM + CommonJS because both can link colocated CSS; UMD and IIFE are rejected.
 
-1. **AST over Regex** - Uses Vite's built-in parser for robustness
-2. **Inline components** - Components are generated as inline functions at build time
-3. **No forwardRef** - React 19 handles ref forwarding automatically
-4. **className order** - Base → Extension → User for correct cascade
-5. **Virtual CSS modules** - Each styled block becomes a virtual .css import
-6. **Zero browser dependencies** - Delegates CSS processing to Vite's pipeline; uses `magic-string` for source-map-safe transforms
-7. **No `css` prop** - Intentionally omitted. Named `css` variables encourage reusable styles and add zero plugin complexity
-8. **No `shouldForwardProp`** - Not needed. No runtime interpolation means no custom styling props to filter. Variants auto-strip their props; use destructuring or data attributes for edge cases
-9. **No `as` prop** - Replaced by `withComponent(To, From)` for build-time polymorphism
+## Source grammar
+
+- One named top-level `const` per extracted definition.
+- `globalCss` is a top-level expression.
+- Use `styled.div`, never bracket notation or `styled("div")`.
+- Component arguments are local identifiers, never member expressions.
+- Variant CSS always uses the imported `css` tag.
+- Configuration keys are identifiers; no quoted, computed, numeric, or `__proto__` keys. Static attrs also allow quoted HTML/ARIA names.
+- Only direct `keyframes` identifiers may be interpolated into CSS.
+- Imports may be aliased and must come from the exact package name.
+
+## Architecture
+
+```text
+source + Vite AST
+  -> compiler.ts (pure module result)
+     -> JavaScript + source map + style artifacts
+  -> vite.ts (registry and lifecycle)
+     -> dev injection/HMR, app CSS, or library chunk CSS
+```
+
+- `compiler.ts` owns module compilation and retains no state.
+- `parse.ts` validates and lowers all top-level definitions in one declaration pass.
+- `codegen.ts` owns safe readable JavaScript generation.
+- `vite.ts` owns only Vite lifecycle and the style registry.
+- `runtime/index.ts` exports `mergeClassNames`.
+- `showcase/` owns content, DOM, interactions, and semantic assertions.
+- `adapters/` and benchmark-local App files own styling-library declarations.
+- Docs and the styled-static benchmark import the exact same adapter.
+
+## Non-negotiable invariants
+
+- AST recognition, not regex rewriting.
+- Never evaluate user JavaScript during extraction.
+- Escape every generated string literal.
+- Never embed raw paths in virtual import IDs.
+- Stable class identity excludes CSS text so HMR edits do not rename declarations.
+- Same local names in different modules do not collide.
+- Variant runtime code uses explicit equality and own-property checks.
+- Base, extension, then user class order.
+- Static attrs are defaults; explicit props win.
+- Library output uses ordinary colocated ESM imports or CommonJS requires.
 
 ## Commands
 
 ```bash
-bun install          # Install dependencies
-bun run build        # Build the library
-bun run test         # Run Node and browser tests
-cd example && bun dev # Run example app
+bun install
+bun run format:check
+bun run lint
+bunx tsc --noEmit
+bun run test
+bun run build
+(cd docs && bun run build)
+for project in emotion panda-css restyle styled-static tailwind; do (cd "benchmarks/$project" && bun run build); done
 ```
 
-## How Transformation Works
+Run `DEBUG_STYLED_STATIC=true vite` for temporary diagnostics. It can reveal local source paths.
 
-**Input:**
+## Changes
 
-```tsx
-const Button = styled.button`
-  padding: 1rem;
-`;
-```
-
-**Output:**
-
-```tsx
-import { createElement } from "react";
-import { m } from "@alex.radulescu/styled-static/runtime";
-import "virtual:styled-static/src/Button.tsx/0.css";
-
-const Button = Object.assign(
-  (props) => createElement("button", { ...props, className: m("ss-abc123", props.className) }),
-  { className: "ss-abc123" },
-);
-```
-
-The CSS is extracted to a virtual module. The styled component becomes an inline function with a static `.className` property for composition.
-
-### Extension Chains
-
-```tsx
-// Input
-const Button = styled.button`
-  padding: 1rem;
-`;
-const Primary = styled(Button)`
-  background: blue;
-`;
-
-// Output
-const Button = Object.assign(
-  (props) => createElement("button", { ...props, className: m("ss-btn", props.className) }),
-  { className: "ss-btn" },
-);
-const Primary = Object.assign(
-  (props) => createElement(Button, { ...props, className: m("ss-primary", props.className) }),
-  { className: Button.className + " ss-primary" }, // "ss-btn ss-primary"
-);
-```
-
-## Runtime Size
-
-The runtime is minimal - just a className merge function:
-
-| Module             | Minified | Brotli   |
-| ------------------ | -------- | -------- |
-| `runtime/index.ts` | **45 B** | **50 B** |
-
-This is a 98% reduction from the previous 3.4 KB runtime.
-
-## The Object.assign Pattern
-
-We use `Object.assign` to create inline component functions with static properties. Here's why:
-
-```tsx
-// This creates a valid React component with a .className property
-const Button = Object.assign(
-  (props) => createElement("button", { ...props, className: m("ss-btn", props.className) }),
-  { className: "ss-btn" },
-);
-```
-
-**Why this works:**
-
-1. **Functions are objects** - In JavaScript, functions can have properties
-2. **React components are functions** - A function returning JSX is a valid React component
-3. **Object.assign returns the first argument** - The function itself, now with `.className` attached
-4. **Single expression** - Easy to generate via AST replacement (no multi-statement blocks)
-
-**Caveats:**
-
-- `React.memo(Button)` won't copy static properties - use `Object.assign(memo(Button), { className: Button.className })`
-- Works perfectly with React Compiler (it only cares that it's a function)
-
-## Plugin Hooks Used
-
-- `configResolved` - Capture dev/prod mode
-- `resolveId` - Handle virtual CSS module IDs
-- `load` - Return CSS content for virtual modules
-- `transform` - AST transformation of source files
-- `handleHotUpdate` - HMR support
-
-## Current Status
-
-✅ Fully implemented and working
-✅ Comprehensive test suite
-✅ Example app demonstrating all features
-✅ Minimal runtime (~45 bytes)
-
-## Potential Future Work
-
-- npm publish + CI/CD
+Prefer tests at the compiler/plugin interface. Add a rejection row for every grammar restriction and a behavioral test for every lifecycle fix. Do not expose parser or registry internals merely for tests. Update the README when the public grammar or generated model changes.

@@ -2,6 +2,7 @@ import { styledStatic } from "../src/vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { type PluginOption, defineConfig } from "vite";
+import { showcaseDedupe } from "../showcase/vite";
 
 export default defineConfig({
   base: "/styled-static/",
@@ -10,6 +11,7 @@ export default defineConfig({
   },
   plugins: [react(), styledStatic() as PluginOption],
   resolve: {
+    dedupe: showcaseDedupe,
     alias: [
       {
         find: "@alex.radulescu/styled-static/runtime",

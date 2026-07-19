@@ -14,14 +14,17 @@ export type HTMLTag = keyof JSX.IntrinsicElements;
  */
 export type Keyframes = string & { readonly __brand: "keyframes" };
 
+/** CSS that came from the required css tagged template. */
+export type ExtractedCss = string & { readonly __brand: "extracted-css" };
+
 // ============================================================================
 // Variant Types
 // ============================================================================
 
-/** CSS string for a variant value */
-export type VariantValue = string;
+/** Extracted CSS for a variant value. */
+export type VariantValue = ExtractedCss;
 
-/** Mapping of variant value names to CSS strings */
+/** Mapping of variant value names to extracted css tagged-template values. */
 export type VariantOptions = Record<string, VariantValue>;
 
 /** Full variants configuration: variantName -> { valueName -> css } */
@@ -33,14 +36,14 @@ export type VariantsConfig = Record<string, VariantOptions>;
  */
 export type CompoundVariantDefinition<V extends VariantsConfig> = Partial<{
   [K in keyof V]: keyof V[K];
-}> & { css: string };
+}> & { css: ExtractedCss };
 
 /**
  * Base configuration for variants (used by cssVariants).
  */
 export interface VariantsDefinition<V extends VariantsConfig = VariantsConfig> {
   /** Base CSS that always applies */
-  css?: string;
+  css?: ExtractedCss;
   /** Variant definitions */
   variants: V;
   /** Default values for variants (applied when prop is undefined) */
@@ -231,7 +234,10 @@ export type StyledComponent<T extends HTMLTag | ComponentType<any>> = (T extends
  * Default attributes for a styled component.
  * Must be a static object. Pass dynamic values as regular component props.
  */
-export type AttrsArg<P> = Partial<P>;
+export type StaticAttrValue = string | number | boolean | null;
+export type AttrsArg<P> = {
+  [K in keyof P]?: Extract<P[K], Exclude<StaticAttrValue, null>> | null;
+};
 
 /**
  * Styled element builder with attrs support.
@@ -243,7 +249,7 @@ export interface StyledElementBuilder<T extends HTMLTag> {
    * @example
    * styled.input.attrs({ type: 'password' })`padding: 0.5rem;`
    */
-  attrs<A extends Partial<JSX.IntrinsicElements[T]>>(
+  attrs<A extends AttrsArg<JSX.IntrinsicElements[T]>>(
     attrs: A,
   ): (strings: TemplateStringsArray, ...interpolations: Keyframes[]) => StyledComponent<T>;
 
@@ -304,21 +310,6 @@ export interface StyledElementBuilder<T extends HTMLTag> {
  * ```
  */
 export type StyledFunction = {
-  /**
-   * Style an HTML element.
-   *
-   * @example
-   * ```tsx
-   * const Heading = styled.h1`
-   *   font-size: 2rem;
-   *   font-weight: bold;
-   * `;
-   * ```
-   */
-  <T extends HTMLTag>(
-    tag: T,
-  ): (strings: TemplateStringsArray, ...interpolations: Keyframes[]) => StyledComponent<T>;
-
   /**
    * Extend an existing styled component or any component with className prop.
    *

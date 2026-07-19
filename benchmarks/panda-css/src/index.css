@@ -1,20 +1,37 @@
-@layer reset, base, tokens, recipes, utilities;
-
-@keyframes ss-docs-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+:root,
+[data-theme="light"] {
+  --bg: #fff;
+  --surface: #f7f8fb;
+  --text: #182033;
+  --muted: #5d687f;
+  --accent: #3157d5;
+  --line: #dfe4ee;
+  color-scheme: light;
 }
-
-@keyframes ss-docs-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
+[data-theme="dark"] {
+  --bg: #111522;
+  --surface: #191f30;
+  --text: #f2f5ff;
+  --muted: #abb5cb;
+  --accent: #89a5ff;
+  --line: #30394e;
+  color-scheme: dark;
+}
+[data-theme="copper"] {
+  --bg: #24150f;
+  --surface: #321d14;
+  --text: #ffe2c4;
+  --muted: #d5aa86;
+  --accent: #e39358;
+  --line: #65402c;
+  color-scheme: dark;
+}
+* {
+  box-sizing: border-box;
+}
+html {
+  scroll-behavior: smooth;
+}
+body {
+  margin: 0;
 }

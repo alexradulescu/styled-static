@@ -1,6 +1,6 @@
 {
   "name": "@alex.radulescu/styled-static",
-  "version": "0.16.0",
+  "version": "1.0.0",
   "private": false,
   "description": "Near-zero-runtime styled components for React 19+ with Vite. CSS extracted at build time, minimal runtime.",
   "keywords": [
@@ -17,6 +17,10 @@
     "type": "git",
     "url": "https://github.com/alexradulescu/styled-static"
   },
+  "workspaces": [
+    "docs",
+    "benchmarks/*"
+  ],
   "files": [
     "dist"
   ],
@@ -27,27 +31,29 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
     },
     "./vite": {
       "types": "./dist/vite.d.ts",
-      "import": "./dist/vite.js"
+      "import": "./dist/vite.js",
+      "require": "./dist/vite.js"
     },
     "./runtime": {
       "types": "./dist/runtime/index.d.ts",
-      "import": "./dist/runtime/index.js"
+      "import": "./dist/runtime/index.js",
+      "require": "./dist/runtime/index.js"
     }
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && bun run build:minify && bun run build:sizes",
-    "build:minify": "bun scripts/minify.ts",
-    "build:sizes": "bun scripts/sizes.ts",
+    "clean": "rm -rf ./dist",
+    "build": "bun run clean && tsc -p tsconfig.build.json",
     "dev": "vite",
     "dev:watch": "tsc --watch",
-    "test": "printf '\\033[33m⚠️  [1/2] Node tests (theme.ts coverage intentionally low — browser paths covered in run 2)\\033[0m\\n' && bun test --coverage --only-failures src/vite.test.ts src/index.test.ts src/theme.test.ts && printf '\\033[32m✓ [2/2] Browser tests (theme.ts expected 100%%)\\033[0m\\n' && bun test --coverage --only-failures --preload ./src/setup-dom.ts ./src/theme.browser.test.ts",
+    "test": "bun test --coverage --only-failures src/vite.test.ts src/index.test.ts src/build.test.ts showcase/contract.test.tsx",
     "test:watch": "bun test --watch",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
@@ -74,9 +80,9 @@
   },
   "peerDependencies": {
     "react": "^19.0.0",
-    "vite": "^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0"
+    "vite": "^8.0.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=24.0.0"
   }
 }
