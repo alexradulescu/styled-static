@@ -124,7 +124,7 @@ describe("mergeClassNames", () => {
     expect(mergeClassNames("ss-btn ss-primary", "active")).toBe("ss-btn ss-primary active");
   });
 
-  it("user class appended last (allows override via CSS cascade)", () => {
+  it("appends the user class after the base class", () => {
     const result = mergeClassNames("ss-base", "override");
     expect(result.indexOf("ss-base")).toBeLessThan(result.indexOf("override"));
   });

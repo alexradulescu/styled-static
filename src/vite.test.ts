@@ -156,6 +156,20 @@ const Danger = styled(Button)\`color: red;\`;`,
     expect(ariaResult!.code).toContain('"aria-label": "Password"');
     expect(ariaResult!.code).toContain("tabIndex: -1");
   });
+
+  it("emits extracted CSS in source declaration order", async () => {
+    const plugin = styledStatic();
+    configure(plugin, "build");
+    const result = await transform(
+      plugin,
+      `import { css, cssVariants } from '${PACKAGE}';
+const tones = cssVariants({ variants: { tone: { calm: css\`color: first-red;\` } } });
+const override = css\`color: second-blue;\`;`,
+    );
+
+    const extracted = loadCss(plugin, result!.code);
+    expect(extracted.indexOf("first-red")).toBeLessThan(extracted.indexOf("second-blue"));
+  });
 });
 
 describe("rejected static language", () => {
@@ -435,24 +449,31 @@ describe("Vite lifecycle", () => {
     expect(loaded).toContain("sourceURL=/project/src/a*");
     expect(loaded).toContain('weird\\"name.ts');
     expect(loaded).toContain('getAttribute("data-ss-id") === id');
-    expect(loaded).toContain("import.meta.hot.dispose");
+    expect(loaded).toContain("const style = existing ?? document.createElement");
+    expect(loaded).not.toContain("existing.remove");
+    expect(loaded).not.toContain("import.meta.hot.dispose");
     expect(loaded).toContain("import.meta.hot.prune");
   });
 
   it("invalidates every style record owned by the changed module", async () => {
     const plugin = styledStatic();
     configure(plugin, "serve");
-    await transform(
+    const result = await transform(
       plugin,
       `import { css } from '${PACKAGE}'; const one = css\`a{}\`; const two = css\`b{}\`;`,
       "/project/src/styles.ts?direct",
     );
     const invalidateModule = mock(() => {});
-    const getModuleById = mock((id: string) => ({ id }));
+    const requestedIds: string[] = [];
+    const getModuleById = mock((id: string) => {
+      requestedIds.push(id);
+      return { id };
+    });
     (plugin.handleHotUpdate as Function)({
       file: "/project/src/styles.ts",
       server: { moduleGraph: { getModuleById, invalidateModule } },
     });
+    expect(requestedIds).toEqual(cssImports(result!.code).map((id) => `\0${id}`));
     expect(invalidateModule).toHaveBeenCalledTimes(2);
   });
 
@@ -491,6 +512,7 @@ describe("Vite lifecycle", () => {
     const chunk = {
       type: "chunk",
       code: libraryResult!.code,
+      map: libraryResult!.map,
       moduleIds: ["/project/src/example.tsx"],
     };
     (library.generateBundle as Function).call(
@@ -514,6 +536,7 @@ describe("Vite lifecycle", () => {
     const chunk = {
       type: "chunk",
       code: result!.code,
+      map: result!.map,
       moduleIds: ["/project/src/example.tsx"],
     };
     expect(() =>
@@ -529,6 +552,30 @@ describe("Vite lifecycle", () => {
       ),
     ).toThrow("cannot link a static stylesheet");
   });
+
+  it("returns a source map when it adds a library CSS import", async () => {
+    const library = styledStatic();
+    configure(library, "build", true);
+    const result = await transform(
+      library,
+      `import { css } from '${PACKAGE}'; const x = css\`a{}\`;`,
+    );
+
+    const chunk = {
+      type: "chunk",
+      code: result!.code,
+      map: result!.map,
+      moduleIds: ["/project/src/example.tsx"],
+    };
+    (library.generateBundle as Function).call(
+      { ...context(), emitFile: () => {} },
+      { format: "es" },
+      { "index.js": chunk },
+    );
+
+    expect(chunk.code).toStartWith('import "./index.css";');
+    expect(chunk.map).toBeDefined();
+  });
 });
 
 describe("small pure helpers", () => {
@@ -542,11 +589,20 @@ describe("small pure helpers", () => {
   it("rewrites only side-effect styling imports", () => {
     const code = `import "virtual:styled-static/a.css";\nexport const value = 1;`;
     const ast = context().parse(code);
-    expect(rewriteCssImports(code, "chunks/value.css", ast as any)).toBe(
+    expect(rewriteCssImports(code, "chunks/value.css", ast as any).code).toBe(
       `import "./value.css";\n\nexport const value = 1;`,
     );
-    expect(rewriteCssImports(code, "chunks/value.css", ast as any, "cjs")).toBe(
+    expect(rewriteCssImports(code, "chunks/value.css", ast as any, "cjs").code).toBe(
       `require("./value.css");\n\nexport const value = 1;`,
+    );
+  });
+
+  it("preserves JavaScript values that contain Vite's empty CSS marker", () => {
+    const code = 'import "virtual:styled-static/a.css";\nexport const marker = "/* empty css */";';
+    const ast = context().parse(code);
+
+    expect(rewriteCssImports(code, "value.css", ast as any).code).toContain(
+      'export const marker = "/* empty css */";',
     );
   });
 });

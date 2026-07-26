@@ -85,14 +85,10 @@ export function compile(
   filePath: string,
   context: CompileContext,
 ): CompileResult | null {
-  const { templates, variants, componentConversions } = analyzeModule(
-    context.ast,
-    code,
-    (localName) => classNameFor(localName, filePath, context.root, context.packageIdentity),
+  const { definitions } = analyzeModule(context.ast, code, (localName) =>
+    classNameFor(localName, filePath, context.root, context.packageIdentity),
   );
-  if (templates.length === 0 && variants.length === 0 && componentConversions.length === 0) {
-    return null;
-  }
+  if (definitions.length === 0) return null;
 
   const output = new MagicString(code);
   const styles: CompiledStyle[] = [];
@@ -118,86 +114,108 @@ export function compile(
     );
   };
 
-  const keyframeNames = new Map<string, string>();
-  for (const template of templates) {
-    if (template.type === "keyframes" && template.variableName) {
-      keyframeNames.set(
-        template.variableName,
-        classNameFor(template.variableName, filePath, context.root, context.packageIdentity),
-      );
-    }
-  }
+  const keyframeNames = new Map(
+    definitions.flatMap((definition) =>
+      definition.type === "keyframes" && definition.variableName
+        ? [
+            [
+              definition.variableName,
+              classNameFor(
+                definition.variableName,
+                filePath,
+                context.root,
+                context.packageIdentity,
+              ),
+            ] as const,
+          ]
+        : [],
+    ),
+  );
 
-  for (const template of templates) {
-    const css = extractTemplateContent(code, template.node.quasi, keyframeNames);
-    const className = classNameFor(
-      template.variableName ?? `global-${styleIndex}`,
-      filePath,
-      context.root,
-      context.packageIdentity,
-    );
-    const extractedCss =
-      template.type === "globalCss"
-        ? css
-        : template.type === "keyframes"
-          ? `@keyframes ${className} { ${css} }`
-          : `.${className} { ${css} }`;
-    addStyle(extractedCss);
-    output.overwrite(
-      template.node.start,
-      template.node.end,
-      generateReplacement(template, className, names),
-    );
-    if (["styled", "styledExtend", "styledAttrs"].includes(template.type)) {
-      needsComponentRuntime = true;
-    }
-  }
-
-  for (const variant of variants) {
-    validateVariantReferences(variant);
-    const baseClassName = classNameFor(
-      variant.variableName,
-      filePath,
-      context.root,
-      context.packageIdentity,
-    );
-    let extractedCss = variant.baseCss ? `.${baseClassName} { ${variant.baseCss} }\n` : "";
-
-    for (const [variantName, values] of variant.variants) {
-      for (const [valueName, css] of values) {
-        extractedCss += `.${createVariantClassName(baseClassName, variantName, valueName)} { ${css} }\n`;
+  for (const definition of definitions) {
+    switch (definition.type) {
+      case "styled":
+      case "styledExtend":
+      case "styledAttrs":
+      case "css":
+      case "globalCss":
+      case "keyframes": {
+        const css = extractTemplateContent(code, definition.node.quasi, keyframeNames);
+        const className = classNameFor(
+          definition.variableName ?? `global-${styleIndex}`,
+          filePath,
+          context.root,
+          context.packageIdentity,
+        );
+        const extractedCss =
+          definition.type === "globalCss"
+            ? css
+            : definition.type === "keyframes"
+              ? `@keyframes ${className} { ${css} }`
+              : `.${className} { ${css} }`;
+        addStyle(extractedCss);
+        output.overwrite(
+          definition.node.start,
+          definition.node.end,
+          generateReplacement(definition, className, names),
+        );
+        if (["styled", "styledExtend", "styledAttrs"].includes(definition.type)) {
+          needsComponentRuntime = true;
+        }
+        break;
       }
-    }
-    for (const compound of variant.compoundVariants ?? []) {
-      const selector = Array.from(
-        compound.conditions,
-        ([name, value]) => `.${createVariantClassName(baseClassName, name, value)}`,
-      ).join("");
-      extractedCss += `${selector} { ${compound.css} }\n`;
-    }
-    addStyle(extractedCss);
 
-    const variantKeys = Array.from(variant.variants.keys());
-    output.overwrite(
-      variant.start,
-      variant.end,
-      generateVariantReplacement(variant, baseClassName, variantKeys, {
-        ...names,
-        variantValues: variantKeys.map((name, index) =>
-          uniqueName(code, createVariantValueName(name, index)),
-        ),
-      }),
-    );
-    if (variant.type === "styledVariants") needsComponentRuntime = true;
-  }
+      case "styledVariants":
+      case "cssVariants": {
+        validateVariantReferences(definition);
+        const baseClassName = classNameFor(
+          definition.variableName,
+          filePath,
+          context.root,
+          context.packageIdentity,
+        );
+        let extractedCss = definition.baseCss
+          ? `.${baseClassName} { ${definition.baseCss} }\n`
+          : "";
 
-  for (const conversion of componentConversions) {
-    output.overwrite(
-      conversion.start,
-      conversion.end,
-      generateWithComponentReplacement(conversion, names),
-    );
-    needsComponentRuntime = true;
+        for (const [variantName, values] of definition.variants) {
+          for (const [valueName, css] of values) {
+            extractedCss += `.${createVariantClassName(baseClassName, variantName, valueName)} { ${css} }\n`;
+          }
+        }
+        for (const compound of definition.compoundVariants ?? []) {
+          const selector = Array.from(
+            compound.conditions,
+            ([name, value]) => `.${createVariantClassName(baseClassName, name, value)}`,
+          ).join("");
+          extractedCss += `${selector} { ${compound.css} }\n`;
+        }
+        addStyle(extractedCss);
+
+        const variantKeys = Array.from(definition.variants.keys());
+        output.overwrite(
+          definition.start,
+          definition.end,
+          generateVariantReplacement(definition, baseClassName, variantKeys, {
+            ...names,
+            variantValues: variantKeys.map((name, index) =>
+              uniqueName(code, createVariantValueName(name, index)),
+            ),
+          }),
+        );
+        if (definition.type === "styledVariants") needsComponentRuntime = true;
+        break;
+      }
+
+      case "withComponent":
+        output.overwrite(
+          definition.start,
+          definition.end,
+          generateWithComponentReplacement(definition, names),
+        );
+        needsComponentRuntime = true;
+        break;
+    }
   }
 
   let header = cssImports.join("\n");

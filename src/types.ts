@@ -177,7 +177,7 @@ export type PropsOf<T> = T extends HTMLTag
  * Styled components created by styled-static support several special features:
  *
  * **Special Props:**
- * - `className` - Additional CSS classes (merged with styled classes, user classes override)
+ * - `className` - Additional CSS classes, appended after styled classes
  *
  * **Static Properties:**
  * - `.className` - The static class name(s) for this component, enabling manual composition
