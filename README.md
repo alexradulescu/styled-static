@@ -4,7 +4,7 @@
 
 ## Start in under five minutes
 
-Requirements: Node 24+, React 19, and Vite 8.
+Requirements: Node `^20.19.0` or `>=22.12.0`, React 19, and Vite 8.
 
 ```bash
 bun add @alex.radulescu/styled-static
@@ -431,6 +431,7 @@ Workspace and linked-library source should live under a named `package.json`. Th
 ## HMR and diagnostics
 
 - Each source module owns stable virtual style modules.
+- Vite owns development style injection, updates, and removal through virtual CSS modules.
 - A refresh removes stale style records and invalidates every affected virtual module.
 - Development styles include their exact source path for DevTools.
 - Query-bearing Vite module IDs are normalized consistently.

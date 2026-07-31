@@ -18,7 +18,6 @@ export interface CompileContext {
   ast: ESTree.Program;
   root: string;
   packageIdentity: string;
-  development: boolean;
 }
 
 export interface CompiledStyle {
@@ -109,9 +108,7 @@ export function compile(
     const baseId = `virtual:styled-static/${hash(normalizePath(filePath)).slice(0, 10)}/${styleIndex++}`;
     const moduleId = `${baseId}.css`;
     styles.push({ moduleId, css });
-    cssImports.push(
-      `import ${safeStringLiteral(context.development ? `${baseId}.js` : moduleId)};`,
-    );
+    cssImports.push(`import ${safeStringLiteral(moduleId)};`);
   };
 
   const keyframeNames = new Map(

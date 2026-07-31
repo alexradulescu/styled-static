@@ -6,7 +6,7 @@ styled-static 1.x is a static styling language for React 19 and Vite 8. Keep its
 
 ## Platform
 
-- Node 24+
+- Node `^20.19.0` or `>=22.12.0`
 - React 19
 - Vite 8
 - TypeScript strict mode
@@ -48,7 +48,7 @@ source + Vite AST
   -> compiler.ts (pure module result)
      -> JavaScript + source map + style artifacts
   -> vite.ts (registry and lifecycle)
-     -> dev injection/HMR, app CSS, or library chunk CSS
+     -> Vite-managed dev CSS/HMR, app CSS, or library chunk CSS
 ```
 
 - `compiler.ts` owns module compilation and retains no state.

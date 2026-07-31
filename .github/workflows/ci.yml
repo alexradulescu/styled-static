@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node:
+          - "20.19.0"
+          - "26.x"
+        vite:
+          - "8.0.0"
+          - "^8.0.0"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install declared dependencies in isolation
+        run: bun install --frozen-lockfile --linker isolated
+
+      - name: Select Vite test version
+        run: bun add --dev --no-save "vite@${{ matrix.vite }}"
+
+      - run: bunx tsc --noEmit
+      - run: bun run format:check
+      - run: bun run lint
+      - run: bun run test
+      - run: bun run build

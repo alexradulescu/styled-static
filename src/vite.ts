@@ -8,6 +8,12 @@ import { compile } from "./compiler.js";
 
 const VIRTUAL_PREFIX = "virtual:styled-static/";
 const RESOLVED_VIRTUAL_PREFIX = `\0${VIRTUAL_PREFIX}`;
+const SOURCE_ID_PATTERN = /\.[cm]?[jt]sx?(?:\?.*)?$/;
+const NODE_MODULES_PATTERN = /(?:^|[/\\])node_modules(?:[/\\]|$)/;
+const NULL_BYTE = String.fromCharCode(0);
+const VIRTUAL_ID_PATTERN = new RegExp(`^${NULL_BYTE}?virtual:styled-static/`);
+const RESOLVED_VIRTUAL_ID_PATTERN = new RegExp(`^${NULL_BYTE}virtual:styled-static/`);
+const PACKAGE_NAME = "@alex.radulescu/styled-static";
 
 interface StyleRecord {
   css: string;
@@ -15,7 +21,7 @@ interface StyleRecord {
 }
 
 interface SourceMapLike {
-  file?: string | null;
+  file?: string | null | undefined;
   toString(): string;
 }
 
@@ -56,14 +62,6 @@ function sameSource(left: string, right: string): boolean {
   return normalizePath(sourcePath(left)) === normalizePath(sourcePath(right));
 }
 
-function canonicalStyleModuleId(id: string): string {
-  return id.replace(/\.(css|js)$/, ".css");
-}
-
-function developmentStyleModuleId(id: string): string {
-  return id.replace(/\.css$/, ".js");
-}
-
 function escapeCssComment(value: string): string {
   return value.replace(/\*\//g, "*\\/").replace(/[\r\n]/g, "");
 }
@@ -94,33 +92,6 @@ function sourcePackage(
   // Let compile() return null for already-compiled dependencies. If this file
   // contains an extracted definition, its package-root check gives the clear error.
   return { root: viteRoot, identity: vitePackageIdentity };
-}
-
-function developmentStyleModule(id: string, record?: StyleRecord): string {
-  const sourceComment = record?.sourceFile
-    ? `\n/*# sourceURL=${escapeCssComment(record.sourceFile)} */`
-    : "";
-  return `
-const id = ${JSON.stringify(id)};
-const css = ${JSON.stringify(`${record?.css ?? ""}${sourceComment}`)};
-
-const existing = Array.from(document.querySelectorAll("style[data-ss-id]")).find(
-  (element) => element.getAttribute("data-ss-id") === id,
-);
-
-const style = existing ?? document.createElement("style");
-if (!existing) {
-  style.setAttribute("data-ss-id", id);
-  document.head.appendChild(style);
-}
-style.textContent = css;
-
-if (import.meta.hot) {
-  import.meta.hot.accept();
-  import.meta.hot.prune(() => style.remove());
-}
-export default css;
-`;
 }
 
 /** Vite 8 adapter for the styled-static compiler. */
@@ -156,40 +127,51 @@ export function styledStatic(): Plugin {
       debug("mode:", development ? "development" : libraryBuild ? "library" : "application");
     },
 
-    resolveId(id) {
-      if (id.startsWith(RESOLVED_VIRTUAL_PREFIX)) return id;
-      if (id.startsWith(VIRTUAL_PREFIX)) return `\0${id}`;
-      return null;
+    resolveId: {
+      filter: { id: VIRTUAL_ID_PATTERN },
+      handler(id) {
+        if (id.startsWith(RESOLVED_VIRTUAL_PREFIX)) return id;
+        if (id.startsWith(VIRTUAL_PREFIX)) return `\0${id}`;
+        return null;
+      },
     },
 
-    load(id) {
-      if (!id.startsWith(RESOLVED_VIRTUAL_PREFIX)) return null;
-      const canonicalId = canonicalStyleModuleId(id.slice(1));
-      const record = styles.get(canonicalId);
-      if (development) return developmentStyleModule(canonicalId, record);
-      return libraryBuild ? "" : (record?.css ?? "");
+    load: {
+      filter: { id: RESOLVED_VIRTUAL_ID_PATTERN },
+      handler(id) {
+        if (!id.startsWith(RESOLVED_VIRTUAL_PREFIX)) return null;
+        const record = styles.get(id.slice(1));
+        if (libraryBuild) return "";
+        const sourceComment =
+          development && record?.sourceFile
+            ? `\n/*# sourceURL=${escapeCssComment(record.sourceFile)} */`
+            : "";
+        return `${record?.css ?? ""}${sourceComment}`;
+      },
     },
 
-    handleHotUpdate({ file, server }) {
+    handleHotUpdate({ file, modules, server }) {
       if (!/\.[cm]?[jt]sx?$/.test(file)) return;
+      const affected = new Set(modules);
       for (const [moduleId, record] of styles) {
         if (!sameSource(record.sourceFile, file)) continue;
-        const developmentId = developmentStyleModuleId(moduleId);
-        const module = server.moduleGraph.getModuleById(`\0${developmentId}`);
-        if (module) server.moduleGraph.invalidateModule(module);
+        const module = server.moduleGraph.getModuleById(`\0${moduleId}`);
+        if (module) {
+          server.moduleGraph.invalidateModule(module);
+          affected.add(module);
+        }
       }
+      return [...affected];
     },
 
     transform: {
-      filter: { id: /\.[cm]?[jt]sx?(?:\?.*)?$/ },
+      filter: {
+        id: { include: SOURCE_ID_PATTERN, exclude: NODE_MODULES_PATTERN },
+        code: PACKAGE_NAME,
+      },
       handler(code, id) {
         const filePath = sourcePath(id);
-        if (
-          /(?:^|[/\\])node_modules(?:[/\\]|$)/.test(filePath) ||
-          !code.includes("@alex.radulescu/styled-static")
-        ) {
-          return null;
-        }
+        if (!code.includes(PACKAGE_NAME)) return null;
 
         let ast: ESTree.Program;
         try {
@@ -209,7 +191,6 @@ export function styledStatic(): Plugin {
           ast,
           root: packageContext.root,
           packageIdentity: packageContext.identity,
-          development,
         });
 
         for (const [moduleId, record] of styles) {

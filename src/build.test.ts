@@ -221,6 +221,7 @@ document.querySelector("#app")!.className = LibraryButton.className + " " + cons
 
       const css = await builtCss(consumerOut);
       expect(css).toContain("library-blue");
+      expect(css).not.toContain("sourceURL=");
       if (consumerUsesPlugin) expect(css).toContain("consumer-red");
     });
   }

@@ -1,6 +1,9 @@
-import { parse } from "acorn";
 import { describe, expect, it, mock } from "bun:test";
-import type { Plugin } from "vite";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { parseSync } from "rolldown/utils";
+import { createServer, type Plugin } from "vite";
 import { rewriteCssImports } from "./codegen";
 import { compile } from "./compiler";
 import { hash } from "./hash";
@@ -11,7 +14,10 @@ const PACKAGE = "@alex.radulescu/styled-static";
 function context() {
   return {
     parse(code: string) {
-      return parse(code, { sourceType: "module", ecmaVersion: "latest" });
+      return parseSync("fixture.js", code, {
+        sourceType: "module",
+        preserveParens: false,
+      }).program;
     },
   };
 }
@@ -38,6 +44,12 @@ async function transform(plugin: Plugin, code: string, id = "/project/src/exampl
   } | null>;
 }
 
+function load(plugin: Plugin, id: string): unknown {
+  const hook = plugin.load as Function | { handler: Function };
+  const handler = typeof hook === "function" ? hook : hook.handler;
+  return handler(id);
+}
+
 function cssImports(code: string): string[] {
   return Array.from(
     code.matchAll(/import "(virtual:styled-static\/[^"]+)";/g),
@@ -47,7 +59,7 @@ function cssImports(code: string): string[] {
 
 function loadCss(plugin: Plugin, transformed: string): string {
   return cssImports(transformed)
-    .map((id) => String((plugin.load as Function)(`\0${id}`)))
+    .map((id) => String(load(plugin, `\0${id}`)))
     .join("\n");
 }
 
@@ -57,6 +69,26 @@ describe("public plugin contract", () => {
     expect(plugin.name).toBe("styled-static");
     expect(plugin.enforce).toBe("post");
     expect(styledStatic.length).toBe(0);
+  });
+
+  it("uses Vite hook filters for source and virtual modules", () => {
+    const plugin = styledStatic();
+    const transformHook = plugin.transform as {
+      filter: {
+        code?: string;
+        id?: { include?: RegExp; exclude?: RegExp };
+      };
+    };
+    const resolveHook = plugin.resolveId as { filter?: { id?: RegExp } };
+    const loadHook = plugin.load as { filter?: { id?: RegExp } };
+
+    expect(transformHook.filter.code).toBe(PACKAGE);
+    expect(transformHook.filter.id?.include?.test("/project/src/Button.tsx?direct")).toBe(true);
+    expect(transformHook.filter.id?.include?.test("/project/src/Button.css")).toBe(false);
+    expect(transformHook.filter.id?.exclude?.test("/project/node_modules/Button.tsx")).toBe(true);
+    expect(resolveHook.filter?.id?.test("virtual:styled-static/example/0.css")).toBe(true);
+    expect(resolveHook.filter?.id?.test("\0virtual:styled-static/example/0.css")).toBe(true);
+    expect(loadHook.filter?.id?.test("\0virtual:styled-static/example/0.css")).toBe(true);
   });
 
   it("defaults library builds to the two formats that can link CSS", () => {
@@ -83,18 +115,64 @@ describe("public plugin contract", () => {
     }
   });
 
-  it("ignores unrelated packages and non-code modules", async () => {
+  it("keeps a handler guard for unrelated packages", async () => {
     const plugin = styledStatic();
     configure(plugin, "build");
     expect(
       await transform(plugin, `import { css } from './styled-static';`, "/project/a.ts"),
     ).toBeNull();
-    expect(
-      await transform(plugin, `import { css } from '${PACKAGE}';`, "/project/a.css"),
-    ).toBeNull();
-    expect(
-      await transform(plugin, `import { css } from '${PACKAGE}';`, "/project/node_modules/a.ts"),
-    ).toBeNull();
+  });
+
+  it("uses the nearest named package in nested workspaces", async () => {
+    const classNames: string[] = [];
+    const roots: string[] = [];
+    try {
+      for (const outerName of ["@example/outer-one", "@example/outer-two"]) {
+        const root = await mkdtemp(join(tmpdir(), "styled-static-package-"));
+        roots.push(root);
+        const packageRoot = join(root, "packages", "ui");
+        const file = join(packageRoot, "src", "Button.tsx");
+        await mkdir(join(packageRoot, "src"), { recursive: true });
+        await writeFile(join(root, "package.json"), JSON.stringify({ name: outerName }));
+        await writeFile(join(packageRoot, "package.json"), JSON.stringify({ name: "@example/ui" }));
+
+        const plugin = styledStatic();
+        configure(plugin, "build", false, root);
+        const result = await transform(
+          plugin,
+          `import { styled } from '${PACKAGE}'; const Button = styled.button\`color:red;\`;`,
+          file,
+        );
+        classNames.push(result!.code.match(/ss-Button-[a-z0-9]+/)?.[0] ?? "");
+      }
+    } finally {
+      await Promise.all(roots.map((root) => rm(root, { recursive: true, force: true })));
+    }
+
+    expect(classNames).toEqual(["ss-Button-1m7pymyozff7g", "ss-Button-1m7pymyozff7g"]);
+  });
+
+  it("skips unnamed package manifests and stops at the filesystem root", async () => {
+    const root = await mkdtemp(join(tmpdir(), "styled-static-package-"));
+    try {
+      const packageRoot = join(root, "packages", "ui");
+      const file = join(packageRoot, "src", "Button.tsx");
+      await mkdir(join(packageRoot, "src"), { recursive: true });
+      await writeFile(join(root, "package.json"), JSON.stringify({ name: "@example/outer" }));
+      await writeFile(join(packageRoot, "package.json"), "{}");
+
+      const plugin = styledStatic();
+      configure(plugin, "build", false, root);
+      const source = `import { styled } from '${PACKAGE}'; const Button = styled.button\`color:red;\`;`;
+      const result = await transform(plugin, source, file);
+      expect(result!.code).toContain("ss-Button-34ataxggispk6");
+
+      await expect(transform(plugin, source, join(root, "..", "detached.ts"))).rejects.toThrow(
+        "outside package root",
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
 
@@ -334,9 +412,10 @@ describe("stable, readable identity", () => {
         ast: context().parse(code) as any,
         root: checkout,
         packageIdentity: "@example/ui",
-        development: false,
       })!.code.match(/ss-Button-[a-z0-9]+/)?.[0];
-    expect(compileAt("/checkout/one")).toBe(compileAt("/different/location"));
+    expect(compileAt("/checkout/one")).toBe("ss-Button-1m7pymyozff7g");
+    expect(compileAt("/different/location")).toBe("ss-Button-1m7pymyozff7g");
+    expect(compileAt("C:\\checkout\\one")).toBe("ss-Button-1m7pymyozff7g");
   });
 
   it("rejects extracted source outside its package root", () => {
@@ -346,7 +425,6 @@ describe("stable, readable identity", () => {
         ast: context().parse(code) as any,
         root: "/project",
         packageIdentity: "app",
-        development: false,
       }),
     ).toThrow("outside package root");
   });
@@ -436,6 +514,81 @@ const Box = styled.div\`color: blue;\`;`,
 });
 
 describe("Vite lifecycle", () => {
+  it("lets Vite own development style injection and CSS HMR", async () => {
+    const entry = "/project/entry.ts";
+    let source = `import { css } from "${PACKAGE}";
+export const token = css\`color:integration-red;\`;`;
+    const fixture: Plugin = {
+      name: "styled-static-test-fixture",
+      enforce: "pre",
+      resolveId(id) {
+        if (id === "/entry.ts" || id === entry) return entry;
+      },
+      load(id) {
+        if (id === entry) return source;
+      },
+    };
+    const acceptUpdates: Plugin = {
+      name: "styled-static-test-hmr-boundary",
+      enforce: "post",
+      transform(code, id) {
+        if (id === entry) return `${code}\nif (import.meta.hot) import.meta.hot.accept();`;
+      },
+    };
+    const server = await createServer({
+      configFile: false,
+      root: "/project",
+      logLevel: "silent",
+      server: { middlewareMode: true },
+      resolve: {
+        alias: { [PACKAGE]: resolve(import.meta.dir, "index.ts") },
+      },
+      plugins: [fixture, styledStatic(), acceptUpdates],
+    });
+
+    try {
+      const firstEntry = await server.environments.client.transformRequest("/entry.ts");
+      const styleModule = Array.from(
+        server.environments.client.moduleGraph.idToModuleMap.values(),
+      ).find((module) => module.id?.startsWith("\0virtual:styled-static/"));
+      expect(styleModule).toBeDefined();
+
+      const firstStyle = await server.environments.client.transformRequest(styleModule!.url);
+      expect(firstStyle?.code).toContain("integration-red");
+      expect(firstStyle?.code).toContain("__vite__updateStyle");
+      expect(firstStyle?.code).toContain("__vite__removeStyle");
+      expect(firstStyle?.code).toContain("sourceURL=/project/entry.ts");
+
+      const update = new Promise<{ updates: Array<{ path: string }> }>((resolveUpdate, reject) => {
+        const timeout = setTimeout(() => reject(new Error("Vite HMR update timed out")), 5_000);
+        server.environments.client.hot.send = (payload) => {
+          if (payload.type !== "update") return;
+          clearTimeout(timeout);
+          resolveUpdate(payload);
+        };
+      });
+
+      source = `import { css } from "${PACKAGE}";
+export const token = css\`color:integration-blue;\`;`;
+      server.watcher.emit("change", entry);
+
+      const payload = await update;
+      expect(payload.updates.some(({ path }) => path.includes("virtual:styled-static/"))).toBe(
+        true,
+      );
+
+      const secondEntry = await server.environments.client.transformRequest("/entry.ts");
+      const secondStyle = await server.environments.client.transformRequest(styleModule!.url);
+      expect(secondStyle?.code).toContain("integration-blue");
+      expect(secondStyle?.code).not.toContain("integration-red");
+      expect(secondEntry?.code.match(/ss-token-[a-z0-9]+/)?.[0]).toBe(
+        firstEntry?.code.match(/ss-token-[a-z0-9]+/)?.[0],
+      );
+    } finally {
+      await server.close();
+    }
+  });
+
   it("normalizes query-bearing source ids and exposes the exact source in development CSS", async () => {
     const plugin = styledStatic();
     configure(plugin, "serve");
@@ -445,14 +598,14 @@ describe("Vite lifecycle", () => {
       '/project/src/a*/weird"name.ts?direct',
     );
     const id = cssImports(result!.code)[0]!;
-    const loaded = String((plugin.load as Function)(`\0${id}`));
+    const loaded = String(load(plugin, `\0${id}`));
+    expect(id).toEndWith(".css");
+    expect(loaded).toContain("color:red");
     expect(loaded).toContain("sourceURL=/project/src/a*");
-    expect(loaded).toContain('weird\\"name.ts');
-    expect(loaded).toContain('getAttribute("data-ss-id") === id');
-    expect(loaded).toContain("const style = existing ?? document.createElement");
-    expect(loaded).not.toContain("existing.remove");
-    expect(loaded).not.toContain("import.meta.hot.dispose");
-    expect(loaded).toContain("import.meta.hot.prune");
+    expect(loaded).toContain('weird"name.ts');
+    expect(loaded).not.toContain("document.");
+    expect(loaded).not.toContain("data-ss-id");
+    expect(loaded).not.toContain("import.meta.hot");
   });
 
   it("invalidates every style record owned by the changed module", async () => {
@@ -469,12 +622,15 @@ describe("Vite lifecycle", () => {
       requestedIds.push(id);
       return { id };
     });
-    (plugin.handleHotUpdate as Function)({
+    const sourceModule = { id: "/project/src/styles.ts" };
+    const affected = (plugin.handleHotUpdate as Function)({
       file: "/project/src/styles.ts",
+      modules: [sourceModule],
       server: { moduleGraph: { getModuleById, invalidateModule } },
     });
     expect(requestedIds).toEqual(cssImports(result!.code).map((id) => `\0${id}`));
     expect(invalidateModule).toHaveBeenCalledTimes(2);
+    expect(affected).toEqual([sourceModule, ...requestedIds.map((id) => ({ id }))]);
   });
 
   it("clears style records when the last definition is deleted", async () => {
@@ -487,10 +643,10 @@ describe("Vite lifecycle", () => {
       file,
     );
     const styleId = cssImports(styled!.code)[0]!;
-    expect(String((plugin.load as Function)(`\0${styleId}`))).toContain("stale-red");
+    expect(String(load(plugin, `\0${styleId}`))).toContain("stale-red");
 
     expect(await transform(plugin, `import { css } from '${PACKAGE}';`, file)).toBeNull();
-    expect(String((plugin.load as Function)(`\0${styleId}`))).not.toContain("stale-red");
+    expect(String(load(plugin, `\0${styleId}`))).not.toContain("stale-red");
   });
 
   it("returns raw CSS for apps and emits colocated CSS imports for libraries", async () => {
