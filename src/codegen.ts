@@ -5,6 +5,7 @@
  * variant calls, and withComponent calls. All functions are pure
  * and produce string output for AST replacement.
  */
+import MagicString from "magic-string";
 import type { FoundTemplate, FoundVariant, FoundWithComponent } from "./parse.js";
 
 // ============================================================================
@@ -15,12 +16,8 @@ import type { FoundTemplate, FoundVariant, FoundWithComponent } from "./parse.js
  * SECURITY: Validates that a string is a safe identifier (alphanumeric + underscore).
  * Prevents code injection via displayName or component name interpolation.
  */
-export function isValidIdentifier(str: string): boolean {
+function isValidIdentifier(str: string): boolean {
   return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(str);
-}
-
-export function isValidComponentReference(value: string): boolean {
-  return value.split(".").every(isValidIdentifier);
 }
 
 /**
@@ -82,6 +79,25 @@ function ownClassName(props: string): string {
   return `Object.hasOwn(${props}, "className") ? ${props}.className : undefined`;
 }
 
+function indent(code: string, spaces: number): string {
+  const prefix = " ".repeat(spaces);
+  return code
+    .split("\n")
+    .map((line) => `${prefix}${line}`)
+    .join("\n");
+}
+
+function variantSelectionDeclaration(
+  source: string,
+  key: string,
+  localName: string,
+  defaultValue: string | undefined,
+): string {
+  const keyLiteral = safeStringLiteral(key);
+  const fallback = defaultValue === undefined ? "undefined" : safeStringLiteral(defaultValue);
+  return `const ${localName} = Object.hasOwn(${source}, ${keyLiteral}) && ${source}[${keyLiteral}] !== undefined ? ${source}[${keyLiteral}] : ${fallback};`;
+}
+
 // ============================================================================
 // Template Code Generation
 // ============================================================================
@@ -109,7 +125,7 @@ export function generateReplacement(
     case "styledExtend":
       // template.baseComponent comes from AST (Identifier node) so it is a valid
       // JS identifier by construction, but assert for defense-in-depth.
-      if (!template.baseComponent || !isValidComponentReference(template.baseComponent)) {
+      if (!template.baseComponent || !isValidIdentifier(template.baseComponent)) {
         /* unreachable: AST component references are validated during parsing */
         throw new Error(`[styled-static] Invalid base component name: ${template.baseComponent}`);
       }
@@ -134,7 +150,7 @@ export function generateWithComponentReplacement(
   conversion: FoundWithComponent,
   runtimeNames: GeneratedRuntimeNames = defaultRuntimeNames,
 ): string {
-  if (!isValidComponentReference(conversion.fromComponent)) {
+  if (!isValidIdentifier(conversion.fromComponent)) {
     /* unreachable: component references are validated during parsing */
     throw new Error(`[styled-static] Invalid source component: ${conversion.fromComponent}`);
   }
@@ -143,7 +159,7 @@ export function generateWithComponentReplacement(
     conversion.toComponent.kind === "htmlTag"
       ? safeStringLiteral(conversion.toComponent.value)
       : conversion.toComponent.value;
-  if (conversion.toComponent.kind === "component" && !isValidComponentReference(target)) {
+  if (conversion.toComponent.kind === "component" && !isValidIdentifier(target)) {
     /* unreachable: component references are validated during parsing */
     throw new Error(`[styled-static] Invalid target component: ${target}`);
   }
@@ -187,15 +203,10 @@ export function generateVariantReplacement(
     })
     .join(", ");
   const propsDestructure = `{ ${omittedVariantProps}${omittedVariantProps ? ", " : ""}className: ${userClassName}_omitted, ...${remainingProps} }`;
-  const styledSelectionDeclarations = variantKeys
-    .map((key, index) => {
-      const keyLiteral = safeStringLiteral(key);
-      const localName = variantValues?.[index] ?? createVariantValueName(key, index);
-      const defaultValue = variant.defaultVariants?.get(key);
-      const fallback = defaultValue === undefined ? "undefined" : safeStringLiteral(defaultValue);
-      return `const ${localName} = Object.hasOwn(${props}, ${keyLiteral}) && ${props}[${keyLiteral}] !== undefined ? ${props}[${keyLiteral}] : ${fallback};`;
-    })
-    .join(" ");
+  const styledSelectionDeclarations = variantKeys.map((key, index) => {
+    const localName = variantValues?.[index] ?? createVariantValueName(key, index);
+    return variantSelectionDeclaration(props, key, localName, variant.defaultVariants?.get(key));
+  });
   const userClassNameDeclaration = `const ${userClassName} = Object.hasOwn(${props}, "className") ? ${props}.className : undefined;`;
 
   const variantChecks: string[] = [];
@@ -209,15 +220,14 @@ export function generateVariantReplacement(
       const valueChecks = Array.from(values.keys())
         .map((value, valueIndex) => {
           const modifierClass = createVariantClassName(baseClass, key, value);
-          return `${valueIndex === 0 ? "if" : "else if"} (${keyRef} === ${safeStringLiteral(value)}) ${classNames} += ${safeStringLiteral(` ${modifierClass}`)}`;
+          return `${valueIndex === 0 ? "if" : "else if"} (${keyRef} === ${safeStringLiteral(value)}) {\n  ${classNames} += ${safeStringLiteral(` ${modifierClass}`)};\n}`;
         })
-        .join("; ");
+        .join(" ");
       if (valueChecks) {
         variantChecks.push(valueChecks);
       }
     }
   }
-  const variantLogic = variantChecks.length > 0 ? variantChecks.join("; ") + "; " : "";
 
   // Note: Compound variants work through CSS specificity alone.
   // The combined selectors (e.g., .ss-btn--size-lg.ss-btn--intent-danger)
@@ -233,7 +243,7 @@ export function generateVariantReplacement(
         throw new Error(`[styled-static] Invalid HTML tag name: ${component.value}`);
       }
     } else {
-      if (!component || !isValidComponentReference(component.value)) {
+      if (!component || !isValidIdentifier(component.value)) {
         /* unreachable: component comes from a validated AST reference */
         throw new Error(`[styled-static] Invalid component name: ${component?.value}`);
       }
@@ -246,34 +256,46 @@ export function generateVariantReplacement(
         ? cls
         : `[${component.value}.className, ${cls}].filter(Boolean).join(" ")`;
 
-    return `Object.assign((${props}) => { const ${propsDestructure} = ${props}; ${styledSelectionDeclarations} ${userClassNameDeclaration} let ${classNames} = ${cls}; ${variantLogic}return ${createElement}(${componentRef}, {...${remainingProps}, className: ${mergeClassNames}(${classNames}, ${userClassName})}); }, { className: ${classNameValue} })`;
+    const body = [
+      `const ${propsDestructure} = ${props};`,
+      ...styledSelectionDeclarations,
+      userClassNameDeclaration,
+      `let ${classNames} = ${cls};`,
+      ...variantChecks,
+      `return ${createElement}(${componentRef}, {...${remainingProps}, className: ${mergeClassNames}(${classNames}, ${userClassName})});`,
+    ].join("\n");
+    return `Object.assign(
+  (${props}) => {
+${indent(body, 4)}
+  },
+  { className: ${classNameValue} },
+)`;
   }
 
   // cssVariants: returns a function that generates a class string.
-  const selectionDeclarations = variantKeys
-    .map((key, index) => {
-      const keyLiteral = safeStringLiteral(key);
-      const localName = variantValues?.[index] ?? createVariantValueName(key, index);
-      const defaultValue = variant.defaultVariants?.get(key);
-      const fallback = defaultValue === undefined ? "undefined" : safeStringLiteral(defaultValue);
-      return `const ${localName} = Object.hasOwn(variants, ${keyLiteral}) && variants[${keyLiteral}] !== undefined ? variants[${keyLiteral}] : ${fallback};`;
-    })
-    .join(" ");
-  return `(variants = {}) => { ${selectionDeclarations} let ${classNames} = ${cls}; ${variantLogic}return ${classNames}; }`;
+  const selectionDeclarations = variantKeys.map((key, index) => {
+    const localName = variantValues?.[index] ?? createVariantValueName(key, index);
+    return variantSelectionDeclaration(
+      "variants",
+      key,
+      localName,
+      variant.defaultVariants?.get(key),
+    );
+  });
+  const body = [
+    ...selectionDeclarations,
+    `let ${classNames} = ${cls};`,
+    ...variantChecks,
+    `return ${classNames};`,
+  ].join("\n");
+  return `(variants = {}) => {
+${indent(body, 2)}
+}`;
 }
 
 // ============================================================================
 // Utility
 // ============================================================================
-
-/**
- * Extract a clean, CSS-safe filename from a file path.
- * Used in dev mode to generate readable class names.
- */
-export function getFileBaseName(filePath: string): string {
-  const base = filePath.split(/[/\\]/).pop() || "unknown";
-  return toClassNameSegment(base.replace(/\.[^.]+$/, ""));
-}
 
 /**
  * Normalize file paths for consistent virtual module IDs across platforms.
@@ -292,7 +314,7 @@ export function rewriteCssImports(
   cssFileName: string,
   ast: import("estree").Program,
   format: "es" | "cjs" = "es",
-): string {
+): { code: string; map: ReturnType<MagicString["generateMap"]> } {
   const importRanges = ast.body
     .filter(
       (node): node is import("estree").ImportDeclaration =>
@@ -305,20 +327,18 @@ export function rewriteCssImports(
     .map((node) => ({
       start: (node as typeof node & { start: number }).start,
       end: (node as typeof node & { end: number }).end,
-    }))
-    .sort((left, right) => right.start - left.start);
+    }));
 
+  const output = new MagicString(code);
   for (const range of importRanges) {
-    code = code.slice(0, range.start) + code.slice(range.end);
+    output.remove(range.start, range.end);
   }
-
-  // Remove /* empty css */ comments Vite adds
-  code = code.replace(/\/\*\s*empty css\s*\*\/\s*/g, "");
 
   // Get just the filename for relative import (same directory)
   const baseName = cssFileName.split("/").pop() || cssFileName;
 
   const cssPath = safeStringLiteral(`./${baseName}`);
   const cssLink = format === "cjs" ? `require(${cssPath});` : `import ${cssPath};`;
-  return `${cssLink}\n${code}`;
+  output.prepend(`${cssLink}\n`);
+  return { code: output.toString(), map: output.generateMap({ hires: true }) };
 }

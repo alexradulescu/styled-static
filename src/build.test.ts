@@ -1,10 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { originalPositionFor, TraceMap } from "@jridgewell/trace-mapping";
 import { execFile } from "node:child_process";
 import { mkdtemp, mkdir, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
-import { build } from "vite";
+import { build, version as viteVersion } from "vite";
 import { styledStatic } from "./vite";
 
 const workspace = await realpath(await mkdtemp(join(tmpdir(), "styled-static-build-")));
@@ -38,6 +39,77 @@ async function builtCss(outDir: string): Promise<string> {
   return readFile(join(assetsDirectory, cssFile!), "utf8");
 }
 
+function generatedPositionOf(code: string, text: string): { line: number; column: number } {
+  const index = code.indexOf(text);
+  expect(index).toBeGreaterThanOrEqual(0);
+  const preceding = code.slice(0, index);
+  const lines = preceding.split("\n");
+  return { line: lines.length, column: lines.at(-1)?.length ?? 0 };
+}
+
+function expectOriginalLine(
+  sourceMap: TraceMap,
+  generatedCode: string,
+  text: string,
+  line: number,
+): void {
+  const original = originalPositionFor(sourceMap, generatedPositionOf(generatedCode, text));
+  expect(original.source).toEndWith("entry.ts");
+  expect(original.line).toBe(line);
+}
+
+function traceMapFromJson(json: string): TraceMap {
+  const sourceMap = JSON.parse(json) as { sources: string[]; mappings: string };
+  return new TraceMap(sourceMap);
+}
+
+async function traceMapFromFile(path: string): Promise<TraceMap> {
+  return traceMapFromJson(await readFile(path, "utf8"));
+}
+
+function inlineTraceMap(generatedCode: string): TraceMap {
+  const encodedMap = generatedCode.match(
+    /sourceMappingURL=data:application\/json[^\r\n,]*;base64,([^\r\n]+)/,
+  )?.[1];
+  expect(encodedMap).toBeDefined();
+  return traceMapFromJson(Buffer.from(encodedMap!, "base64").toString("utf8"));
+}
+
+async function buildSourceMapFixture(
+  name: string,
+  sourcemap: true | "inline",
+  sourcemapFileNames?: string,
+): Promise<{ generatedCode: string; outDir: string }> {
+  const root = join(workspace, name);
+  const outDir = join(root, "dist");
+  const entry = join(root, "entry.ts");
+  await write(
+    entry,
+    `import { css } from "@alex.radulescu/styled-static";
+export const marker = "source-map-marker";
+export const token = css\`color: source-map-blue;\`;`,
+  );
+
+  await build({
+    configFile: false,
+    root,
+    plugins: [styledStatic()],
+    resolve: { alias: aliases() },
+    build: {
+      lib: { entry, formats: ["es"], fileName: () => "index.mjs", cssFileName: "vite" },
+      outDir,
+      emptyOutDir: true,
+      sourcemap,
+      ...(sourcemapFileNames ? { rollupOptions: { output: { sourcemapFileNames } } } : undefined),
+    },
+  });
+
+  return {
+    generatedCode: await readFile(join(outDir, "index.mjs"), "utf8"),
+    outDir,
+  };
+}
+
 describe("real library consumption", () => {
   const libraryRoot = join(workspace, "library");
   const libraryOut = join(libraryRoot, "dist");
@@ -49,6 +121,7 @@ describe("real library consumption", () => {
     await write(
       entry,
       `import { styled } from "@alex.radulescu/styled-static";
+export const marker = "source-map-marker";
 export const LibraryButton = styled.button\`color: library-blue;\`;`,
     );
 
@@ -65,6 +138,7 @@ export const LibraryButton = styled.button\`color: library-blue;\`;`,
         },
         outDir: libraryOut,
         emptyOutDir: true,
+        sourcemap: true,
         rollupOptions: {
           external: ["react", "@alex.radulescu/styled-static/runtime"],
         },
@@ -80,8 +154,16 @@ export const LibraryButton = styled.button\`color: library-blue;\`;`,
 
   it("emits format-appropriate CSS linkage for CommonJS", async () => {
     const javascript = await readFile(libraryCommonJs, "utf8");
-    expect(javascript).toStartWith('require("./index.css");');
+    expect(javascript).toStartWith('require("./index.css")');
     expect(javascript).not.toStartWith("import ");
+  });
+
+  it("preserves source mappings after adding the CSS import", async () => {
+    const javascript = await readFile(libraryJavaScript, "utf8");
+    const traceMap = await traceMapFromFile(`${libraryJavaScript}.map`);
+
+    expectOriginalLine(traceMap, javascript, "source-map-marker", 2);
+    expectOriginalLine(traceMap, javascript, "ss-LibraryButton-", 3);
   });
 
   it("preserves CommonJS library CSS when a Vite app consumes it", async () => {
@@ -139,9 +221,72 @@ document.querySelector("#app")!.className = LibraryButton.className + " " + cons
 
       const css = await builtCss(consumerOut);
       expect(css).toContain("library-blue");
+      expect(css).not.toContain("sourceURL=");
       if (consumerUsesPlugin) expect(css).toContain("consumer-red");
     });
   }
+
+  it("links CSS when library chunk names include content hashes", async () => {
+    const hashedRoot = join(workspace, "hashed-library");
+    const hashedOut = join(hashedRoot, "dist");
+    const entry = join(hashedRoot, "entry.ts");
+    await write(
+      entry,
+      `import { css } from "@alex.radulescu/styled-static";
+export const token = css\`color: hashed-blue;\`;`,
+    );
+
+    await build({
+      configFile: false,
+      root: hashedRoot,
+      plugins: [styledStatic()],
+      resolve: { alias: aliases() },
+      build: {
+        lib: { entry, formats: ["es"], cssFileName: "vite" },
+        outDir: hashedOut,
+        emptyOutDir: true,
+        rollupOptions: {
+          output: { entryFileNames: "chunks/[name]-[hash].js" },
+        },
+      },
+    });
+
+    const chunksDirectory = join(hashedOut, "chunks");
+    const files = await readdir(chunksDirectory);
+    const javascriptFile = files.find((file) => file.endsWith(".js"));
+    expect(javascriptFile).toBeDefined();
+    const javascript = await readFile(join(chunksDirectory, javascriptFile!), "utf8");
+    const cssImport = javascript.match(/import\s*["'](.+\.css)["']/)?.[1];
+    expect(cssImport).toBeDefined();
+    expect(await readFile(resolve(chunksDirectory, cssImport!), "utf8")).toContain("hashed-blue");
+  });
+
+  it("updates inline source maps after adding the CSS import", async () => {
+    const { generatedCode } = await buildSourceMapFixture("inline-source-map-library", "inline");
+    const traceMap = inlineTraceMap(generatedCode);
+
+    expectOriginalLine(traceMap, generatedCode, "source-map-marker", 2);
+    expectOriginalLine(traceMap, generatedCode, "ss-token-", 3);
+  });
+
+  const customSourceMapTest = viteVersion.startsWith("8.0.") ? it.skip : it;
+  customSourceMapTest(
+    "updates custom-named source-map assets after adding the CSS import",
+    async () => {
+      const { generatedCode, outDir } = await buildSourceMapFixture(
+        "custom-source-map-library",
+        true,
+        "maps/[name]-custom.map",
+      );
+      const mapFiles = await readdir(join(outDir, "maps"));
+      const mapFile = mapFiles.find((file) => file.endsWith(".map"));
+      expect(mapFile).toBeDefined();
+      const traceMap = await traceMapFromFile(join(outDir, "maps", mapFile!));
+
+      expectOriginalLine(traceMap, generatedCode, "source-map-marker", 2);
+      expectOriginalLine(traceMap, generatedCode, "ss-token-", 3);
+    },
+  );
 });
 
 describe("published package", () => {

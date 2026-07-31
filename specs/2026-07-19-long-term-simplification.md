@@ -164,7 +164,7 @@ Inside `styledVariants` and `cssVariants`, require `css\`...\`` for base, value,
     "vite": "^8.0.0"
   },
   "engines": {
-    "node": ">=24.0.0"
+    "node": "^20.19.0 || >=22.12.0"
   }
 }
 ```
@@ -467,7 +467,7 @@ Run dependency audits after workspace consolidation and document that CSS templa
 
 ### 3. Narrow package and plugin configuration
 
-- Set Vite 8, React 19, and Node 24 requirements.
+- Set Vite 8, React 19, and Vite's supported Node requirements.
 - Remove plugin options and validation.
 - Add one environment-controlled logger.
 - Make application/library selection automatic.
@@ -543,7 +543,7 @@ Run dependency audits after workspace consolidation and document that CSS templa
 - The agreed public interface is fully documented and tested.
 - Removed interfaces cannot silently survive untransformed.
 - `styledStatic()` has no options.
-- Vite 8 and Node 24 are the only promised build platform.
+- Vite 8 and its supported Node range are the only promised build platform.
 - Direct and library consumption work automatically.
 - HMR remains precise and source-traceable.
 - Theme policy is absent from package runtime and covered by a complete recipe.

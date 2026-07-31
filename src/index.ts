@@ -209,8 +209,8 @@ export function globalCss(
  */
 export function cx(...args: (string | false | null | undefined)[]): string {
   let result = "";
-  for (const a of args) {
-    if (a) result = result ? `${result} ${a}` : a;
+  for (const className of args) {
+    if (className) result = result ? `${result} ${className}` : className;
   }
   return result;
 }

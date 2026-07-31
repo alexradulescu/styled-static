@@ -12,7 +12,7 @@
  * ## `mergeClassNames`
  *
  * Merges the styled component's base class with any user-provided className.
- * Order: base class first, user class last (allows user to override).
+ * Order: base class first, user class last.
  *
  * @example
  * mergeClassNames("ss-btn", undefined)     // → "ss-btn"
