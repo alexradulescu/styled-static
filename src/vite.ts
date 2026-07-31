@@ -204,7 +204,7 @@ export function styledStatic(): Plugin {
           styles.set(style.moduleId, { css: style.css, sourceFile: filePath });
         }
         debug("compiled:", id, `${result.styles.length} style module(s)`);
-        return { code: result.code, map: result.map };
+        return { code: result.code, map: result.map.toString() };
       },
     },
 

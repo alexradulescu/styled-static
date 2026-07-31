@@ -3,7 +3,13 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseSync } from "rolldown/utils";
-import { createServer, type Plugin } from "vite";
+import {
+  createServer,
+  type Plugin,
+  type PrunePayload,
+  type UpdatePayload,
+  type ViteDevServer,
+} from "vite";
 import { rewriteCssImports } from "./codegen";
 import { compile } from "./compiler";
 import { hash } from "./hash";
@@ -61,6 +67,30 @@ function loadCss(plugin: Plugin, transformed: string): string {
   return cssImports(transformed)
     .map((id) => String(load(plugin, `\0${id}`)))
     .join("\n");
+}
+
+function virtualStyleId(transformed: string): string {
+  const id = transformed.match(/virtual:styled-static\/[^"'?]+\.css/)?.[0];
+  expect(id).toBeDefined();
+  return id!;
+}
+
+type ExpectedHotPayload<T extends "update" | "prune"> = T extends "update"
+  ? UpdatePayload
+  : PrunePayload;
+
+function nextVitePayload<T extends "update" | "prune">(
+  server: ViteDevServer,
+  type: T,
+): Promise<ExpectedHotPayload<T>> {
+  return new Promise((resolvePayload, reject) => {
+    const timeout = setTimeout(() => reject(new Error(`Vite HMR ${type} timed out`)), 5_000);
+    server.environments.client.hot.send = (payload) => {
+      if (payload.type !== type) return;
+      clearTimeout(timeout);
+      resolvePayload(payload as ExpectedHotPayload<T>);
+    };
+  });
 }
 
 describe("public plugin contract", () => {
@@ -514,7 +544,7 @@ const Box = styled.div\`color: blue;\`;`,
 });
 
 describe("Vite lifecycle", () => {
-  it("lets Vite own development style injection and CSS HMR", async () => {
+  it("lets Vite own development style injection, updates, and removal", async () => {
     const entry = "/project/entry.ts";
     let source = `import { css } from "${PACKAGE}";
 export const token = css\`color:integration-red;\`;`;
@@ -548,25 +578,16 @@ export const token = css\`color:integration-red;\`;`;
 
     try {
       const firstEntry = await server.environments.client.transformRequest("/entry.ts");
-      const styleModule = Array.from(
-        server.environments.client.moduleGraph.idToModuleMap.values(),
-      ).find((module) => module.id?.startsWith("\0virtual:styled-static/"));
-      expect(styleModule).toBeDefined();
+      const styleId = virtualStyleId(firstEntry!.code);
 
-      const firstStyle = await server.environments.client.transformRequest(styleModule!.url);
+      const firstStyle = await server.environments.client.transformRequest(styleId);
       expect(firstStyle?.code).toContain("integration-red");
-      expect(firstStyle?.code).toContain("__vite__updateStyle");
-      expect(firstStyle?.code).toContain("__vite__removeStyle");
+      expect(firstStyle?.code).toContain('from "/@vite/client"');
+      expect(firstStyle?.code).toContain("import.meta.hot.accept()");
+      expect(firstStyle?.code).toContain("import.meta.hot.prune(");
       expect(firstStyle?.code).toContain("sourceURL=/project/entry.ts");
 
-      const update = new Promise<{ updates: Array<{ path: string }> }>((resolveUpdate, reject) => {
-        const timeout = setTimeout(() => reject(new Error("Vite HMR update timed out")), 5_000);
-        server.environments.client.hot.send = (payload) => {
-          if (payload.type !== "update") return;
-          clearTimeout(timeout);
-          resolveUpdate(payload);
-        };
-      });
+      const update = nextVitePayload(server, "update");
 
       source = `import { css } from "${PACKAGE}";
 export const token = css\`color:integration-blue;\`;`;
@@ -578,12 +599,28 @@ export const token = css\`color:integration-blue;\`;`;
       );
 
       const secondEntry = await server.environments.client.transformRequest("/entry.ts");
-      const secondStyle = await server.environments.client.transformRequest(styleModule!.url);
+      const secondStyle = await server.environments.client.transformRequest(styleId);
       expect(secondStyle?.code).toContain("integration-blue");
       expect(secondStyle?.code).not.toContain("integration-red");
       expect(secondEntry?.code.match(/ss-token-[a-z0-9]+/)?.[0]).toBe(
         firstEntry?.code.match(/ss-token-[a-z0-9]+/)?.[0],
       );
+
+      const removal = nextVitePayload(server, "update");
+      source = `import { css } from "${PACKAGE}";
+export const token = "plain";`;
+      server.watcher.emit("change", entry);
+
+      const removalPayload = await removal;
+      expect(
+        removalPayload.updates.some(({ path }) => path.includes("virtual:styled-static/")),
+      ).toBe(true);
+
+      const pruning = nextVitePayload(server, "prune");
+      const finalEntry = await server.environments.client.transformRequest("/entry.ts");
+      const prunePayload = await pruning;
+      expect(finalEntry?.code).not.toContain("virtual:styled-static/");
+      expect(prunePayload.paths.some((path) => path.includes("virtual:styled-static/"))).toBe(true);
     } finally {
       await server.close();
     }
